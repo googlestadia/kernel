@@ -746,6 +746,8 @@ check: $(OUTPUT)common-cmds.h
 	fi
 
 ### Installation rules
+# GOOGLE: Modified some rules to better fit the system.
+# GOOGLE: bash completions moved to $(sharedir)/bash-completion/completions
 
 ifndef NO_GTK2
 install-gtk: $(OUTPUT)libperf-gtk.so
@@ -810,8 +812,8 @@ ifndef NO_LIBPYTHON
 		$(INSTALL) scripts/python/bin/* -t '$(DESTDIR_SQ)$(perfexec_instdir_SQ)/scripts/python/bin'
 endif
 	$(call QUIET_INSTALL, perf_completion-script) \
-		$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(sysconfdir_SQ)/bash_completion.d'; \
-		$(INSTALL) perf-completion.sh '$(DESTDIR_SQ)$(sysconfdir_SQ)/bash_completion.d/perf'
+		$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(sharedir)/bash-completion/completions'; \
+		$(INSTALL) perf-completion.sh '$(DESTDIR_SQ)$(sharedir)/bash-completion/completions/perf'
 	$(call QUIET_INSTALL, perf-tip) \
 		$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(tip_instdir_SQ)'; \
 		$(INSTALL) Documentation/tips.txt -t '$(DESTDIR_SQ)$(tip_instdir_SQ)'
