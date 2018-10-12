@@ -748,6 +748,11 @@ static int drm_atomic_connector_check(struct drm_connector *connector,
 {
 	struct drm_crtc_state *crtc_state;
 	struct drm_writeback_job *writeback_job = state->writeback_job;
+	const struct drm_display_info *info = &connector->display_info;
+
+	state->max_bpc = info->bpc ? info->bpc : 8;
+	if (connector->max_bpc_property)
+		state->max_bpc = min(state->max_bpc, state->max_requested_bpc);
 
 	if ((connector->connector_type != DRM_MODE_CONNECTOR_WRITEBACK) || !writeback_job)
 		return 0;
@@ -1425,6 +1430,8 @@ static int drm_atomic_connector_set_property(struct drm_connector *connector,
 
 		return set_out_fence_for_connector(state->state, connector,
 						   fence_ptr);
+	} else if (property == connector->max_bpc_property) {
+	        state->max_requested_bpc = val;
 	} else if (connector->funcs->atomic_set_property) {
 		return connector->funcs->atomic_set_property(connector,
 				state, property, val);
@@ -1520,6 +1527,8 @@ drm_atomic_connector_get_property(struct drm_connector *connector,
 		*val = 0;
 	} else if (property == config->writeback_out_fence_ptr_property) {
 		*val = 0;
+	} else if (property == connector->max_bpc_property) {
+	        *val = state->max_requested_bpc;
 	} else if (connector->funcs->atomic_get_property) {
 		return connector->funcs->atomic_get_property(connector,
 				state, property, val);
