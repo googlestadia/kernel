@@ -375,4 +375,47 @@ void amdgpu_virt_init_data_exchange(struct amdgpu_device *adev)
 	}
 }
 
+void amdgpu_virt_init_reg_access_mode(struct amdgpu_device *adev)
+{
+	struct amdgpu_virt *virt = &adev->virt;
 
+	if (virt->ops && virt->ops->init_reg_access_mode)
+		virt->ops->init_reg_access_mode(adev);
+
+}
+
+bool amdgpu_virt_support_psp_prg_ih_reg(struct amdgpu_device *adev)
+{
+	bool ret = false;
+	struct amdgpu_virt *virt = &adev->virt;
+
+	if (amdgpu_sriov_vf(adev)
+		&& (virt->reg_access_mode & AMDGPU_VIRT_REG_ACCESS_PSP_PRG_IH))
+		ret = true;
+
+	return ret;
+}
+
+bool amdgpu_virt_support_rlc_prg_reg(struct amdgpu_device *adev)
+{
+	bool ret = false;
+	struct amdgpu_virt *virt = &adev->virt;
+
+	if (amdgpu_sriov_vf(adev)
+		&& (virt->reg_access_mode & AMDGPU_VIRT_REG_ACCESS_RLC))
+		ret = true;
+
+	return ret;
+}
+
+bool amdgpu_virt_support_skip_setting(struct amdgpu_device *adev)
+{
+	bool ret = false;
+	struct amdgpu_virt *virt = &adev->virt;
+
+	if (amdgpu_sriov_vf(adev)
+		&& (virt->reg_access_mode & AMDGPU_VIRT_REG_SKIP_SEETING))
+		ret = true;
+
+	return ret;
+}
