@@ -929,6 +929,14 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 				&replaced);
 		state->color_mgmt_changed |= replaced;
 		return ret;
+	} else if (property == plane->ctm_property) {
+		ret = drm_atomic_replace_property_blob_from_id(dev,
+						&state->ctm,
+						val,
+						sizeof(struct drm_color_ctm), -1,
+						&replaced);
+		state->color_mgmt_changed |= replaced;
+		return ret;
 	} else if (plane->funcs->atomic_set_property) {
 		return plane->funcs->atomic_set_property(plane, state,
 				property, val);
@@ -1002,6 +1010,8 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
 	} else if (property == plane->degamma_lut_property) {
 		*val = (state->degamma_lut) ?
 			state->degamma_lut->base.id : 0;
+	} else if (property == plane->ctm_property) {
+		*val = (state->ctm) ? state->ctm->base.id : 0;
 	} else if (plane->funcs->atomic_get_property) {
 		return plane->funcs->atomic_get_property(plane, state, property, val);
 	} else {
