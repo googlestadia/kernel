@@ -434,6 +434,15 @@ const char *drm_get_color_range_name(enum drm_color_range range)
  *	Blob property which allows a userspace to provide CTM coefficients
  *	to do color space conversion or any other enhancement by doing a
  *	matrix multiplication using the h/w CTM processing engine
+ *
+ * gamma_lut_property:
+ *	Blob property which allows a userspace to provide LUT values
+ *	to apply gamma/tone-mapping curve using the h/w plane gamma
+ *	processing engine, thereby making the content as non-linear
+ *	or to perform any tone mapping operation for HDR usecases.
+ *
+ * gamma_lut_size_property:
+ *	Range Property to indicate size of the plane gamma LUT.
  */
 int drm_plane_color_create_prop(struct drm_device *dev,
 				struct drm_plane *plane)
@@ -458,6 +467,19 @@ int drm_plane_color_create_prop(struct drm_device *dev,
 	if (!prop)
 		return -ENOMEM;
 	plane->ctm_property = prop;
+
+	prop = drm_property_create(dev, DRM_MODE_PROP_BLOB,
+				   "PLANE_GAMMA_LUT", 0);
+	if (!prop)
+		return -ENOMEM;
+	plane->gamma_lut_property = prop;
+
+	prop = drm_property_create_range(dev, DRM_MODE_PROP_IMMUTABLE,
+					 "PLANE_GAMMA_LUT_SIZE", 0,
+					 UINT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	plane->gamma_lut_size_property = prop;
 
 	return 0;
 }
