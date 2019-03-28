@@ -486,6 +486,48 @@ int drm_plane_color_create_prop(struct drm_device *dev,
 EXPORT_SYMBOL(drm_plane_color_create_prop);
 
 /**
+ * drm_plane_enable_color_mgmt - enable color management properties
+ * @plane: DRM Plane
+ * @plane_degamma_lut_size: the size of the degamma lut (before CSC)
+ * @plane_has_ctm: whether to attach ctm_property for CSC matrix
+ * @plane_gamma_lut_size: the size of the gamma lut (after CSC)
+ *
+ * This function lets the driver enable the color correction
+ * properties on a plane. This includes 3 degamma, csc and gamma
+ * properties that userspace can set and 2 size properties to inform
+ * the userspace of the lut sizes. Each of the properties are
+ * optional. The gamma and degamma properties are only attached if
+ * their size is not 0 and ctm_property is only attached if has_ctm is
+ * true.
+ */
+void drm_plane_enable_color_mgmt(struct drm_plane *plane,
+				 u32 plane_degamma_lut_size,
+				 bool plane_has_ctm,
+				 u32 plane_gamma_lut_size)
+{
+	if (plane_degamma_lut_size) {
+		drm_object_attach_property(&plane->base,
+					   plane->degamma_lut_property, 0);
+		drm_object_attach_property(&plane->base,
+					   plane->degamma_lut_size_property,
+					   plane_degamma_lut_size);
+	}
+
+	if (plane_has_ctm)
+		drm_object_attach_property(&plane->base,
+					   plane->ctm_property, 0);
+
+	if (plane_gamma_lut_size) {
+		drm_object_attach_property(&plane->base,
+					   plane->gamma_lut_property, 0);
+		drm_object_attach_property(&plane->base,
+					   plane->gamma_lut_size_property,
+					   plane_gamma_lut_size);
+	}
+}
+EXPORT_SYMBOL(drm_plane_enable_color_mgmt);
+
+/**
  * drm_plane_create_color_properties - color encoding related plane properties
  * @plane: plane object
  * @supported_encodings: bitfield indicating supported color encodings

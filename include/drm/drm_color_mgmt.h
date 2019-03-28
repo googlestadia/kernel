@@ -39,6 +39,11 @@ void drm_crtc_enable_color_mgmt(struct drm_crtc *crtc,
 int drm_mode_crtc_set_gamma_size(struct drm_crtc *crtc,
 				 int gamma_size);
 
+void drm_plane_enable_color_mgmt(struct drm_plane *plane,
+				 u32 plane_degamma_lut_size,
+				 bool plane_has_ctm,
+				 u32 plane_gamma_lut_size);
+
 /**
  * drm_color_lut_size - calculate the number of entries in the LUT
  * @blob: blob containing the LUT
