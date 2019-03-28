@@ -192,6 +192,15 @@ struct drm_plane_state {
 	struct drm_property_blob *ctm;
 
 	/**
+	 * @gamma_lut:
+	 *
+	 * Lookup table for converting pixel data after the color conversion
+	 * matrix @ctm.  See drm_plane_enable_color_mgmt(). The blob (if not
+	 * NULL) is an array of &struct drm_color_lut_ext.
+	 */
+	struct drm_property_blob *gamma_lut;
+
+	/**
 	 * @commit: Tracks the pending commit to prevent use-after-free conditions,
 	 * and for async plane updates.
 	 *
@@ -722,6 +731,19 @@ struct drm_plane {
 	 * degamma LUT.
 	 */
 	struct drm_property *ctm_property;
+
+	/**
+	 * @plane_gamma_lut_property: Optional Plane property to set the LUT
+	 * used to convert the colors, after the CTM matrix, to the common
+	 * gamma space chosen for blending.
+	 */
+	struct drm_property *gamma_lut_property;
+
+	/**
+	 * @plane_gamma_lut_size_property: Optional Plane property for the size
+	 * of the gamma LUT as supported by the driver (read-only).
+	 */
+	struct drm_property *gamma_lut_size_property;
 };
 
 #define obj_to_plane(x) container_of(x, struct drm_plane, base)
