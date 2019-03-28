@@ -128,6 +128,26 @@ uint32_t drm_color_lut_extract(uint32_t user_input, uint32_t bit_precision)
 }
 EXPORT_SYMBOL(drm_color_lut_extract);
 
+/*
+ * Added to accommodate enhanced LUT precision.
+ * Max LUT precision is 32 bits.
+ */
+u64 drm_color_lut_extract_ext(u64 user_input, u32 bit_precision)
+{
+	u64 val = user_input & 0xffffffff;
+	u32 max = 0xffffffff >> (32 - bit_precision);
+
+	/* Round only if we're not using full precision. */
+	if (bit_precision < 32) {
+		val += 1UL << (32 - bit_precision - 1);
+		val >>= 32 - bit_precision;
+	}
+
+	return ((user_input & 0xffffffff00000000) |
+		clamp_val(val, 0, max));
+}
+EXPORT_SYMBOL(drm_color_lut_extract_ext);
+
 /**
  * drm_crtc_enable_color_mgmt - enable color management properties
  * @crtc: DRM CRTC
