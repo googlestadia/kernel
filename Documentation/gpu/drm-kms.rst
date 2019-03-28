@@ -641,6 +641,9 @@ Plane Color Management Properties
 .. kernel-doc:: drivers/gpu/drm/drm_color_mgmt.c
    :doc: export
 
+.. kernel-doc:: drivers/gpu/drm/drm_color_mgmt.c
+   :doc: ctm_property
+
 Tile Group Property
 -------------------
 
