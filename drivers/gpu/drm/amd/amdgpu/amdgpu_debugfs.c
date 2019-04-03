@@ -135,7 +135,8 @@ static int  amdgpu_debugfs_process_reg_op(bool read, struct file *f,
 		return -EINVAL;
 
 	/* force skip KIQ for debug purpose */
-	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 
 	/* are we reading registers for which a PG lock is necessary? */
 	pm_pg_lock = (*pos >> 23) & 1;
@@ -168,7 +169,8 @@ static int  amdgpu_debugfs_process_reg_op(bool read, struct file *f,
 	if (use_bank) {
 		if ((sh_bank != 0xFFFFFFFF && sh_bank >= adev->gfx.config.max_sh_per_se) ||
 		    (se_bank != 0xFFFFFFFF && se_bank >= adev->gfx.config.max_shader_engines)) {
-			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+			if (amdgpu_sriov_vf(adev))
+				adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 			return -EINVAL;
 		}
 		mutex_lock(&adev->grbm_idx_mutex);
@@ -216,7 +218,8 @@ end:
 	if (pm_pg_lock)
 		mutex_unlock(&adev->pm.mutex);
 
-	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -261,7 +264,8 @@ static ssize_t amdgpu_debugfs_regs_pcie_read(struct file *f, char __user *buf,
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
 
-	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 
 	while (size) {
 		uint32_t value;
@@ -280,7 +284,8 @@ static ssize_t amdgpu_debugfs_regs_pcie_read(struct file *f, char __user *buf,
 	}
 
 _exit:
-	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -305,8 +310,8 @@ static ssize_t amdgpu_debugfs_regs_pcie_write(struct file *f, const char __user 
 
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
-
-	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 
 	while (size) {
 		uint32_t value;
@@ -326,7 +331,8 @@ static ssize_t amdgpu_debugfs_regs_pcie_write(struct file *f, const char __user 
 	}
 
 _exit:
-	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -351,8 +357,8 @@ static ssize_t amdgpu_debugfs_regs_didt_read(struct file *f, char __user *buf,
 
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
-
-	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 
 	while (size) {
 		uint32_t value;
@@ -371,7 +377,8 @@ static ssize_t amdgpu_debugfs_regs_didt_read(struct file *f, char __user *buf,
 	}
 
 _exit:
-	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -396,8 +403,8 @@ static ssize_t amdgpu_debugfs_regs_didt_write(struct file *f, const char __user 
 
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
-
-	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 
 	while (size) {
 		uint32_t value;
@@ -417,7 +424,8 @@ static ssize_t amdgpu_debugfs_regs_didt_write(struct file *f, const char __user 
 	}
 
 _exit:
-	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -442,8 +450,8 @@ static ssize_t amdgpu_debugfs_regs_smc_read(struct file *f, char __user *buf,
 
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
-
-	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 
 	while (size) {
 		uint32_t value;
@@ -462,7 +470,8 @@ static ssize_t amdgpu_debugfs_regs_smc_read(struct file *f, char __user *buf,
 	}
 
 _exit:
-	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -488,7 +497,8 @@ static ssize_t amdgpu_debugfs_regs_smc_write(struct file *f, const char __user *
 	if (size & 0x3 || *pos & 0x3)
 		return -EINVAL;
 
-	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 
 	while (size) {
 		uint32_t value;
@@ -508,7 +518,8 @@ static ssize_t amdgpu_debugfs_regs_smc_write(struct file *f, const char __user *
 	}
 
 _exit:
-	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -685,7 +696,8 @@ static ssize_t amdgpu_debugfs_wave_read(struct file *f, char __user *buf,
 	if (size & 3 || *pos & 3)
 		return -EINVAL;
 
-	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 
 	/* decode offset */
 	offset = (*pos & GENMASK_ULL(6, 0));
@@ -707,7 +719,8 @@ static ssize_t amdgpu_debugfs_wave_read(struct file *f, char __user *buf,
 	mutex_unlock(&adev->grbm_idx_mutex);
 
 	if (!x) {
-		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+		if (amdgpu_sriov_vf(adev))
+			adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 		return -EINVAL;
 	}
 
@@ -724,8 +737,8 @@ static ssize_t amdgpu_debugfs_wave_read(struct file *f, char __user *buf,
 		offset += 4;
 		size -= 4;
 	}
-
-	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
@@ -775,8 +788,8 @@ static ssize_t amdgpu_debugfs_gpr_read(struct file *f, char __user *buf,
 	data = kmalloc_array(1024, sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
-
-	adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps &= ~AMDGPU_SRIOV_CAPS_RUNTIME;
 
 	/* switch to the specific se/sh/cu */
 	mutex_lock(&adev->grbm_idx_mutex);
@@ -810,7 +823,8 @@ static ssize_t amdgpu_debugfs_gpr_read(struct file *f, char __user *buf,
 
 err:
 	kfree(data);
-	adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
+	if (amdgpu_sriov_vf(adev))
+		adev->virt.caps |= AMDGPU_SRIOV_CAPS_RUNTIME;
 	return result;
 }
 
