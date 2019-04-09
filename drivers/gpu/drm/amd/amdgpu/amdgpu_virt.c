@@ -419,3 +419,12 @@ bool amdgpu_virt_support_skip_setting(struct amdgpu_device *adev)
 
 	return ret;
 }
+
+void amdgpu_virt_adjust_ip_init_order(struct amdgpu_device *adev,
+		const char *first, const char *second)
+{
+	struct amdgpu_virt *virt = &adev->virt;
+
+	if (virt->ops && virt->ops->adjust_ip_init_order)
+		virt->ops->adjust_ip_init_order(adev, first, second);
+}

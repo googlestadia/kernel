@@ -64,6 +64,8 @@ struct amdgpu_virt_ops {
 	int (*wait_reset)(struct amdgpu_device *adev);
 	void (*trans_msg)(struct amdgpu_device *adev, u32 req, u32 data1, u32 data2, u32 data3);
 	void (*init_reg_access_mode)(struct amdgpu_device *adev);
+	void (*adjust_ip_init_order)(struct amdgpu_device *adev, const char *first,
+			const char *second);
 };
 
 /*
@@ -307,5 +309,6 @@ void amdgpu_virt_init_reg_access_mode(struct amdgpu_device *adev);
 bool amdgpu_virt_support_psp_prg_ih_reg(struct amdgpu_device *adev);
 bool amdgpu_virt_support_rlc_prg_reg(struct amdgpu_device *adev);
 bool amdgpu_virt_support_skip_setting(struct amdgpu_device *adev);
-
+void amdgpu_virt_adjust_ip_init_order(struct amdgpu_device *adev,
+					const char *first, const char *second);
 #endif

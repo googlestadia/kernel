@@ -250,5 +250,6 @@ int psp_ras_enable_features(struct psp_context *psp,
 		union ta_ras_cmd_input *info, bool enable);
 
 extern const struct amdgpu_ip_block_version psp_v11_0_ip_block;
+int psp_ih_program(struct psp_context *psp, uint32_t reg, uint32_t value);
 
 #endif

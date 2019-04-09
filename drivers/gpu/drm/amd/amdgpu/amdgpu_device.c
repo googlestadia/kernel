@@ -1535,6 +1535,12 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 
 		/* query the reg access mode at the very beginning */
 		amdgpu_virt_init_reg_access_mode(adev);
+
+		/* If fw support psp to program IH,
+		 * then PSP module must be initialized before IH
+		 */
+		if (amdgpu_virt_support_psp_prg_ih_reg(adev))
+			amdgpu_virt_adjust_ip_init_order(adev, "PSP", "IH");
 	}
 
 	adev->pm.pp_feature = amdgpu_pp_feature_mask;
@@ -1580,13 +1586,15 @@ static int amdgpu_device_ip_hw_init_phase1(struct amdgpu_device *adev)
 		if (adev->ip_blocks[i].status.hw)
 			continue;
 		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_COMMON ||
-		    adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_IH) {
-			r = adev->ip_blocks[i].version->funcs->hw_init(adev);
-			if (r) {
-				DRM_ERROR("hw_init of IP block <%s> failed %d\n",
-					  adev->ip_blocks[i].version->funcs->name, r);
-				return r;
-			}
+			adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_IH ||
+			((adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_PSP) &&
+			amdgpu_virt_support_psp_prg_ih_reg(adev))) {
+				r = adev->ip_blocks[i].version->funcs->hw_init(adev);
+				if (r) {
+					DRM_ERROR("hw_init of IP block <%s> failed %d\n",
+						  adev->ip_blocks[i].version->funcs->name, r);
+					return r;
+				}
 			adev->ip_blocks[i].status.hw = true;
 		}
 	}

@@ -370,6 +370,55 @@ void xgpu_ai_mailbox_put_irq(struct amdgpu_device *adev)
 	amdgpu_irq_put(adev, &adev->virt.rcv_irq, 0);
 }
 
+static const struct amdgpu_ip_block_version *get_ip(struct amdgpu_device *adev,
+		const char *name)
+{
+	/* currently only support adjustment for Vega10 PSP and IH */
+	if (adev->asic_type == CHIP_VEGA10) {
+		if (!strcmp(name, "PSP"))
+			return &psp_v3_1_ip_block;
+		else if (!strcmp(name, "IH"))
+			return &vega10_ih_ip_block;
+	}
+
+	return NULL;
+}
+
+static void xgpu_ai_adjust_ip_init_order(struct amdgpu_device *adev,
+		const char *first, const char *second)
+{
+	int i = 0;
+	int id_first = -1;
+	int id_second = -1;
+
+	const struct amdgpu_ip_block_version *ip_first = get_ip(adev, first);
+	const struct amdgpu_ip_block_version *ip_second = get_ip(adev, second);
+
+	if (!ip_first || !ip_second) {
+		DRM_WARN("Not supported blocks %s and %s\n", first, second);
+		return;
+	}
+
+	for (i = 0; i < adev->num_ip_blocks; i++) {
+		const struct amdgpu_ip_block_version *ip = adev->ip_blocks[i].version;
+		if (ip == ip_first)
+			id_first = i;
+		else if (ip == ip_second)
+			id_second = i;
+
+		/* found the original position of the two ips */
+		if ((id_first != -1) && (id_second != -1))
+			break;
+	}
+
+	/* swap if needed */
+	if ((id_first != -1) && (id_second != -1) && id_first > id_second) {
+		adev->ip_blocks[id_first].version = ip_second;
+		adev->ip_blocks[id_second].version = ip_first;
+		DRM_INFO("Adjust vega10 ih and psp!\n");
+	}
+}
+
 void xgpu_ai_init_reg_access_mode(struct amdgpu_device *adev)
 {
 	uint32_t rlc_fw_ver = RREG32_SOC15(GC, 0, mmRLC_GPM_GENERAL_6);
@@ -394,4 +443,5 @@ const struct amdgpu_virt_ops xgpu_ai_virt_ops = {
 	.wait_reset = NULL,
 	.trans_msg = xgpu_ai_mailbox_trans_msg,
 	.init_reg_access_mode = xgpu_ai_init_reg_access_mode,
+	.adjust_ip_init_order = xgpu_ai_adjust_ip_init_order,
 };

@@ -32,6 +32,8 @@
 #include "psp_v3_1.h"
 #include "psp_v10_0.h"
 #include "psp_v11_0.h"
+#include "oss/osssys_4_0_offset.h"
+#include "oss/osssys_4_0_sh_mask.h"
 
 static void psp_set_funcs(struct amdgpu_device *adev);
 
@@ -280,6 +282,48 @@ static int psp_asd_load(struct psp_context *psp)
 
 	ret = psp_cmd_submit_buf(psp, NULL, cmd,
 				 psp->fence_buf_mc_addr);
+
+	kfree(cmd);
+
+	return ret;
+}
+
+static void psp_prep_ih_prog_cmd_buf(struct psp_gfx_cmd_resp *cmd,
+				     enum ih_reg_id id, uint32_t value)
+{
+	cmd->cmd_id = GFX_CMD_ID_GBR_IH_REG;
+	cmd->cmd.cmd_setup_ih_reg.reg_value = value;
+	cmd->cmd.cmd_setup_ih_reg.reg_id = id;
+}
+
+int psp_ih_program(struct psp_context *psp, uint32_t reg, uint32_t value)
+{
+	int ret;
+	enum ih_reg_id id;
+	struct psp_gfx_cmd_resp *cmd = NULL;
+
+	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
+	if (!cmd)
+		return -ENOMEM;
+
+	switch (reg) {
+	case mmIH_RB_CNTL:
+		id = IH_RB_CNTL;
+		break;
+	case mmIH_RB_CNTL_RING1:
+		id = IH_RB_CNTL_RING1;
+		break;
+	case mmIH_RB_CNTL_RING2:
+		id = IH_RB_CNTL_RING2;
+		break;
+	default:
+		kfree(cmd);
+		return -EINVAL;
+	}
+
+	psp_prep_ih_prog_cmd_buf(cmd, id, value);
+
+	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
 
 	kfree(cmd);
 

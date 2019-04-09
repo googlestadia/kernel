@@ -94,6 +94,7 @@ enum psp_gfx_cmd_id
     GFX_CMD_ID_SAVE_RESTORE = 0x00000008,   /* save/restore HW IP FW */
     GFX_CMD_ID_SETUP_VMR    = 0x00000009,   /* setup VMR region */
     GFX_CMD_ID_DESTROY_VMR  = 0x0000000A,   /* destroy VMR region */
+	GFX_CMD_ID_GBR_IH_REG   = 0x0000000B,   /* set Gbr IH RB CNTL */
 };
 
 
@@ -217,6 +218,19 @@ struct psp_gfx_cmd_save_restore_ip_fw
     enum psp_gfx_fw_type    fw_type;              /* FW type */
 };
 
+/* IH registers ID for PSP programming */
+enum ih_reg_id {
+	IH_RB_CNTL       = 0,            /* register IH_RB_CNTL */
+	IH_RB_CNTL_RING1  = 1,            /* register IH_RB_CNTL_RING1 */
+	IH_RB_CNTL_RING2  = 2             /* register IH_RB_CNTL_RING2 */
+};
+
+/* Command to setup IH register */
+struct psp_gfx_cmd_ih_reg {
+	uint32_t                reg_value;
+	enum ih_reg_id          reg_id;
+};
+
 /* All GFX ring buffer commands. */
 union psp_gfx_commands
 {
@@ -226,6 +240,7 @@ union psp_gfx_commands
     struct psp_gfx_cmd_setup_tmr        cmd_setup_tmr;
     struct psp_gfx_cmd_load_ip_fw       cmd_load_ip_fw;
     struct psp_gfx_cmd_save_restore_ip_fw cmd_save_restore_ip_fw;
+	struct psp_gfx_cmd_ih_reg       cmd_setup_ih_reg;
 };
 
 
