@@ -249,6 +249,17 @@ function build_boot_disk() {
     "${INITRD_NAME}"
   dd if=/usr/lib/syslinux/mbr/mbr.bin of="${BOOT_DISK}" conv=notrunc
   pigz --keep --force "${BOOT_DISK}"
+  cat >"${BOOT_DISK}-pkgdef" <<EOL
+pkgdef mpm = {
+  package_name = 'chrome/cloudcast/kernel/gamelet_disk_test_${USER}'
+  source = [
+    {
+      source_file = '${BOOT_DISK}'
+      package_path = 'disk.raw'
+    },
+  ]
+}
+EOL
 }
 
 function build_perf() {
