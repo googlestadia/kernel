@@ -66,6 +66,8 @@ struct amdgpu_virt_ops {
 	void (*init_reg_access_mode)(struct amdgpu_device *adev);
 	void (*adjust_ip_init_order)(struct amdgpu_device *adev, const char *first,
 			const char *second);
+	int (*get_pp_clk)(struct amdgpu_device *adev, u32 type, char *buf);
+	int (*force_dpm_level)(struct amdgpu_device *adev, u32 level);
 };
 
 /*
@@ -92,6 +94,8 @@ enum AMDGIM_FEATURE_FLAG {
 	AMDGIM_FEATURE_GIM_LOAD_UCODES   = 0x2,
 	/* VRAM LOST by GIM */
 	AMDGIM_FEATURE_GIM_FLR_VRAMLOST = 0x4,
+	/* HW PERF SIM in GIM */
+	AMDGIM_FEATURE_HW_PERF_SIMULATION = (1 << 3),
 };
 
 struct amd_sriov_msg_pf2vf_info_header {
@@ -262,6 +266,8 @@ struct amdgpu_virt {
 	struct amdgpu_virt_fw_reserve	fw_reserve;
 	uint32_t gim_feature;
 	uint32_t reg_access_mode;
+	/* protect DPM events to GIM */
+	struct mutex                    dpm_mutex;
 };
 
 #define amdgpu_sriov_enabled(adev) \
@@ -288,6 +294,9 @@ static inline bool is_virtual_machine(void)
 #endif
 }
 
+#define amdgim_is_hwperf(adev) \
+	((adev)->virt.gim_feature & AMDGIM_FEATURE_HW_PERF_SIMULATION)
+
 bool amdgpu_virt_mmio_blocked(struct amdgpu_device *adev);
 void amdgpu_virt_init_setting(struct amdgpu_device *adev);
 uint32_t amdgpu_virt_kiq_rreg(struct amdgpu_device *adev, uint32_t reg);
@@ -311,4 +320,6 @@ bool amdgpu_virt_support_rlc_prg_reg(struct amdgpu_device *adev);
 bool amdgpu_virt_support_skip_setting(struct amdgpu_device *adev);
 void amdgpu_virt_adjust_ip_init_order(struct amdgpu_device *adev,
 					const char *first, const char *second);
+uint32_t amdgpu_virt_get_sclk(struct amdgpu_device *adev, bool lowest);
+uint32_t amdgpu_virt_get_mclk(struct amdgpu_device *adev, bool lowest);
 #endif
