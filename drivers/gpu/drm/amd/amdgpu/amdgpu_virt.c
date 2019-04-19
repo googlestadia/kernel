@@ -402,8 +402,10 @@ bool amdgpu_virt_support_rlc_prg_reg(struct amdgpu_device *adev)
 	bool ret = false;
 	struct amdgpu_virt *virt = &adev->virt;
 
+	/* Only call RLC to program registers during initialization */
 	if (amdgpu_sriov_vf(adev)
-		&& (virt->reg_access_mode & AMDGPU_VIRT_REG_ACCESS_RLC))
+		&& (virt->reg_access_mode & AMDGPU_VIRT_REG_ACCESS_RLC)
+		&& !(amdgpu_sriov_runtime(adev)))
 		ret = true;
 
 	return ret;
