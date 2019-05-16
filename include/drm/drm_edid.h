@@ -25,6 +25,7 @@
 
 #include <linux/types.h>
 #include <linux/hdmi.h>
+#include <drm/drm_mode.h>
 
 struct drm_device;
 struct i2c_adapter;
@@ -331,6 +332,7 @@ struct cea_sad {
 
 struct drm_encoder;
 struct drm_connector;
+struct drm_connector_state;
 struct drm_display_mode;
 
 int drm_edid_to_sad(struct edid *edid, struct cea_sad **sads);
@@ -373,6 +375,10 @@ static inline int drm_eld_mnl(const uint8_t *eld)
 {
 	return (eld[DRM_ELD_CEA_EDID_VER_MNL] & DRM_ELD_MNL_MASK) >> DRM_ELD_MNL_SHIFT;
 }
+
+int
+drm_hdmi_infoframe_set_hdr_metadata(struct hdmi_drm_infoframe *frame,
+				    const struct drm_connector_state *conn_state);
 
 /**
  * drm_eld_sad - Get ELD SAD structures.
