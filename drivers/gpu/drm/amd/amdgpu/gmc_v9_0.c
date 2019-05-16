@@ -808,7 +808,7 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 
 	if (amdgpu_emu_mode != 1)
 		adev->gmc.vram_width = amdgpu_atomfirmware_get_vram_width(adev);
-	if (!adev->gmc.vram_width) {
+	if (!adev->gmc.vram_width && !amdgpu_sriov_vf(adev)) {
 		/* hbm memory channel size */
 		if (adev->flags & AMD_IS_APU)
 			chansize = 64;
