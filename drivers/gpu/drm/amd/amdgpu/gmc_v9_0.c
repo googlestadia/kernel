@@ -819,6 +819,13 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 		adev->gmc.vram_width = numchan * chansize;
 	}
 
+	/* For Vega10 SR-IOV, vram_width can't be read from ATOM as RAVEN,
+	 * and DF related registers is not readable, seems hardcord is the
+	 * only way to set the correct vram_width */
+	if (amdgpu_sriov_vf(adev) && (adev->asic_type == CHIP_VEGA10)) {
+		adev->gmc.vram_width = 2048;
+	}
+
 	/* size in MB on si */
 	adev->gmc.mc_vram_size =
 		adev->nbio_funcs->get_memsize(adev) * 1024ULL * 1024ULL;
