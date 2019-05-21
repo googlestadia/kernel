@@ -22,6 +22,8 @@
  */
 
 #include "amdgpu.h"
+#include <linux/debugfs.h>
+static const char *autodump_query_list[MAX_AUTODUMP_NODE] = {"dummy", "hang", "name"};
 
 bool amdgpu_virt_mmio_blocked(struct amdgpu_device *adev)
 {
@@ -480,5 +482,233 @@ uint32_t amdgpu_virt_get_mclk(struct amdgpu_device *adev, bool lowest)
 	kfree(buf);
 
 	return clk;
+}
+
+static bool autodump_is_booked_alive_locked(struct amdgpu_virt *virt)
+{
+	struct task_struct *ref;
+	struct pid *pid;
+
+	if (virt->autodump.task == NULL || virt->autodump.pid == 0)
+		return false;
+
+	pid = find_get_pid(virt->autodump.pid);
+	ref = pid_task(pid, PIDTYPE_PID);
+
+	return ref == virt->autodump.task;
+}
+
+/* only the registered task can do write with val 0 or 2,
+ * new task can do val 1 if previous registered task died
+ */
+static int autodump_action_write(void *data, uint64_t val)
+{
+	struct amdgpu_device *adev = data;
+	struct amdgpu_virt *virt = &adev->virt;
+	int ret = -EPERM;
+
+	mutex_lock(&adev->virt.dump_mutex);
+	switch (val) {
+	case 1:
+		/* unbook first if previous one died */
+		if (!autodump_is_booked_alive_locked(virt)) {
+			if (virt->autodump.task) {
+				put_task_struct(virt->autodump.task);
+			}
+			memset(&virt->autodump, 0 ,sizeof(virt->autodump));
+			goto book_new;
+		}
+
+		/* disallow new booker as long as previous not died */
+		goto quit;
+
+book_new:
+		get_task_struct(current);
+		virt->autodump.task = current;
+		virt->autodump.tgid = current->tgid;
+		virt->autodump.pid = current->pid;
+		get_task_comm(virt->autodump.process_name, current->group_leader);
+		printk("autodump:%s book autodump --> tgid=%u, pid=%u\n", virt->autodump.process_name, current->tgid, current->pid);
+		ret = 0;
+		break;
+	case 0:
+		if (current->pid != virt->autodump.pid ||
+		    current != virt->autodump.task)
+			goto quit;
+
+		printk("autodump:%s unbook autodump --> tgid=%u, pid=%u\n", virt->autodump.process_name, current->tgid, current->pid);
+		if (virt->autodump.task)
+			put_task_struct(virt->autodump.task);
+
+		memset(&virt->autodump, 0 ,sizeof(virt->autodump));
+		ret = 0;
+		break;
+	case 2:
+		if (current->pid != virt->autodump.pid ||
+		    current != virt->autodump.task)
+			goto quit;
+
+		complete(&virt->dump_cpl);
+		printk("autodump:%s unblock GPU recovery --> tgid=%u, pid=%u\n", virt->autodump.process_name, current->tgid, current->pid);
+		ret = 0;
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+quit:
+	mutex_unlock(&adev->virt.dump_mutex);
+	return ret;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(autodump_action_fops,
+				NULL,
+				autodump_action_write, "%llu\n");
+
+static ssize_t autodump_query_read(struct file *f, char __user *buf,
+					size_t size, loff_t *pos)
+{
+	char tmp[16] = {0};
+	struct amdgpu_device *adev = f->private_data;
+
+	mutex_lock(&adev->virt.dump_mutex);
+	switch (adev->virt.autodump.query) {
+		case 1:
+			snprintf(tmp, sizeof(tmp), "%s", adev->virt.autodump.ring_name==NULL? "no":"yes");
+			break;
+		case 2:
+			snprintf(tmp, sizeof(tmp), "%s", adev->virt.autodump.ring_name);
+			break;
+		default:
+			mutex_unlock(&adev->virt.dump_mutex);
+			return -EINVAL;
+	}
+
+	mutex_unlock(&adev->virt.dump_mutex);
+	return simple_read_from_buffer(buf, size, pos, tmp, sizeof(tmp));
+}
+
+static ssize_t autodump_query_write(struct file *f, const char __user *buf,
+					 size_t size, loff_t *pos)
+{
+	int i;
+	ssize_t ret;
+	char tmp[16] = {0};
+	unsigned long done;
+	struct amdgpu_device *adev = f->private_data;
+
+	ret = simple_write_to_buffer(tmp, sizeof(tmp), pos, buf, size);
+
+	i = 1;
+	while (i < sizeof(autodump_query_list)/sizeof(autodump_query_list[0])) {
+		if (!memcmp(tmp, autodump_query_list[i], strlen(autodump_query_list[i])))
+			break;
+		i++;
+	}
+
+	if (i < sizeof(autodump_query_list)/sizeof(autodump_query_list[0])) {
+		mutex_lock(&adev->virt.dump_mutex);
+		adev->virt.autodump.query = i;
+		mutex_unlock(&adev->virt.dump_mutex);
+		return ret;
+	}
+
+	return -EINVAL;
+}
+
+static const struct file_operations autodump_query_fops = {
+	.owner = THIS_MODULE,
+	.open  = simple_open,
+	.read = autodump_query_read,
+	.write = autodump_query_write,
+	.llseek = default_llseek,
+};
+
+int amdgpu_virt_create_debugs(struct amdgpu_device *adev)
+{
+	struct dentry *entry;
+	struct amdgpu_virt *virt = &adev->virt;
+
+	init_completion(&adev->virt.dump_cpl);
+
+	entry = debugfs_create_file("autodump_action",
+			S_IWUSR,
+			adev->ddev->primary->debugfs_root,
+			adev, &autodump_action_fops);
+
+	virt->dump_dentries[1] = entry;
+
+	entry = debugfs_create_file("autodump_query",
+			S_IRUSR | S_IWUSR,
+			adev->ddev->primary->debugfs_root,
+			adev, &autodump_query_fops);
+
+	virt->dump_dentries[2] = entry;
+err:
+	return -EFAULT;
+}
+
+void amdgpu_virt_remove_debugfs(struct amdgpu_device *adev)
+{
+	struct amdgpu_virt *virt = &adev->virt;
+	int idx;
+
+	for (idx = 0; idx < MAX_AUTODUMP_NODE; idx++)
+		debugfs_remove(virt->dump_dentries[idx]);
+}
+
+int amdgpu_virt_notify_booked(struct amdgpu_device *adev, struct amdgpu_job *job)
+{
+	struct kernel_siginfo info;
+	int ret = -ENOENT;
+
+	mutex_lock(&adev->virt.dump_mutex);
+	if (adev->virt.autodump.task == NULL ||
+		adev->virt.autodump.pid == 0)
+		goto quit;
+
+	if (!autodump_is_booked_alive_locked(&adev->virt)) {
+		/* looks the pid is used on another task
+		 * which indiates the virt.task may already
+		 * killed
+		 */
+		put_task_struct(adev->virt.autodump.task);
+		memset(&adev->virt.autodump, 0 ,sizeof(adev->virt.autodump));
+		goto quit;
+	}
+
+	memset(&info, 0, sizeof(info));
+	info.si_signo = SIGUSR1;
+#if 0
+	info.si_errno = 0;
+	info.si_code = 0;
+	info.si_addr = 0;
+	info.si_addr_lsb = 0;
+#endif
+
+	adev->virt.autodump.ring_name = job->base.sched->name;
+
+	ret = send_sig_info(info.si_signo, &info, adev->virt.autodump.task);
+quit:
+	mutex_unlock(&adev->virt.dump_mutex);
+	return ret;
+}
+
+int amdgpu_virt_wait_dump(struct amdgpu_device *adev, unsigned long tmo)
+{
+	int ret;
+
+	ret = wait_for_completion_interruptible_timeout(&adev->virt.dump_cpl, tmo);
+
+	if (ret == 0) { /* time out and dump tool still not finish its dump*/
+		pr_err("autodump: timeout before dump finished, move on to gpu recovery\n");
+		return -ETIMEDOUT;
+	} else if (ret < 0) {
+		pr_err("autodump: get interrupted during dump waiting\n");
+		return ret;
+	}
+
+	return 0;
 }
 
