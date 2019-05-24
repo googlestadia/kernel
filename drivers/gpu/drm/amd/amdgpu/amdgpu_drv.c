@@ -135,6 +135,7 @@ int amdgpu_job_hang_limit = 0;
 int amdgpu_lbpw = -1;
 int amdgpu_compute_multipipe = -1;
 int amdgpu_gpu_recovery = -1; /* auto */
+int amdgpu_peermem_size = 32;
 int amdgpu_emu_mode = 0;
 uint amdgpu_smu_memory_pool_size = 0;
 /* FBC (bit 0) disabled by default*/
@@ -526,6 +527,9 @@ module_param_named(ras_enable, amdgpu_ras_enable, int, 0444);
  */
 MODULE_PARM_DESC(amdgpu_ras_mask, "Mask of RAS features to enable (default 0xffffffff), only valid when ras_enable == 1");
 module_param_named(ras_mask, amdgpu_ras_mask, uint, 0444);
+
+MODULE_PARM_DESC(peermem_size, "Peer device mem access size in megabytes (default 32MB)");
+module_param_named(peermem_size, amdgpu_peermem_size, int, 0444);
 
 
 /**
