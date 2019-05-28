@@ -738,6 +738,9 @@ static bool soc15_need_reset_on_init(struct amdgpu_device *adev)
 {
 	u32 sol_reg;
 
+	if (!amdgpu_passthrough(adev))
+		return false;
+
 	if (adev->flags & AMD_IS_APU)
 		return false;
 
