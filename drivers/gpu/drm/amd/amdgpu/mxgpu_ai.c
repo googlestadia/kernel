@@ -498,21 +498,18 @@ static void xgpu_ai_adjust_ip_init_order(struct amdgpu_device *adev,
 	}
 }
 
-void xgpu_ai_init_reg_access_mode(struct amdgpu_device *adev)
+static void xgpu_ai_init_reg_access_mode(struct amdgpu_device *adev)
 {
-	uint32_t rlc_fw_ver = RREG32_SOC15(GC, 0, mmRLC_GPM_GENERAL_6);
-	uint32_t sos_fw_ver = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_58);
+        adev->virt.reg_access_mode = AMDGPU_VIRT_REG_ACCESS_LEGACY;
 
-	adev->virt.reg_access_mode = 0;
+        /* Enable L1 security reg access mode by defaul,  as non-security VF
+         * will no longer be supported.
+         */
+        adev->virt.reg_access_mode |= AMDGPU_VIRT_REG_ACCESS_RLC;
 
-	if (rlc_fw_ver >= 0x5d)
-		adev->virt.reg_access_mode |= AMDGPU_VIRT_REG_ACCESS_RLC;
+        adev->virt.reg_access_mode |= AMDGPU_VIRT_REG_ACCESS_PSP_PRG_IH;
 
-	if (sos_fw_ver >= 0x80455)
-		adev->virt.reg_access_mode |= AMDGPU_VIRT_REG_ACCESS_PSP_PRG_IH;
-
-	if (sos_fw_ver >= 0x8045b)
-		adev->virt.reg_access_mode |= AMDGPU_VIRT_REG_SKIP_SEETING;
+        adev->virt.reg_access_mode |= AMDGPU_VIRT_REG_SKIP_SEETING;
 }
 
 const struct amdgpu_virt_ops xgpu_ai_virt_ops = {
