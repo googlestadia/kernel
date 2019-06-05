@@ -1,0 +1,46 @@
+#!/bin/bash
+# https://docs.bazel.build/versions/master/user-manual.html#flag--workspace_status_command
+
+# STABLE
+
+git_rev=$(git rev-parse --short HEAD)
+if [[ $? != 0 ]]; then
+  git_rev=""
+fi
+echo "STABLE_BUILD_SCM_REVISION ${git_rev:-unknown}"
+
+git_branch=$(git rev-parse --abbrev-ref HEAD)
+if [[ $? != 0 ]]; then
+  git_branch=""
+fi
+echo "STABLE_BUILD_SCM_BRANCH ${git_branch:-unknown}"
+
+# Check whether there are any uncommited changes
+git diff-index --quiet HEAD --
+if [[ $? == 0 ]]; then
+  tree_status="Clean"
+else
+  tree_status="Modified"
+fi
+echo "STABLE_BUILD_SCM_STATUS ${tree_status:-unknown}"
+
+# Include kokoro information if available.
+if [[ -n "${KOKORO_BUILD_ID}" ]]; then
+  echo "STABLE_KOKORO_BUILD_ID ${KOKORO_BUILD_ID}"
+fi
+if [[ -n "${KOKORO_BUILD_NUMBER}" ]]; then
+  echo "STABLE_KOKORO_BUILD_NUMBER ${KOKORO_BUILD_NUMBER}"
+fi
+if [[ -n "${KOKORO_JOB_NAME}" ]]; then
+  echo "STABLE_KOKORO_JOB_NAME ${KOKORO_JOB_NAME}"
+fi
+if [[ -n "${KOKORO_JOB_TYPE}" ]]; then
+  echo "STABLE_KOKORO_JOB_TYPE ${KOKORO_JOB_TYPE}"
+fi
+
+# Include rapid information if available.
+if [[ -n "${RAPID_CANDIDATE_NAME}" ]]; then
+  echo "STABLE_RAPID_CANDIDATE_NAME ${RAPID_CANDIDATE_NAME}"
+fi
+
+# VOLATILE

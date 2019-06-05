@@ -1,0 +1,3 @@
+# initramfs file for gen_init_cpio that creates an initial /dev/console.
+dir /dev 0755 0 0
+nod /dev/console 0600 0 0 c 5 1
