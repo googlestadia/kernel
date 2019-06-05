@@ -229,9 +229,17 @@ static const struct sysfs_ops ttm_mem_global_ops = {
 	.store = &ttm_mem_global_store,
 };
 
+void ttm_mem_glob_kobj_release(struct kobject *kobj)
+{
+	struct ttm_mem_global *glob = container_of(kobj, struct ttm_mem_global, kobj);
+
+	memset(glob, 0, sizeof(*glob));
+}
+
 static struct kobj_type ttm_mem_glob_kobj_type = {
 	.sysfs_ops = &ttm_mem_global_ops,
 	.default_attrs = ttm_mem_global_attrs,
+	.release = ttm_mem_glob_kobj_release,
 };
 
 static bool ttm_zones_above_swap_target(struct ttm_mem_global *glob,
