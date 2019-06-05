@@ -313,8 +313,11 @@ static ssize_t amdgpu_get_dpm_forced_performance_level(struct device *dev,
 	struct amdgpu_device *adev = ddev->dev_private;
 	enum amd_dpm_forced_level level = 0xff;
 
-	if  ((adev->flags & AMD_IS_PX) &&
-	     (ddev->switch_power_state != DRM_SWITCH_POWER_ON))
+	if (amdgpu_sriov_vf(adev))
+		return 0;
+
+	if ((adev->flags & AMD_IS_PX) &&
+	    (ddev->switch_power_state != DRM_SWITCH_POWER_ON))
 		return snprintf(buf, PAGE_SIZE, "off\n");
 
 	if (is_support_sw_smu(adev))
@@ -352,9 +355,11 @@ static ssize_t amdgpu_set_dpm_forced_performance_level(struct device *dev,
 	     (ddev->switch_power_state != DRM_SWITCH_POWER_ON))
 		return -EINVAL;
 
-	if (is_support_sw_smu(adev))
+	if (!amdgpu_sriov_vf(adev) && is_support_sw_smu(adev))
 		current_level = smu_get_performance_level(&adev->smu);
-	else if (adev->powerplay.pp_funcs->get_performance_level)
+	else if (!amdgpu_sriov_vf(adev) &&
+		 adev->powerplay.pp_funcs &&
+		 adev->powerplay.pp_funcs->get_performance_level)
 		current_level = amdgpu_dpm_get_performance_level(adev);
 
 	if (strncmp("low", buf, strlen("low")) == 0) {
@@ -913,6 +918,9 @@ static ssize_t amdgpu_set_pp_dpm_sclk(struct device *dev,
 	int ret;
 	uint32_t mask = 0;
 
+	if (amdgpu_sriov_vf(adev))
+		return 0;
+
 	ret = amdgpu_read_mask(buf, count, &mask);
 	if (ret)
 		return ret;
@@ -935,6 +943,10 @@ static ssize_t amdgpu_get_pp_dpm_mclk(struct device *dev,
 	struct drm_device *ddev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = ddev->dev_private;
 
+	if (amdgpu_sriov_vf(adev) && amdgim_is_hwperf(adev) &&
+	    adev->virt.ops->get_pp_clk)
+		return adev->virt.ops->get_pp_clk(adev,PP_MCLK,buf);
+
 	if (is_support_sw_smu(adev))
 		return smu_print_clk_levels(&adev->smu, PP_MCLK, buf);
 	else if (adev->powerplay.pp_funcs->print_clock_levels)
@@ -952,6 +964,9 @@ static ssize_t amdgpu_set_pp_dpm_mclk(struct device *dev,
 	struct amdgpu_device *adev = ddev->dev_private;
 	int ret;
 	uint32_t mask = 0;
+
+	if (amdgpu_sriov_vf(adev))
+		return 0;
 
 	ret = amdgpu_read_mask(buf, count, &mask);
 	if (ret)
@@ -2531,6 +2546,44 @@ void amdgpu_pm_print_power_states(struct amdgpu_device *adev)
 	for (i = 0; i < adev->pm.dpm.num_ps; i++)
 		amdgpu_dpm_print_power_state(adev, &adev->pm.dpm.ps[i]);
 
+}
+
+int amdgpu_virt_pm_sysfs_init(struct amdgpu_device *adev)
+{
+	int ret = 0;
+
+	if (!(amdgpu_sriov_vf(adev) && amdgim_is_hwperf(adev)))
+		return ret;
+
+	ret = device_create_file(adev->dev, &dev_attr_pp_dpm_sclk);
+	if (ret) {
+		DRM_ERROR("failed to create device file pp_dpm_sclk\n");
+		return ret;
+	}
+
+	ret = device_create_file(adev->dev, &dev_attr_pp_dpm_mclk);
+	if (ret) {
+		DRM_ERROR("failed to create device file pp_dpm_mclk\n");
+		return ret;
+	}
+
+	ret = device_create_file(adev->dev, &dev_attr_power_dpm_force_performance_level);
+	if (ret) {
+		DRM_ERROR("failed to create device file for dpm state\n");
+		return ret;
+	}
+
+	return ret;
+}
+
+void amdgpu_virt_pm_sysfs_fini(struct amdgpu_device *adev)
+{
+	if (!(amdgpu_sriov_vf(adev) && amdgim_is_hwperf(adev)))
+		return;
+
+	device_remove_file(adev->dev, &dev_attr_power_dpm_force_performance_level);
+	device_remove_file(adev->dev, &dev_attr_pp_dpm_sclk);
+	device_remove_file(adev->dev, &dev_attr_pp_dpm_mclk);
 }
 
 int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
