@@ -157,7 +157,7 @@ static void fsl_dcu_drm_lastclose(struct drm_device *dev)
 DEFINE_DRM_GEM_CMA_FOPS(fsl_dcu_drm_fops);
 
 static struct drm_driver fsl_dcu_drm_driver = {
-	.driver_features	= DRIVER_HAVE_IRQ | DRIVER_GEM | DRIVER_MODESET
+	.driver_features	= DRIVER_GEM | DRIVER_MODESET
 				| DRIVER_PRIME | DRIVER_ATOMIC,
 	.lastclose		= fsl_dcu_drm_lastclose,
 	.load			= fsl_dcu_load,
