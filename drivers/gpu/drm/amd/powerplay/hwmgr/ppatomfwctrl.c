@@ -293,6 +293,13 @@ int pp_atomfwctrl_get_avfs_information(struct pp_hwmgr *hwmgr,
 	format_revision = ((struct atom_common_table_header *)profile)->format_revision;
 	content_revision = ((struct atom_common_table_header *)profile)->content_revision;
 
+	if (format_revision == 4)
+	{
+		profile->gb_vdroop_table_cksoff_a0 = 0xfffcd2e7;
+		profile->gb_vdroop_table_cksoff_a1 = 0x24902;
+		profile->gb_vdroop_table_cksoff_a2 = 0x249ba;
+	}
+
 	if (format_revision == 4 && content_revision == 1) {
 		param->ulMaxVddc = le32_to_cpu(profile->maxvddc);
 		param->ulMinVddc = le32_to_cpu(profile->minvddc);
