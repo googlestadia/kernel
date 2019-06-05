@@ -1,0 +1,80 @@
+#!/bin/sh
+
+init=/lib/systemd/systemd
+cmdline_root=auto
+rootflags=
+rootfstype=
+rootro=-r
+mofidev=/mofi.squashfs
+
+# Mount sysfs, procfs, devtmpfs, devpts, and tmpfs.
+[ -d /sys ] || mkdir /sys
+mount -t sysfs -o nodev,noexec,nosuid sysfs /sys
+
+[ -d /proc ] || mkdir /proc
+mount -t proc -o nodev,noexec,nosuid proc /proc
+
+[ -d /dev ] || mkdir -m 0755 /dev
+mount -t devtmpfs -o nosuid,mode=0755 udev /dev
+
+mkdir /dev/pts
+mount -t devpts -o noexec,nosuid,gid=5,mode=0620 devpts /dev/pts
+
+# The primary tmpfs should be 5 GB. It is assumed that the root overlayfs will
+# use this tmpfs for its writable layer (see scripts/overlay.sh).
+# b/109826171
+[ -d /run ] || mkdir -m 0755 /run
+mount -t tmpfs -o nodev,mode=755,size=5G tmpfs /run
+
+# Parse the command line for a few well-known options affecting how the root
+# filesystem is mounted and what init to chain to.
+for x in $(cat /proc/cmdline); do
+	case $x in
+		init=*)
+			init="${x#init=}"
+			;;
+		root=*)
+			cmdline_root="${x#root=}"
+			;;
+		rootflags=*)
+			rootflags="${x#rootflags=}"
+			;;
+		rootfstype=*)
+			rootfstype="${x#rootfstype=}"
+			;;
+		rw)
+			rootro="-w"
+			;;
+	esac
+done
+
+rescue_shell() {
+	echo "Something went wrong. Dropping to a shell."
+	exec sh
+}
+
+# Mount the root overlayfs.
+. /scripts/overlay.sh || rescue_shell
+mount_root_overlayfs || rescue_shell
+
+# Move filesystems to the final root fs.
+
+# gpuvm's synthesized root fs does not have /run.
+# See https://cs.corp.google.com/piper///depot/google3/platforms/gpus/testing/gpuminivmm/mini_vmm_helper.cc?g=0&l=25
+if [ -d /root/run ]; then
+	tmpfsmnt=/root/run
+else
+	tmpfsmnt=/root/tmp
+fi
+
+mount -n -o move /sys /root/sys || rescue_shell
+mount -n -o move /proc /root/proc || rescue_shell
+mount -n -o move /dev /root/dev || rescue_shell
+mount -n -o move /run "${tmpfsmnt}" || rescue_shell
+
+# Keep /dev available (for /dev/console, below).
+rm -rf /dev
+ln -s /root/dev /dev || rescue_shell
+
+# Chain to the final root fs.
+exec switch_root -c /dev/console /root "${init}" || rescue_shell
