@@ -355,14 +355,13 @@ static inline dma_addr_t *amdgpu_gem_peer_dma_addr(struct device *dev, struct mm
 		if (pte_none(*pte))
 			break;
 
-		/* dma_map_resource will BUG_ON if pte is in ram range */
 		if (pfn_valid(pte_pfn(*pte))) {
-			/* dma_map_resource forbids system ram doing the PEER_MEM,
-			 * so we call dma_map_page() here to get the device dma_addr
-			 * for that sys ram pte
-			 */
-			dma_addr[idx++] = pte_pfn(*pte) << PAGE_SHIFT;
-			dma_map_page(dev, pfn_to_page(pte_pfn(*pte)), 0, PAGE_SIZE, DMA_BIDIRECTIONAL);
+			/* for system ram we return error, user should call regular USRPTR to handle that case */
+			while (--idx > -1)
+				dma_unmap_resource(dev, dma_addr[idx], PAGE_SIZE, DMA_BIDIRECTIONAL, 0);
+
+			kfree(dma_addr);
+			return NULL;
 		} else {
 			/* it is valid to dma_map on a non-ram physical address */
 			dma_addr[idx++] = dma_map_resource(dev, pte_pfn(*pte) << PAGE_SHIFT, PAGE_SIZE, DMA_BIDIRECTIONAL, 0);
