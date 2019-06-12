@@ -1325,7 +1325,11 @@ static struct drm_driver kms_driver = {
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 	    DRIVER_ATOMIC |
 #endif
+#ifdef DRIVER_IRQ_SHARED
 	    DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_GEM |
+#else
+	    DRIVER_HAVE_IRQ | DRIVER_GEM |
+#endif
 #if DRM_VERSION_CODE >= DRM_VERSION(4, 13, 0)
 	    DRIVER_SYNCOBJ |
 #endif
