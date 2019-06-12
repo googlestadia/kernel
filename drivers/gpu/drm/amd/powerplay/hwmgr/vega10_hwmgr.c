@@ -800,8 +800,10 @@ static int vega10_hwmgr_backend_fini(struct pp_hwmgr *hwmgr)
 	kfree(hwmgr->dyn_state.vddc_dep_on_dal_pwrl);
 	hwmgr->dyn_state.vddc_dep_on_dal_pwrl = NULL;
 
+	mutex_lock(&hwmgr->smu_lock);
 	kfree(hwmgr->backend);
 	hwmgr->backend = NULL;
+	mutex_unlock(&hwmgr->smu_lock);
 
 	return 0;
 }
@@ -4747,16 +4749,20 @@ static void vega10_power_gate_vce(struct pp_hwmgr *hwmgr, bool bgate)
 {
 	struct vega10_hwmgr *data = hwmgr->backend;
 
-	data->vce_power_gated = bgate;
-	vega10_enable_disable_vce_dpm(hwmgr, !bgate);
+	if(data){
+		data->vce_power_gated = bgate;
+		vega10_enable_disable_vce_dpm(hwmgr, !bgate);
+	}
 }
 
 static void vega10_power_gate_uvd(struct pp_hwmgr *hwmgr, bool bgate)
 {
 	struct vega10_hwmgr *data = hwmgr->backend;
 
-	data->uvd_power_gated = bgate;
-	vega10_enable_disable_uvd_dpm(hwmgr, !bgate);
+	if(data){
+		data->uvd_power_gated = bgate;
+		vega10_enable_disable_uvd_dpm(hwmgr, !bgate);
+	}
 }
 
 static inline bool vega10_are_power_levels_equal(
