@@ -15,6 +15,10 @@ function download_gcs() {
   local dst_path=$2
   local -r sha256sum=$3
 
+  if ! hash gsutil 2>/dev/null; then
+    return 1
+  fi
+
   if [[ -d "${dst_path}" ]]; then
     dst_path="${dst_path%/}/$(basename "${url}")"
   fi
