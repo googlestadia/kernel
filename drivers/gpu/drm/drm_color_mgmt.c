@@ -29,11 +29,11 @@
 /**
  * DOC: overview
  *
- * Color management or color space adjustments is supported through a set of 5
- * properties on the &drm_crtc object. They are set up by calling
+ * Pipe Color management or color space adjustments is supported through a
+ * set of 5 properties on the &drm_crtc object. They are set up by calling
  * drm_crtc_enable_color_mgmt().
  *
- * "DEGAMMA_LUT”:
+ * "DEGAMMA_LUT
  *	Blob property to set the degamma lookup table (LUT) mapping pixel data
  *	from the framebuffer before it is given to the transformation matrix.
  *	The data is interpreted as an array of &struct drm_color_lut elements.
@@ -414,6 +414,43 @@ const char *drm_get_color_range_name(enum drm_color_range range)
 
 	return color_range_name[range];
 }
+
+/**
+ * DOC: Plane Color Properties
+ *
+ * Plane Color management or color space adjustments is supported
+ * through a set of 5 properties on the &drm_plane object.
+ *
+ * degamma_lut_property:
+ *     Blob property which allows a userspace to provide LUT values
+ *     to apply degamma curve using the h/w plane degamma processing
+ *     engine, thereby making the content as linear for further color
+ *     processing.
+ *
+ * degamma_lut_size_property:
+ *     Range Property to indicate size of the plane degamma LUT.
+ */
+int drm_plane_color_create_prop(struct drm_device *dev,
+				struct drm_plane *plane)
+{
+	struct drm_property *prop;
+
+	prop = drm_property_create(dev, DRM_MODE_PROP_BLOB,
+				   "PLANE_DEGAMMA_LUT", 0);
+	if (!prop)
+		return -ENOMEM;
+	plane->degamma_lut_property = prop;
+
+	prop = drm_property_create_range(dev, DRM_MODE_PROP_IMMUTABLE,
+					 "PLANE_DEGAMMA_LUT_SIZE", 0,
+					 UINT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	plane->degamma_lut_size_property = prop;
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_plane_color_create_prop);
 
 /**
  * drm_plane_create_color_properties - color encoding related plane properties

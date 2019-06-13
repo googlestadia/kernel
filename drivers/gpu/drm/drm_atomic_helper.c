@@ -3649,6 +3649,9 @@ void __drm_atomic_helper_plane_duplicate_state(struct drm_plane *plane,
 
 	state->fence = NULL;
 	state->commit = NULL;
+	if (state->degamma_lut)
+		drm_property_blob_get(state->degamma_lut);
+	state->color_mgmt_changed = false;
 }
 EXPORT_SYMBOL(__drm_atomic_helper_plane_duplicate_state);
 
@@ -3693,6 +3696,7 @@ void __drm_atomic_helper_plane_destroy_state(struct drm_plane_state *state)
 
 	if (state->commit)
 		drm_crtc_commit_put(state->commit);
+	drm_property_blob_put(state->degamma_lut);
 }
 EXPORT_SYMBOL(__drm_atomic_helper_plane_destroy_state);
 

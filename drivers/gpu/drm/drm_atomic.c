@@ -867,6 +867,8 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 {
 	struct drm_device *dev = plane->dev;
 	struct drm_mode_config *config = &dev->mode_config;
+	bool replaced = false;
+	int ret;
 
 	if (property == config->prop_fb_id) {
 		struct drm_framebuffer *fb = drm_framebuffer_lookup(dev, NULL, val);
@@ -920,6 +922,13 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 		state->color_encoding = val;
 	} else if (property == plane->color_range_property) {
 		state->color_range = val;
+	} else if (property == plane->degamma_lut_property) {
+		ret = drm_atomic_replace_property_blob_from_id(dev,
+				&state->degamma_lut,
+				val, -1, sizeof(struct drm_color_lut),
+				&replaced);
+		state->color_mgmt_changed |= replaced;
+		return ret;
 	} else if (plane->funcs->atomic_set_property) {
 		return plane->funcs->atomic_set_property(plane, state,
 				property, val);
@@ -990,6 +999,9 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
 		*val = state->color_encoding;
 	} else if (property == plane->color_range_property) {
 		*val = state->color_range;
+	} else if (property == plane->degamma_lut_property) {
+		*val = (state->degamma_lut) ?
+			state->degamma_lut->base.id : 0;
 	} else if (plane->funcs->atomic_get_property) {
 		return plane->funcs->atomic_get_property(plane, state, property, val);
 	} else {
@@ -1130,6 +1142,7 @@ static void drm_atomic_plane_print_state(struct drm_printer *p,
 		   drm_get_color_encoding_name(state->color_encoding));
 	drm_printf(p, "\tcolor-range=%s\n",
 		   drm_get_color_range_name(state->color_range));
+	drm_printf(p, "\tcolor_mgmt_changed=%d\n", state->color_mgmt_changed);
 
 	if (plane->funcs->atomic_print_state)
 		plane->funcs->atomic_print_state(p, state);
