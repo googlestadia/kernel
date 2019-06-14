@@ -660,7 +660,11 @@ void amdgpu_virt_remove_debugfs(struct amdgpu_device *adev)
 
 int amdgpu_virt_notify_booked(struct amdgpu_device *adev, struct amdgpu_job *job)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
+	siginfo_t info;
+#else
 	struct kernel_siginfo info;
+#endif
 	int ret = -ENOENT;
 
 	mutex_lock(&adev->virt.dump_mutex);
@@ -680,13 +684,6 @@ int amdgpu_virt_notify_booked(struct amdgpu_device *adev, struct amdgpu_job *job
 
 	memset(&info, 0, sizeof(info));
 	info.si_signo = SIGUSR1;
-#if 0
-	info.si_errno = 0;
-	info.si_code = 0;
-	info.si_addr = 0;
-	info.si_addr_lsb = 0;
-#endif
-
 	adev->virt.autodump.ring_name = job->base.sched->name;
 
 	ret = send_sig_info(info.si_signo, &info, adev->virt.autodump.task);
