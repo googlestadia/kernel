@@ -1,7 +1,7 @@
 #!/bin/bash
 set -xe
 
-readonly SCRIPT_DIR=$(dirname $(readlink -f "${0}"))
+readonly SCRIPT_DIR=$(dirname "$(readlink -f "${0}")")
 readonly SRC_DIR=$(readlink -f "${SCRIPT_DIR}/../../..")
 readonly GCLOUD_KEY_FILE="${KOKORO_KEYSTORE_DIR}/71274_kokoro_service_key_json"
 readonly INITRAMFS_BIN_URL="gs://stadia_kernels/initramfs/initramfs-20190312.tar.gz"
@@ -44,7 +44,7 @@ function download_gcs() {
     echo "${sha256sum}  ${dst_path}" | sha256sum --quiet -c
     if [[ $? -ne 0 ]]; then
       rm -f "${dst_path}"
-      if [[ ${local_hash} == ${remote_hash} ]]; then
+      if [[ ${local_hash} == "${remote_hash}" ]]; then
         download_gcs "${url}" "${dst_path}" "${sha256sum}"
       else
         return 1
@@ -83,13 +83,6 @@ function setup_gcloud() {
   if [[ -e "${GCLOUD_KEY_FILE}" ]]; then
     gcloud auth activate-service-account --key-file "${GCLOUD_KEY_FILE}"
   fi
-}
-
-function install_build_tools() {
-  # Install tools that are not in the build image. Remove once build image has
-  # been updated.
-  sudo apt-get -yq update
-  sudo apt-get -yq install squashfs-tools
 }
 
 function download_initramfs_artifacts() {
@@ -158,19 +151,19 @@ function build_bzimage_and_headers() {
   pushd "${SRC_DIR}"
   readonly INITRD_NAME="initrd.img-${KERNELRELEASE}"
   readonly VMLINUZ_NAME="vmlinuz-${KERNELRELEASE}"
-  make -j $(nproc) bzImage "${MAKE_ARGS[@]}"
-  make -j $(nproc) headers_install "${MAKE_ARGS[@]}"
+  make -j "$(nproc)" bzImage "${MAKE_ARGS[@]}"
+  make -j "$(nproc)" headers_install "${MAKE_ARGS[@]}"
   popd
 }
 
 function build_modules() {
   pushd "${SRC_DIR}"
-  make -j $(nproc) modules "${MAKE_ARGS[@]}"
+  make -j "$(nproc)" modules "${MAKE_ARGS[@]}"
   readonly MOD_INSTALL_DIR="${KBUILD_OUTPUT}/modules-install"
   rm -rf "${MOD_INSTALL_DIR}"
   local -r mod_install_usr_dir="${MOD_INSTALL_DIR}/usr"
   mkdir -p "${mod_install_usr_dir}"
-  make -j $(nproc) modules_install "${MAKE_ARGS[@]}" \
+  make -j "$(nproc)" modules_install "${MAKE_ARGS[@]}" \
     INSTALL_MOD_PATH="${mod_install_usr_dir}" \
     INSTALL_MOD_STRIP=1
   rm \
@@ -269,7 +262,7 @@ function build_perf() {
   readonly PERF_INSTALL_DIR="${KBUILD_OUTPUT}"/perf-install
   rm -rf "${PERF_INSTALL_DIR}"
   mkdir -p "${PERF_INSTALL_DIR}"
-  make -f Makefile.perf -j $(nproc) install-bin \
+  make -f Makefile.perf -j "$(nproc)" install-bin \
     O="${perf_objs}" \
     DESTDIR="${PERF_INSTALL_DIR}" \
     prefix=/usr \
@@ -302,7 +295,6 @@ function build() {
   check_kokoro_env
   set_LOCALVERSION_from_buildstamp
   setup_gcloud
-  install_build_tools
   download_initramfs_artifacts
   download_firmware
   create_kbuild_output
