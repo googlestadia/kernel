@@ -5,7 +5,7 @@ cmdline_root=auto
 rootflags=
 rootfstype=
 rootro=-r
-mofidev=/mofi.squashfs
+krootfsdev=/krootfs.squashfs
 
 # Mount sysfs, procfs, devtmpfs, devpts, and tmpfs.
 [ -d /sys ] || mkdir /sys
