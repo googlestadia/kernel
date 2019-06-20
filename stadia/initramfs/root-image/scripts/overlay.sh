@@ -15,7 +15,7 @@ mount_root_overlayfs() {
 
 	local boot_mnt="${ofs_dir}/boot"
 	local root_mnt="${ofs_dir}/root"
-	local mofi_mnt="${ofs_dir}/mofi"
+	local krootfs_mnt="${ofs_dir}/krootfs"
 	local rwfs_mnt="${ofs_dir}/rwfs"
 
 	local squashfs_layer_index=0
@@ -147,14 +147,15 @@ EOT
 		lowerdir="${lowerdir}${boot_mnt}:"
 	fi
 
-	# If a modules-and-firmware squashfs was bundled with the initramfs,
-	# mount it and append its mount path to `lowerdir`. overlayfs stacks
-	# layers from right to left (leftmost is top). If `lowerdir` is not
-	# empty, it will contain a suffix ':'.
-	if [ -f "${mofidev}" ]; then
-		mkdir "${mofi_mnt}"
-		mount -t squashfs -r "${mofidev}" "${mofi_mnt}" || return 1
-		lowerdir="${lowerdir}${mofi_mnt}:"
+	# If a kernel rootfs was bundled with the initramfs, mount it and append
+	# its mount path to `lowerdir`. overlayfs stacks layers from right to
+	# left (leftmost is top). If `lowerdir` is not empty, it will contain a
+	# suffix ':'.
+	if [ -f "${krootfsdev}" ]; then
+		mkdir "${krootfs_mnt}"
+		mount -t squashfs -r "${krootfsdev}" "${krootfs_mnt}" \
+			|| return 1
+		lowerdir="${lowerdir}${krootfs_mnt}:"
 	fi
 
 	# If a root fs was specified or found, mount it read-only and append its

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -xe
 
-readonly RELEASE_SCRIPT_DIR=$(dirname $(readlink -f "${0}"))
+readonly RELEASE_SCRIPT_DIR=$(dirname "$(readlink -f "${0}")")
 
 function release_check_kokoro_env() {
   if [[ ! -d ${KOKORO_ARTIFACTS_DIR} ]]; then

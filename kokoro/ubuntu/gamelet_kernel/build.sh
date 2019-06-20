@@ -172,17 +172,23 @@ function build_modules() {
   popd
 }
 
-function build_modules_and_firmware_squashfs_for_initramfs() {
-  readonly MOFI_SQUASHFS="${INITRAMFS_INSTALL_DIR}/mofi.squashfs"
-  rm -f "${MOFI_SQUASHFS}"
+function build_kernel_rootfs() {
+  # LINT.IfChange
+  readonly KROOTFS="${INITRAMFS_INSTALL_DIR}/krootfs.squashfs"
+  # LINT.ThenChange(
+  #     stadia/initramfs/root-image/init,
+  #     stadia/initramfs/root-image/scripts/overlay.sh,
+  # )
+  rm -f "${KROOTFS}"
   # mksquashfs does not support merging, so do it with rsync.
-  local -r mofi_install_dir="${KBUILD_OUTPUT}/mofi-install"
-  mkdir "${mofi_install_dir}" || true
+  local -r krootfs_install_dir="${KBUILD_OUTPUT}/krootfs-install"
+  mkdir "${krootfs_install_dir}" || true
   rsync -a --delete \
     "${MOD_INSTALL_DIR}"/ \
     "${FIRMWARE_INSTALL_DIR}"/ \
-    "${mofi_install_dir}"/
-  mksquashfs "${mofi_install_dir}" "${MOFI_SQUASHFS}" \
+    "${PERF_INSTALL_DIR}"/ \
+    "${krootfs_install_dir}"/
+  mksquashfs "${krootfs_install_dir}" "${KROOTFS}" \
     -comp xz -no-exports -all-root -no-progress -no-recovery -Xbcj x86
 }
 
@@ -233,7 +239,7 @@ function build_boot_disk() {
   local -r boot_disk_mount_dir="${KBUILD_OUTPUT}/boot-mount"
   rm -f "${BOOT_DISK}"
   touch "${BOOT_DISK}"
-  fallocate --zero-range --length 16M "${BOOT_DISK}"
+  fallocate --zero-range --length 28M "${BOOT_DISK}"
   /sbin/parted --script "${BOOT_DISK}" -- mklabel msdos mkpart primary ext2 \
     2048s -1s set 1 boot on
   /sbin/mkfs.ext2 -F -L GGPBOOTFS -Eoffset=1048576 "${BOOT_DISK}"
@@ -302,12 +308,12 @@ function build() {
   finalize_config
   build_bzimage_and_headers
   build_modules
-  build_modules_and_firmware_squashfs_for_initramfs
+  build_perf
+  build_kernel_rootfs
   build_initramfs
   build_linux_tar_xz
-  build_boot_disk
-  build_perf
   build_perf_tar_xz
+  build_boot_disk
 }
 
 build
