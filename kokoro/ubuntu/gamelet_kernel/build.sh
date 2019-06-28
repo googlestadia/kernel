@@ -250,7 +250,7 @@ function build_boot_disk() {
   pigz --keep --force "${BOOT_DISK}"
   cat >"${BOOT_DISK}-pkgdef" <<EOL
 pkgdef mpm = {
-  package_name = 'chrome/cloudcast/kernel/gamelet_disk_test_${USER}'
+  package_name = 'test/chrome/cloudcast/kernel/gamelet_disk_test_${USER}'
   source = [
     {
       source_file = '${BOOT_DISK}'
