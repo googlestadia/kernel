@@ -1169,8 +1169,10 @@ int ttm_bo_validate(struct ttm_buffer_object *bo,
 	 */
 	if (!ttm_bo_mem_compat(placement, &bo->mem, &new_flags)) {
 		ret = ttm_bo_move_buffer(bo, placement, ctx);
-		if (ret)
+		if (ret) {
+			ttm_bo_mem_space_debug(bo, placement);
 			return ret;
+		}
 	} else {
 		/*
 		 * Use the access and other non-mapping-related flag bits from
