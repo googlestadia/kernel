@@ -230,6 +230,8 @@ function build_linux_tar_xz() {
     -C "${TAR_INSTALL_DIR}" . | xz --threads=0 > "${LINUX_TAR_XZ}"
   # Print the content of the archive for the build log.
   tar -tvf "${LINUX_TAR_XZ}"
+  ln -sf "$(basename "${LINUX_TAR_XZ}")" \
+    "$(dirname "${LINUX_TAR_XZ}")/linux-latest.tar.xz"
   popd
 }
 
@@ -248,7 +250,11 @@ function build_boot_disk() {
     "${INITRD_NAME}"
   dd if=/usr/lib/syslinux/mbr/mbr.bin of="${BOOT_DISK}" conv=notrunc
   pigz --keep --force "${BOOT_DISK}"
-  cat >"${BOOT_DISK}-pkgdef" <<EOL
+  ln -sf "$(basename "${BOOT_DISK}")" \
+    "$(dirname "${BOOT_DISK}")/disk-latest.raw"
+  ln -sf "$(basename "${BOOT_DISK_GZ}")" \
+    "$(dirname "${BOOT_DISK_GZ}")/disk-latest.raw.gz"
+  cat >"${KBUILD_OUTPUT}/disk-latest-pkgdef" <<EOL
 pkgdef mpm = {
   package_name = 'test/chrome/cloudcast/kernel/gamelet_disk_test_${USER}'
   source = [
@@ -295,6 +301,8 @@ function build_perf_tar_xz() {
     -C "${PERF_INSTALL_DIR}" . | xz --threads=0 > "${PERF_TAR_XZ}"
   # Print the content of the archive for the build log.
   tar -tvf "${PERF_TAR_XZ}"
+  ln -sf "$(basename "${PERF_TAR_XZ}")" \
+    "$(dirname "${PERF_TAR_XZ}")/perf-latest.tar.xz"
 }
 
 function build() {
