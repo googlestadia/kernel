@@ -120,6 +120,9 @@ int amdgpu_dm_crtc_set_crc_source(struct drm_crtc *crtc, const char *src_name,
 
 	crtc_state->crc_enabled = enable;
 
+#if DRM_VERSION_CODE < DRM_VERSION(4, 20, 0)
+	*values_cnt = 3;
+#endif
 	/* Reset crc_skipped on dm state */
 	crtc_state->crc_skip_count = 0;
 	return 0;
