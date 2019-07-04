@@ -2906,7 +2906,6 @@ static void fill_gamma_from_crtc(
 }
 #endif
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 20, 0)
 static void
 fill_blending_from_plane_state(struct drm_plane_state *plane_state,
 			       const struct dc_plane_state *dc_plane_state,
@@ -2942,7 +2941,6 @@ fill_blending_from_plane_state(struct drm_plane_state *plane_state,
 		*global_alpha_value = plane_state->alpha >> 8;
 	}
 }
-#endif
 
 static int
 fill_plane_color_attributes(const struct drm_plane_state *plane_state,
