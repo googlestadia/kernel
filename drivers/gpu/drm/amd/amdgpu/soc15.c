@@ -738,15 +738,16 @@ static bool soc15_need_reset_on_init(struct amdgpu_device *adev)
 {
 	u32 sol_reg;
 
-	if (!amdgpu_passthrough(adev))
-		return false;
-
 	if (adev->flags & AMD_IS_APU)
 		return false;
 
 	/* Check sOS sign of life register to confirm sys driver and sOS
 	 * are already been loaded.
 	 */
+
+	if (amdgpu_passthrough(adev))
+		return true;
+
 	sol_reg = RREG32_SOC15(MP0, 0, mmMP0_SMN_C2PMSG_81);
 	if (sol_reg)
 		return true;
