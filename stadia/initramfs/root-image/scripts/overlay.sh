@@ -137,25 +137,29 @@ EOT
 $(lsblk -P -o NAME,FSTYPE,LABEL,UUID,RO)
 EOT
 
-	# If a boot fs was found, mount it read-only and append its mount path
+	# If a boot fs was found, mount it read-only and prepend its mount path
 	# to `lowerdir`. overlayfs stacks layers from right to left (leftmost is
-	# top). If `lowerdir` is not empty, it will contain a suffix ':'.
+	# top).
+	# NOTE: By design, stacked squashfs filesystems and the root fs (if any)
+	# do not override or mask the contents of the boot fs.
 	if [ -n "${bootfs_dev}" ]; then
 		mkdir "${boot_mnt}"
 		mount -t "${bootfs_fstype}" -r "${bootfs_dev}" "${boot_mnt}" \
 			|| return 1
-		lowerdir="${lowerdir}${boot_mnt}:"
+		lowerdir="${boot_mnt}:${lowerdir}"
 	fi
 
-	# If a kernel rootfs was bundled with the initramfs, mount it and append
-	# its mount path to `lowerdir`. overlayfs stacks layers from right to
-	# left (leftmost is top). If `lowerdir` is not empty, it will contain a
-	# suffix ':'.
+	# If a kernel rootfs was bundled with the initramfs, mount it and
+	# prepend its mount path to `lowerdir`. overlayfs stacks layers from
+	# right to left (leftmost is top).
+	# NOTE: By design, stacked squashfs filesystems and the root fs (if any)
+	# do not override or mask the contents of the kernel rootfs.
+	# NOTE: By design, the kernel rootfs is stacked "above" the boot fs.
 	if [ -f "${krootfsdev}" ]; then
 		mkdir "${krootfs_mnt}"
 		mount -t squashfs -r "${krootfsdev}" "${krootfs_mnt}" \
 			|| return 1
-		lowerdir="${lowerdir}${krootfs_mnt}:"
+		lowerdir="${krootfs_mnt}:${lowerdir}"
 	fi
 
 	# If a root fs was specified or found, mount it read-only and append its
