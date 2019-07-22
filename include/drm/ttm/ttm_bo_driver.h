@@ -496,6 +496,8 @@ struct ttm_bo_device {
 	bool need_dma32;
 
 	bool no_retry;
+	wait_queue_head_t destroy_done;
+	atomic_t destroy_num;
 };
 
 /**

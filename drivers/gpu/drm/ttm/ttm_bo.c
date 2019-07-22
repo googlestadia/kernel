@@ -169,6 +169,8 @@ static void ttm_bo_release_list(struct kref *list_kref)
 	mutex_destroy(&bo->wu_mutex);
 	bo->destroy(bo);
 	ttm_mem_global_free(bdev->glob->mem_glob, acc_size);
+	atomic_inc(&bdev->destroy_num);
+	wake_up_interruptible(&bdev->destroy_done);
 }
 
 void ttm_bo_add_to_lru(struct ttm_buffer_object *bo)
@@ -635,7 +637,6 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 
 			spin_lock(&glob->lru_lock);
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
-
 		} else if (kcl_reservation_object_trylock(bo->resv)) {
 			ttm_bo_cleanup_refs(bo, false, !remove_all, true);
 		} else {
@@ -1641,6 +1642,8 @@ int ttm_bo_device_init(struct ttm_bo_device *bdev,
 		return ret;
 
 	bdev->driver = driver;
+	init_waitqueue_head(&bdev->destroy_done);
+	atomic_set(&bdev->destroy_num, 0);
 
 	memset(bdev->man, 0, sizeof(bdev->man));
 
@@ -1769,21 +1772,33 @@ EXPORT_SYMBOL(ttm_bo_synccpu_write_release);
  */
 int ttm_bo_swapout(struct ttm_bo_global *glob, struct ttm_operation_ctx *ctx)
 {
-	struct ttm_buffer_object *bo;
+	struct ttm_buffer_object *bo = NULL;
+	struct ttm_bo_device *bdev = NULL;
 	int ret = -EBUSY;
 	bool locked;
 	unsigned i;
+	unsigned long orig;
 
 	spin_lock(&glob->lru_lock);
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
 		list_for_each_entry(bo, &glob->swap_lru[i], swap) {
+			bdev = bo->bdev;
 			if (ttm_bo_evict_swapout_allowable(bo, ctx, &locked)) {
 				ret = 0;
 				break;
 			}
 		}
+
 		if (!ret)
 			break;
+	}
+
+	if (ret && bdev && !list_empty(&bdev->ddestroy)) {
+		orig = atomic_read(&bdev->destroy_num);
+		spin_unlock(&glob->lru_lock);
+		wait_event_interruptible(bdev->destroy_done,
+					orig != atomic_read(&bdev->destroy_num));
+		return 0;
 	}
 
 	if (ret) {
