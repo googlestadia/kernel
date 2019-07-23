@@ -28,7 +28,7 @@
 #include "vega10_inc.h"
 #include "vega10_ppsmc.h"
 #include "vega10_baco.h"
-
+#include "smu9_smumgr.h"
 
 
 static const struct soc15_baco_cmd_entry  pre_baco_tbl[] =
@@ -41,7 +41,7 @@ static const struct soc15_baco_cmd_entry  pre_baco_tbl[] =
 
 static const struct soc15_baco_cmd_entry enter_baco_tbl[] =
 {
-	{CMD_WAITFOR, SOC15_REG_ENTRY(THM, 0, mmTHM_BACO_CNTL), THM_BACO_CNTL__SOC_DOMAIN_IDLE_MASK, THM_BACO_CNTL__SOC_DOMAIN_IDLE__SHIFT, 0xffffffff, 0x80000000},
+	{CMD_DELAY_MS, 0, 0, 0, 0, 0, 0, 5, 0},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(NBIF, 0, mmBACO_CNTL), BACO_CNTL__BACO_EN_MASK, BACO_CNTL__BACO_EN__SHIFT, 0, 1},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(NBIF, 0, mmBACO_CNTL), BACO_CNTL__BACO_BIF_LCLK_SWITCH_MASK, BACO_CNTL__BACO_BIF_LCLK_SWITCH__SHIFT, 0, 1},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(NBIF, 0, mmBACO_CNTL), BACO_CNTL__BACO_DUMMY_EN_MASK, BACO_CNTL__BACO_DUMMY_EN__SHIFT, 0, 1},
@@ -55,7 +55,7 @@ static const struct soc15_baco_cmd_entry enter_baco_tbl[] =
 	{CMD_DELAY_MS, 0, 0, 0, 0, 0, 0, 5, 0},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(THM, 0, mmTHM_BACO_CNTL), THM_BACO_CNTL__BACO_RESET_EN_MASK, THM_BACO_CNTL__BACO_RESET_EN__SHIFT, 0, 1},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(THM, 0, mmTHM_BACO_CNTL), THM_BACO_CNTL__BACO_PWROKRAW_CNTL_MASK, THM_BACO_CNTL__BACO_PWROKRAW_CNTL__SHIFT, 0, 0},
-	{CMD_WAITFOR, SOC15_REG_ENTRY(NBIF, 0, mmBACO_CNTL), BACO_CNTL__BACO_MODE_MASK, BACO_CNTL__BACO_MODE__SHIFT, 0xffffffff, 0x100}
+	{CMD_DELAY_MS, 0, 0, 0, 0, 0, 0, 5, 0}
 };
 
 static const struct soc15_baco_cmd_entry exit_baco_tbl[] =
@@ -71,12 +71,12 @@ static const struct soc15_baco_cmd_entry exit_baco_tbl[] =
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(THM, 0, mmTHM_BACO_CNTL), THM_BACO_CNTL__BACO_SOC_VDCI_RESET_MASK, THM_BACO_CNTL__BACO_SOC_VDCI_RESET__SHIFT, 0, 0},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(THM, 0, mmTHM_BACO_CNTL), THM_BACO_CNTL__BACO_EXIT_MASK, THM_BACO_CNTL__BACO_EXIT__SHIFT, 0, 1},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(THM, 0, mmTHM_BACO_CNTL), THM_BACO_CNTL__BACO_RESET_EN_MASK, THM_BACO_CNTL__BACO_RESET_EN__SHIFT, 0, 0},
-	{CMD_WAITFOR, SOC15_REG_ENTRY(THM, 0, mmTHM_BACO_CNTL), THM_BACO_CNTL__BACO_EXIT_MASK, 0, 0xffffffff, 0},
+	{CMD_DELAY_MS, 0, 0, 0, 0, 0, 0, 5, 0},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(THM, 0, mmTHM_BACO_CNTL), THM_BACO_CNTL__BACO_SB_AXI_FENCE_MASK, THM_BACO_CNTL__BACO_SB_AXI_FENCE__SHIFT, 0, 0},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(NBIF, 0, mmBACO_CNTL), BACO_CNTL__BACO_DUMMY_EN_MASK, BACO_CNTL__BACO_DUMMY_EN__SHIFT,  0, 0},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(NBIF, 0, mmBACO_CNTL), BACO_CNTL__BACO_BIF_LCLK_SWITCH_MASK ,BACO_CNTL__BACO_BIF_LCLK_SWITCH__SHIFT, 0, 0},
 	{CMD_READMODIFYWRITE, SOC15_REG_ENTRY(NBIF, 0, mmBACO_CNTL), BACO_CNTL__BACO_EN_MASK , BACO_CNTL__BACO_EN__SHIFT, 0,0},
-	{CMD_WAITFOR, SOC15_REG_ENTRY(NBIF, 0, mmBACO_CNTL), BACO_CNTL__BACO_MODE_MASK, 0, 0xffffffff, 0}
+	{CMD_DELAY_MS, 0, 0, 0, 0, 0, 0, 5, 0}
  };
 
 static const struct soc15_baco_cmd_entry clean_baco_tbl[] =
@@ -98,8 +98,11 @@ int vega10_baco_set_state(struct pp_hwmgr *hwmgr, enum BACO_STATE state)
 	if (state == BACO_STATE_IN) {
 		if (soc15_baco_program_registers(hwmgr, pre_baco_tbl,
 					     ARRAY_SIZE(pre_baco_tbl))) {
-			if (smum_send_msg_to_smc(hwmgr, PPSMC_MSG_EnterBaco))
-				return -EINVAL;
+			/* If SMU running, need to idle SMU first */
+			if (smu9_is_smc_ram_running(hwmgr)) {
+				if (smum_send_msg_to_smc(hwmgr, PPSMC_MSG_EnterBaco))
+					return -EINVAL;
+			}
 
 			if (soc15_baco_program_registers(hwmgr, enter_baco_tbl,
 						   ARRAY_SIZE(enter_baco_tbl)))
