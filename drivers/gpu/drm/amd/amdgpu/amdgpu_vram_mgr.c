@@ -138,6 +138,24 @@ static ssize_t amdgpu_mem_info_vram_vendor(struct device *dev,
 	}
 }
 
+static ssize_t amdgpu_mem_info_num_bytes_moved(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = ddev->dev_private;
+
+	return snprintf(buf, PAGE_SIZE, "%llu\n", adev->num_bytes_moved);
+}
+
+static ssize_t amdgpu_mem_info_num_evictions(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct drm_device *ddev = dev_get_drvdata(dev);
+	struct amdgpu_device *adev = ddev->dev_private;
+
+	return snprintf(buf, PAGE_SIZE, "%llu\n", adev->num_evictions);
+}
+
 static DEVICE_ATTR(mem_info_vram_total, S_IRUGO,
 		   amdgpu_mem_info_vram_total_show, NULL);
 static DEVICE_ATTR(mem_info_vis_vram_total, S_IRUGO,
@@ -148,6 +166,10 @@ static DEVICE_ATTR(mem_info_vis_vram_used, S_IRUGO,
 		   amdgpu_mem_info_vis_vram_used_show, NULL);
 static DEVICE_ATTR(mem_info_vram_vendor, S_IRUGO,
 		   amdgpu_mem_info_vram_vendor, NULL);
+static DEVICE_ATTR(mem_info_num_bytes_moved, S_IRUGO,
+		   amdgpu_mem_info_num_bytes_moved, NULL);
+static DEVICE_ATTR(mem_info_num_evictions, S_IRUGO,
+		   amdgpu_mem_info_num_evictions, NULL);
 
 /**
  * amdgpu_vram_mgr_init - init VRAM manager and DRM MM
@@ -196,6 +218,14 @@ static int amdgpu_vram_mgr_init(struct ttm_mem_type_manager *man,
 	ret = device_create_file(adev->dev, &dev_attr_mem_info_vram_vendor);
 	if (ret) {
 		DRM_ERROR("Failed to create device file mem_info_vram_vendor\n");
+	ret = device_create_file(adev->dev, &dev_attr_mem_info_num_bytes_moved);
+	if (ret) {
+		DRM_ERROR("Failed to create device file mem_info_num_bytes_moved\n");
+		return ret;
+	}
+	ret = device_create_file(adev->dev, &dev_attr_mem_info_num_evictions);
+	if (ret) {
+		DRM_ERROR("Failed to create device file mem_info_num_evictions\n");
 		return ret;
 	}
 
@@ -225,6 +255,8 @@ static int amdgpu_vram_mgr_fini(struct ttm_mem_type_manager *man)
 	device_remove_file(adev->dev, &dev_attr_mem_info_vram_used);
 	device_remove_file(adev->dev, &dev_attr_mem_info_vis_vram_used);
 	device_remove_file(adev->dev, &dev_attr_mem_info_vram_vendor);
+	device_remove_file(adev->dev, &dev_attr_mem_info_num_bytes_moved);
+	device_remove_file(adev->dev, &dev_attr_mem_info_num_evictions);
 	return 0;
 }
 
