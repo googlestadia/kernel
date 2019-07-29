@@ -1,0 +1,15 @@
+name: "Linux kernel"
+description: "Linux kernel"
+
+third_party {
+  url {
+    type: HOMEPAGE
+    value: "https://www.kernel.org/"
+  }
+  url {
+    type: GIT
+    value: "https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux-stable"
+  }
+  version: "v4.19.59"
+  last_upgrade_date { year: 2019 month: 7 day: 17 }
+}
