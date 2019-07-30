@@ -120,8 +120,8 @@ int amdgpu_direct_gma_size = 0;
 int amdgpu_ssg_enabled = 0;
 uint amdgpu_pcie_gen_cap = 0;
 uint amdgpu_pcie_lane_cap = 0;
-uint amdgpu_cg_mask = 0xffffffff;
-uint amdgpu_pg_mask = 0xffffffff;
+uint amdgpu_cg_mask = 0x00000000;
+uint amdgpu_pg_mask = 0x00000000;
 uint amdgpu_sdma_phase_quantum = 32;
 char *amdgpu_disable_cu = NULL;
 char *amdgpu_virtual_display = NULL;
@@ -418,17 +418,17 @@ module_param_named(pcie_lane_cap, amdgpu_pcie_lane_cap, uint, 0444);
 /**
  * DOC: cg_mask (uint)
  * Override Clockgating features enabled on GPU (0 = disable clock gating). See the AMD_CG_SUPPORT flags in
- * drivers/gpu/drm/amd/include/amd_shared.h. The default is 0xffffffff (all enabled).
+ * drivers/gpu/drm/amd/include/amd_shared.h. The default is 0x00000000 (all disabled).
  */
-MODULE_PARM_DESC(cg_mask, "Clockgating flags mask (0 = disable clock gating)");
+MODULE_PARM_DESC(cg_mask, "Clockgating flags mask (0 = disable clock gating(default))");
 module_param_named(cg_mask, amdgpu_cg_mask, uint, 0444);
 
 /**
  * DOC: pg_mask (uint)
  * Override Powergating features enabled on GPU (0 = disable power gating). See the AMD_PG_SUPPORT flags in
- * drivers/gpu/drm/amd/include/amd_shared.h. The default is 0xffffffff (all enabled).
+ * drivers/gpu/drm/amd/include/amd_shared.h. The default is 0x00000000 (all disabled).
  */
-MODULE_PARM_DESC(pg_mask, "Powergating flags mask (0 = disable power gating)");
+MODULE_PARM_DESC(pg_mask, "Powergating flags mask (0 = disable power gating(default))");
 module_param_named(pg_mask, amdgpu_pg_mask, uint, 0444);
 
 /**
