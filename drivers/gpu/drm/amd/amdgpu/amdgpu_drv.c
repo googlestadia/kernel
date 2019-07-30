@@ -1497,7 +1497,7 @@ static int __init amdgpu_init(void)
 #if defined(DRM_VER) && defined(DRM_PATCH) && defined(DRM_SUB)
 	DRM_INFO("OS DRM version: %d.%d.%d\n", DRM_VER, DRM_PATCH, DRM_SUB);
 #endif
-	DRM_INFO("2019 V320 Q3 B3\n");
+	DRM_INFO("2019 V320 Q3 B4\n");
 
 	kms_driver.num_ioctls = amdgpu_max_kms_ioctl;
 	amdgpu_register_atpx_handler();
