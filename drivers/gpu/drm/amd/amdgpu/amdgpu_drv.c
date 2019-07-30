@@ -1332,7 +1332,14 @@ int amdgpu_device_get_job_timeout_settings(struct amdgpu_device *adev)
 	 * And there is no timeout enforced on compute jobs.
 	 */
 	adev->gfx_timeout = adev->sdma_timeout = adev->video_timeout = 10000;
-	adev->compute_timeout = MAX_SCHEDULE_TIMEOUT;
+	/*
+	 * For SR-IOV and passthrough usage, compute ring
+	 * default timeout is set to the same as gfx ring
+	 */
+	if (amdgpu_passthrough(adev) || amdgpu_sriov_vf(adev))
+		adev->compute_timeout = adev->gfx_timeout;
+	else
+		adev->compute_timeout = MAX_SCHEDULE_TIMEOUT;
 
 	if (strnlen(input, AMDGPU_MAX_TIMEOUT_PARAM_LENTH)) {
 		while ((timeout_setting = strsep(&input, ",")) &&
