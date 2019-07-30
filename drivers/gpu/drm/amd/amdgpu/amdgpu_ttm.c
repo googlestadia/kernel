@@ -738,7 +738,7 @@ static unsigned long amdgpu_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
 
 	if (bo->mem.mem_type == AMDGPU_PL_DGMA ||
 			bo->mem.mem_type == AMDGPU_PL_DGMA_IMPORT ||
-			bo->mem.mem_type != AMDGPU_PL_DGMA_PEER)
+			bo->mem.mem_type == AMDGPU_PL_DGMA_PEER)
 		return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT)
 			+ page_offset;
 
