@@ -593,6 +593,15 @@ int soc15_set_ip_blocks(struct amdgpu_device *adev)
 
 	adev->rev_id = soc15_get_rev_id(adev);
 	adev->nbio_funcs->detect_hw_virt(adev);
+	/*
+	 * If running under SR-IOV or passthrough mode,
+	 * and user didn't set custom value for compute
+	 * ring timeout, need to set compute ring timeout
+	 * to the same value as gfx ring.
+	 */
+	if ((amdgpu_sriov_vf(adev) || amdgpu_passthrough(adev))
+		&& adev->compute_timeout == MAX_SCHEDULE_TIMEOUT)
+		adev->compute_timeout = adev->gfx_timeout;
 
 	if (amdgpu_sriov_vf(adev))
 		adev->virt.ops = &xgpu_ai_virt_ops;
