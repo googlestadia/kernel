@@ -182,12 +182,16 @@ function build_kernel_rootfs() {
   rm -f "${KROOTFS}"
   # mksquashfs does not support merging, so do it with rsync.
   local -r krootfs_install_dir="${KBUILD_OUTPUT}/krootfs-install"
-  mkdir "${krootfs_install_dir}" || true
+  rm -rf "${KROOTFS}" "${krootfs_install_dir}"
+  mkdir "${krootfs_install_dir}"
+  chmod 00755 "${krootfs_install_dir}"
   rsync -a --delete \
     "${MOD_INSTALL_DIR}"/ \
     "${FIRMWARE_INSTALL_DIR}"/ \
     "${PERF_INSTALL_DIR}"/ \
     "${krootfs_install_dir}"/
+  find "${krootfs_install_dir}" -type d -exec chmod 00755 {} \;
+  find "${krootfs_install_dir}/usr/local/bin" -type f -exec chmod 00755 {} \;
   mksquashfs "${krootfs_install_dir}" "${KROOTFS}" \
     -comp xz -no-exports -all-root -no-progress -no-recovery -Xbcj x86
 }
@@ -220,12 +224,11 @@ function build_linux_tar_xz() {
     "${tar_boot_dir}/System.map-${KERNELRELEASE}"
   cp -a "${KCONFIG_CONFIG}" "${tar_boot_dir}/config-${KERNELRELEASE}"
   cp -a "${INITRAMFS_DATA_CPIO_XZ}" "${TAR_INITRD}"
-  # Getting the permissions wrong on /, /usr, or /boot is disastrous. Be
-  # extra-safe and run a few chmods.
-  chmod 0755 "${TAR_INSTALL_DIR}" "${TAR_INSTALL_DIR}"/*
-  # Kokoro sets the suid and sgid bits on its root build folder, which must
-  # not make it into the tar archive. Use GNU tar's --mode flag to forcefully
-  # remove those bits.
+  # Getting the permissions wrong on /, /usr, or /boot is disastrous.
+  # Kokoro sets the sgid bit on its root build folder, which must not make it
+  # into the tar archive. Use GNU tar's --mode flag to forcefully remove them.
+  # https://cs.corp.google.com/piper///depot/google3/devtools/kokoro/vanadium/linux_scripts/usr/local/bin/format_tmpfs.sh
+  chmod 00755 "${TAR_INSTALL_DIR}" "${TAR_INSTALL_DIR}"/*
   tar -cf - --owner=root --group=root --mode='u-s,g-s' \
     -C "${TAR_INSTALL_DIR}" . | xz --threads=0 > "${LINUX_TAR_XZ}"
   # Print the content of the archive for the build log.
@@ -291,12 +294,11 @@ function build_perf() {
 
 function build_perf_tar_xz() {
   readonly PERF_TAR_XZ="${KBUILD_OUTPUT}/perf-${KERNELRELEASE}-${ARCH}.tar.xz"
-  # Getting the permissions wrong on /, /usr, or /boot is disastrous. Be
-  # extra-safe and run a few chmods.
-  chmod 0755 "${PERF_INSTALL_DIR}" "${PERF_INSTALL_DIR}"/*
-  # Kokoro sets the suid and sgid bits on its root build folder, which must
-  # not make it into the tar archive. Use GNU tar's --mode flag to forcefully
-  # remove those bits.
+  # Getting the permissions wrong on /, /usr, or /boot is disastrous.
+  # Kokoro sets the sgid bit on its root build folder, which must not make it
+  # into the tar archive. Use GNU tar's --mode flag to forcefully remove them.
+  # https://cs.corp.google.com/piper///depot/google3/devtools/kokoro/vanadium/linux_scripts/usr/local/bin/format_tmpfs.sh
+  chmod 00755 "${PERF_INSTALL_DIR}" "${PERF_INSTALL_DIR}"/*
   tar -cf - --owner=root --group=root --mode='u-s,g-s' \
     -C "${PERF_INSTALL_DIR}" . | xz --threads=0 > "${PERF_TAR_XZ}"
   # Print the content of the archive for the build log.
