@@ -188,3 +188,7 @@ obj-$(CONFIG_GNSS)		+= gnss/
 obj-$(CONFIG_INTERCONNECT)	+= interconnect/
 obj-$(CONFIG_COUNTER)		+= counter/
 obj-$(CONFIG_MOST)		+= most/
+
+# HW Accelerators
+obj-$(CONFIG_HW_ACCEL)          += accel/
+obj-$(CONFIG_GASKET_FRAMEWORK)  += gasket/
