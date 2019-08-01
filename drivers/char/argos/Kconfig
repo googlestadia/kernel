@@ -1,0 +1,23 @@
+menu "Argos devices"
+
+config ARGOS_SHARED
+  tristate "Argos shared components"
+  help
+  This contains shared Argos components used by multiple devices.
+  Say Y if you want to include this driver in the kernel.
+
+  To compile this driver as a module, choose M here.  The module
+  will be called argos_shared.
+
+config VARGOS_DRIVER
+  tristate "VArgos driver"
+  depends on GASKET_FRAMEWORK
+  depends on ARGOS_SHARED
+  help
+  This driver supports the VArgos device.  Say Y if you want to include this
+  driver in the kernel.
+
+  To compile this driver as a module, choose M here.  The module
+  will be called vargos.
+
+endmenu
