@@ -201,6 +201,10 @@ source "drivers/dax/Kconfig"
 
 source "drivers/nvmem/Kconfig"
 
+source "drivers/accel/Kconfig"
+
+source "drivers/gasket/Kconfig"
+
 source "drivers/hwtracing/Kconfig"
 
 source "drivers/fpga/Kconfig"
