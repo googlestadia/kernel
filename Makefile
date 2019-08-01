@@ -693,6 +693,10 @@ include/config/auto.conf:
 endif # may-sync-config
 endif # need-config
 
+# Enable stadia-only configurations inside the prodkernel-ported argos kernel
+# driver. See kcl/250449, kcl/250541, and kcl/250744.
+KBUILD_CFLAGS   += -DSTADIA_KERNEL
+
 KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
 KBUILD_CFLAGS	+= $(call cc-disable-warning,frame-address,)
 KBUILD_CFLAGS	+= $(call cc-disable-warning, format-truncation)

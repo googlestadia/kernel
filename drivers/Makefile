@@ -186,3 +186,7 @@ obj-$(CONFIG_SIOX)		+= siox/
 obj-$(CONFIG_GNSS)		+= gnss/
 obj-$(CONFIG_INTERCONNECT)	+= interconnect/
 obj-$(CONFIG_COUNTER)		+= counter/
+
+# HW Accelerators
+obj-$(CONFIG_HW_ACCEL)          += accel/
+obj-$(CONFIG_GASKET_FRAMEWORK)  += gasket/
