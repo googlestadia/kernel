@@ -1,0 +1,2 @@
+# Allow all users to use render nodes.
+SUBSYSTEM=="drm", ACTION=="add", DEVPATH=="/devices/*/renderD*", MODE="020666"
