@@ -3435,7 +3435,7 @@ static int amdgpu_do_asic_reset(struct amdgpu_hive_info *hive,
 			       bool *need_full_reset_arg)
 {
 	struct amdgpu_device *tmp_adev = NULL;
-	bool need_full_reset = *need_full_reset_arg, vram_lost = false;
+	bool need_full_reset = *need_full_reset_arg;
 	int r = 0;
 
 	/*
@@ -3490,11 +3490,8 @@ static int amdgpu_do_asic_reset(struct amdgpu_hive_info *hive,
 				if (r)
 					goto out;
 
-				vram_lost = amdgpu_device_check_vram_lost(tmp_adev);
-				if (vram_lost) {
-					DRM_ERROR("VRAM is lost!\n");
-					atomic_inc(&tmp_adev->vram_lost_counter);
-				}
+				DRM_WARN("VRAM is lost!\n");
+				atomic_inc(&tmp_adev->vram_lost_counter);
 
 				r = amdgpu_gtt_mgr_recover(
 					&tmp_adev->mman.bdev.man[TTM_PL_TT]);
@@ -3508,9 +3505,6 @@ static int amdgpu_do_asic_reset(struct amdgpu_hive_info *hive,
 				r = amdgpu_device_ip_resume_phase2(tmp_adev);
 				if (r)
 					goto out;
-
-				if (vram_lost)
-					amdgpu_device_fill_reset_magic(tmp_adev);
 
 				/* Update PSP FW topology after reset */
 				if (hive && tmp_adev->gmc.xgmi.num_physical_nodes > 1)
