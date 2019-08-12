@@ -54,9 +54,8 @@ static inline void spsc_queue_init(struct spsc_queue *queue)
 
 static inline struct spsc_node *spsc_queue_peek(struct spsc_queue *queue)
 {
-	return queue->head;
+	return READ_ONCE(queue->head);
 }
-
 static inline int spsc_queue_count(struct spsc_queue *queue)
 {
 	return atomic_read(&queue->job_count);
@@ -70,9 +69,9 @@ static inline bool spsc_queue_push(struct spsc_queue *queue, struct spsc_node *n
 
 	preempt_disable();
 
+	atomic_inc(&queue->job_count);
 	tail = (struct spsc_node **)atomic_long_xchg(&queue->tail, (long)&node->next);
 	WRITE_ONCE(*tail, node);
-	atomic_inc(&queue->job_count);
 
 	/*
 	 * In case of first element verify new node will be visible to the consumer
@@ -93,6 +92,7 @@ static inline struct spsc_node *spsc_queue_pop(struct spsc_queue *queue)
 	/* Verify reading from memory and not the cache */
 	smp_rmb();
 
+	atomic_dec(&queue->job_count);
 	node = READ_ONCE(queue->head);
 
 	if (!node)
@@ -113,7 +113,6 @@ static inline struct spsc_node *spsc_queue_pop(struct spsc_queue *queue)
 		}
 	}
 
-	atomic_dec(&queue->job_count);
 	return node;
 }
 
