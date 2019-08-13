@@ -92,7 +92,6 @@ static inline struct spsc_node *spsc_queue_pop(struct spsc_queue *queue)
 	/* Verify reading from memory and not the cache */
 	smp_rmb();
 
-	atomic_dec(&queue->job_count);
 	node = READ_ONCE(queue->head);
 
 	if (!node)
@@ -113,6 +112,7 @@ static inline struct spsc_node *spsc_queue_pop(struct spsc_queue *queue)
 		}
 	}
 
+	atomic_dec(&queue->job_count);
 	return node;
 }
 
