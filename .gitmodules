@@ -1,4 +1,4 @@
 [submodule "dkms"]
 	path = dkms
 	url = ./
-	branch = amd/19.20
+	branch = amd/19.20-patch
