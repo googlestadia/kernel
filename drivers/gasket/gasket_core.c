@@ -1681,9 +1681,10 @@ int gasket_mm_unmap_region(
 
 
 
- return zap_vma_ptes(vma, vma->vm_start + virt_offset,
+ zap_vma_ptes(vma, vma->vm_start + virt_offset,
   DIV_ROUND_UP(mappable_region.length_bytes, PAGE_SIZE) *
    PAGE_SIZE);
+ return 0;
 }
 EXPORT_SYMBOL(gasket_mm_unmap_region);
 
