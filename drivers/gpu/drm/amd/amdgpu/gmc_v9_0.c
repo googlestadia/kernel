@@ -1179,6 +1179,26 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 		 (unsigned)(adev->gmc.gart_size >> 20),
 		 (unsigned long long)amdgpu_bo_gpu_offset(adev->gart.bo));
 	adev->gart.ready = true;
+
+	if (!amdgpu_sriov_vf(adev)) {
+		DRM_INFO("disable auto Pchg is a w/a for the vega10 UMC hardware bug\n");
+		WREG32(0x5010c/4, 0x1002);
+		WREG32(0x5210c/4, 0x1002);
+		WREG32(0x5410c/4, 0x1002);
+		WREG32(0x5610c/4, 0x1002);
+		WREG32(0x15010c/4, 0x1002);
+		WREG32(0x15210c/4, 0x1002);
+		WREG32(0x15410c/4, 0x1002);
+		WREG32(0x15610c/4, 0x1002);
+		WREG32(0x25010c/4, 0x1002);
+		WREG32(0x25210c/4, 0x1002);
+		WREG32(0x25410c/4, 0x1002);
+		WREG32(0x25610c/4, 0x1002);
+		WREG32(0x35010c/4, 0x1002);
+		WREG32(0x35210c/4, 0x1002);
+		WREG32(0x35410c/4, 0x1002);
+		WREG32(0x35610c/4, 0x1002);
+	}
 	return 0;
 }
 
