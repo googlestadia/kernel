@@ -12,10 +12,10 @@ import os
 import re
 import time
 
-KOKORO_RELEASE_TRAIN_RE = re.compile(r"(\d{4}\.\d+)/release")
+KOKORO_RELEASE_TRAIN_RE = re.compile(r"(\d{4}\.R+\d+)/release")
 RAPID_RC_NUMBER_RE = re.compile(r"_RC(\d+)$")
-RAPID_RELEASE_TRAIN_RE = re.compile(r"(\d{4}\.\d+)_RC\d+$")
-SCM_BRANCH_RELEASE_TRAIN_RE = re.compile(r"^release/gamelet/(\d{4}\.\d+)")
+RAPID_RELEASE_TRAIN_RE = re.compile(r"(\d{4}\.R+\d+)_RC\d+$")
+SCM_BRANCH_RELEASE_TRAIN_RE = re.compile(r"^release/gamelet/(\d{4}\.R+\d+)")
 
 
 def main():
