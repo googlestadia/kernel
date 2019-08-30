@@ -332,6 +332,7 @@ function build_perf() {
     NO_JVMTI=1 \
     LIBCLANGLLVM=1 \
     LLVM_CONFIG=/usr/bin/llvm-config-3.9 \
+    WERROR=0 \
     "${MAKE_ARGS[@]}"
   popd
 }
