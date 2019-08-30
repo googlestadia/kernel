@@ -288,7 +288,7 @@ function build_boot_disk() {
   local -r boot_disk_mount_dir="${KBUILD_OUTPUT}/boot-mount"
   rm -f "${BOOT_DISK}"
   touch "${BOOT_DISK}"
-  fallocate --zero-range --length 32M "${BOOT_DISK}"
+  fallocate --zero-range --length 35M "${BOOT_DISK}"
   /sbin/parted --script "${BOOT_DISK}" -- mklabel msdos mkpart primary ext2 \
     2048s -1s set 1 boot on
   /sbin/mkfs.ext2 -F -L GGPBOOTFS -Eoffset=1048576 "${BOOT_DISK}"
