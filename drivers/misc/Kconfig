@@ -528,3 +528,9 @@ source "drivers/misc/cxl/Kconfig"
 source "drivers/misc/ocxl/Kconfig"
 source "drivers/misc/cardreader/Kconfig"
 endmenu
+
+config DUMMY_AMDKFD
+	tristate "Dummy AMD KFD"
+	default m
+	---help---
+	  Dummy module used for backward compatiblity with platform testing
