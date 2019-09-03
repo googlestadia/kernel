@@ -7,7 +7,7 @@ GTT_RAM=$((${TOTAL_RAM}*3/(4*1024)))
 PEER_SIZE=128
 
 modprobe amdgpu gttsize="${GTT_RAM}" sched_jobs=256 sched_hw_submission=8 \
-  peermem_size="${PEER_SIZE}"
+  peermem_size="${PEER_SIZE}" no_evict=1
 
 # Allow RGP to set the DPM level to profile_standard when host is in SIMPERF
 for f in /sys/class/drm/card?/device/power_dpm_force_performance_level; do
