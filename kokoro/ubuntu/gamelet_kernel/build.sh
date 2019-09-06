@@ -2,8 +2,7 @@
 set -xe
 
 readonly SCRIPT_DIR=$(dirname "$(readlink -f "${0}")")
-readonly SRC_DIR=$(readlink -f "${SCRIPT_DIR}/../../..")
-readonly GCLOUD_KEY_FILE="${KOKORO_KEYSTORE_DIR}/71274_kokoro_service_key_json"
+readonly SRC_DIR=${DOCKER_SRC_DIR}
 readonly INITRAMFS_BIN_URL="gs://stadia_kernels/initramfs/initramfs-20190312.tar.gz"
 readonly INITRAMFS_BIN_SHA256="9790f1a9a859eca95c8ca036416f0ca7d76fdd0bc41c273fcad4636caf4681d3"
 readonly AMDGPU_FIRMWARE_URL="gs://stadia_kernels/amdgpu-firmware/amdgpu-firmware-2019.3.tar.gz"
@@ -55,23 +54,30 @@ function download_gcs() {
   echo "${dst_path}"
 }
 
-function check_kokoro_env() {
-  if [[ ! -d ${KOKORO_ROOT} ]]; then
-    echo "KOKORO_ROOT is not a valid directory path."
+function check_env() {
+  if [[ ! -d ${DOCKER_TMP_DIR} ]]; then
+    echo "DOCKER_TMP_DIR is not a valid directory path."
     exit 1
   fi
-  export KOKORO_ROOT="${KOKORO_ROOT%/}"
+  export ARTIFACT_ROOT="${DOCKER_TMP_DIR%/}/build_output"
+  mkdir ${ARTIFACT_ROOT}
+
+  if [[ ! -d ${DOCKER_ARTIFACTS_DIR} ]]; then
+    echo "DOCKER_ARTIFACTS_DIR is not a valid directory path."
+    exit 1
+  fi
+  export DOCKER_ARTIFACTS_DIR="${DOCKER_ARTIFACTS_DIR%/}"
 }
 
 function set_LOCALVERSION_from_buildstamp() {
   pushd "${SRC_DIR}"
-  local -r buildstamp_vars_script="${KOKORO_ROOT}"/builstamp.sh
-  "${SCRIPT_DIR}"/get_workspace_status > "${KOKORO_ROOT}"/workspace-status.txt
+  local -r buildstamp_vars_script="${ARTIFACT_ROOT}"/buildstamp.sh
+  "${SCRIPT_DIR}"/get_workspace_status > "${ARTIFACT_ROOT}"/workspace-status.txt
   python3 "${SCRIPT_DIR}"/gen_buildstamp_vars.py \
     --output "${buildstamp_vars_script}" \
     --template "${SCRIPT_DIR}"/buildstamp_sh_template.txt \
     --var_format "export {}=\"{}\"" \
-    "${KOKORO_ROOT}"/workspace-status.txt
+    "${ARTIFACT_ROOT}"/workspace-status.txt
   source "${buildstamp_vars_script}"
   if [[ -z ${STABLE_KOKORO_JOB_NAME} ]]; then
     readonly LOCALVERSION="${LOCALVERSION}-local"
@@ -80,22 +86,27 @@ function set_LOCALVERSION_from_buildstamp() {
 }
 
 function setup_gcloud() {
-  if [[ -e "${GCLOUD_KEY_FILE}" ]]; then
-    gcloud auth activate-service-account --key-file "${GCLOUD_KEY_FILE}"
+  # If a key file is specified, then we're running in a CI job that needs the
+  # corresponding service account to be activated.
+  # If not, we're assuming that we're running locally, and the user has their
+  # home directory mounted at $HOME, with a gcloud config that is already
+  # authenticated.
+  if [[ -e "${DOCKER_GCLOUD_KEY_FILE}" ]]; then
+    gcloud auth activate-service-account --key-file "${DOCKER_GCLOUD_KEY_FILE}"
   fi
 }
 
 function download_initramfs_artifacts() {
-  readonly TMP_INITRAMFS_DIR="${KOKORO_ROOT}/initramfs"
+  readonly TMP_INITRAMFS_DIR="${ARTIFACT_ROOT}/initramfs"
   rm -rf "${TMP_INITRAMFS_DIR}"
   mkdir "${TMP_INITRAMFS_DIR}"
 
-  local -r initramfs_bin_archive="$(download_gcs "${INITRAMFS_BIN_URL}" "${KOKORO_ROOT}" "${INITRAMFS_BIN_SHA256}")"
+  local -r initramfs_bin_archive="$(download_gcs "${INITRAMFS_BIN_URL}" "${ARTIFACT_ROOT}" "${INITRAMFS_BIN_SHA256}")"
   tar -xf "${initramfs_bin_archive}" -C "${TMP_INITRAMFS_DIR}/"
 }
 
 function download_firmware() {
-  readonly FIRMWARE_INSTALL_DIR="${KOKORO_ROOT}/firmware-install"
+  readonly FIRMWARE_INSTALL_DIR="${ARTIFACT_ROOT}/firmware-install"
   mkdir -p "${FIRMWARE_INSTALL_DIR}"
 
   local -r firmware_install_usr_dir="${FIRMWARE_INSTALL_DIR}/usr/lib/firmware"
@@ -103,12 +114,12 @@ function download_firmware() {
 
   local -r amdgpu_firmware_dir="${firmware_install_usr_dir}/amdgpu"
   mkdir -p "${amdgpu_firmware_dir}"
-  local -r amdgpu_firmware_archive="$(download_gcs "${AMDGPU_FIRMWARE_URL}" "${KOKORO_ROOT}" "${AMDGPU_FIRMWARE_SHA256}")"
+  local -r amdgpu_firmware_archive="$(download_gcs "${AMDGPU_FIRMWARE_URL}" "${ARTIFACT_ROOT}" "${AMDGPU_FIRMWARE_SHA256}")"
   tar -xf "${amdgpu_firmware_archive}" -C "${amdgpu_firmware_dir}"/
 }
 
 function create_kbuild_output() {
-  export KBUILD_OUTPUT="${KOKORO_ROOT}/obj"
+  export KBUILD_OUTPUT="${ARTIFACT_ROOT}/obj"
   mkdir "${KBUILD_OUTPUT}" || true
 }
 
@@ -238,7 +249,8 @@ function build_linux_tar_xz() {
 }
 
 function build_boot_disk() {
-  readonly BOOT_DISK="${KBUILD_OUTPUT}/disk-${KERNELRELEASE}-${ARCH}.raw"
+  readonly BOOT_DISK_NAME="disk-${KERNELRELEASE}-${ARCH}.raw"
+  readonly BOOT_DISK="${KBUILD_OUTPUT}/${BOOT_DISK_NAME}"
   readonly BOOT_DISK_GZ="${BOOT_DISK}.gz"
   local -r boot_disk_mount_dir="${KBUILD_OUTPUT}/boot-mount"
   rm -f "${BOOT_DISK}"
@@ -247,7 +259,7 @@ function build_boot_disk() {
   /sbin/parted --script "${BOOT_DISK}" -- mklabel msdos mkpart primary ext2 \
     2048s -1s set 1 boot on
   /sbin/mkfs.ext2 -F -L GGPBOOTFS -Eoffset=1048576 "${BOOT_DISK}"
-  sudo "${SCRIPT_DIR}"/build_boot_disk_helper.sh "${BOOT_DISK}" \
+  "${SCRIPT_DIR}"/build_boot_disk_helper.sh "${BOOT_DISK}" \
     "${boot_disk_mount_dir}" "${TAR_INSTALL_DIR}" "${VMLINUZ_NAME}" \
     "${INITRD_NAME}"
   dd if=/usr/lib/syslinux/mbr/mbr.bin of="${BOOT_DISK}" conv=notrunc
@@ -261,10 +273,11 @@ pkgdef mpm = {
   package_name = 'test/chrome/cloudcast/kernel/gamelet_disk_test_${USER}'
   source = [
     {
-      source_file = '${BOOT_DISK}'
+      source_file = '${BOOT_DISK_NAME}'
       package_path = 'disk.raw'
     },
   ]
+  relative_path_anchor = 'PKGDEF_DIR'
 }
 EOL
 }
@@ -307,8 +320,28 @@ function build_perf_tar_xz() {
     "$(dirname "${PERF_TAR_XZ}")/perf-latest.tar.xz"
 }
 
+function stage_artifacts() {
+  readonly artifacts_dir="${DOCKER_ARTIFACTS_DIR}"
+  readonly mpm_dir="${artifacts_dir}/mpm"
+
+  cp -a "${LINUX_TAR_XZ}" "${artifacts_dir}/"
+  cp -a "${BOOT_DISK_GZ}" "${artifacts_dir}/"
+  cp -a "${PERF_TAR_XZ}" "${artifacts_dir}/"
+  cp -a "${VMLINUX}" "${artifacts_dir}/"
+
+  readonly kernel_mpm_dir="${mpm_dir}"/chrome/cloudcast/kernel/gamelet
+  mkdir -p "${kernel_mpm_dir}"
+  cp -a "${TAR_INITRD}" "${kernel_mpm_dir}/initrd"
+  cp -a "${TAR_VMLINUZ}" "${kernel_mpm_dir}/vmlinuz"
+
+  # See https://g3doc.corp.google.com/cloud/network/edge/g3doc/vm_disk.md#creating-an-mpm-disk-package
+  readonly kernel_disk_mpm_dir="${mpm_dir}"/chrome/cloudcast/kernel/gamelet_disk
+  mkdir -p "${kernel_disk_mpm_dir}"
+  cp -a "${BOOT_DISK}" "${kernel_disk_mpm_dir}/disk.raw"
+}
+
 function build() {
-  check_kokoro_env
+  check_env
   set_LOCALVERSION_from_buildstamp
   setup_gcloud
   download_initramfs_artifacts
@@ -324,6 +357,7 @@ function build() {
   build_linux_tar_xz
   build_perf_tar_xz
   build_boot_disk
+  stage_artifacts
 }
 
 build
