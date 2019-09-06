@@ -335,7 +335,7 @@ static int __init vargos_init(void)
 {
  int i;
 
- gasket_nodev_info("Loading VArgos driver.");
+ gasket_nodev_info("Loading VArgos driver: a935519476cc.");
 
  i = vargos_wormhole_setup();
  if (i)
