@@ -134,6 +134,8 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	int r = 0;
 	bool need_pipe_sync = false;
 	unsigned extra_nop = 0;
+	unsigned vmhub = ring->funcs->vmhub;
+	struct amdgpu_vmid_mgr *id_mgr = &adev->vm_manager.id_mgr[vmhub];
 
 	if (num_ibs == 0)
 		return -EINVAL;
@@ -189,8 +191,10 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 
 	if (job) {
 		amdgpu_ring_insert_nop(ring, extra_nop); /* prevent CE go too fast than DE */
-
+		mutex_lock(&id_mgr->lock);
 		r = amdgpu_vm_flush(ring, job, need_pipe_sync);
+		mutex_unlock(&id_mgr->lock);
+
 		if (r) {
 			amdgpu_ring_undo(ring);
 			return r;
