@@ -192,4 +192,9 @@ EOT
 	mount -t overlay overlay -o \
 		"lowerdir=${lowerdir},upperdir=${upperdir},workdir=${workdir}" \
 		/root || return 1
+
+
+	# WORKAROUND: Create /mnt/package in the root overlayfs.
+	# TODO(b/139151730): ESC asset mounting broken
+	mkdir -p /root/mnt/package
 }
