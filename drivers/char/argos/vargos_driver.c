@@ -97,6 +97,8 @@
 
 #define VARGOS_CHIP_GLOBAL_START 0x02000000
 #define VARGOS_CHIP_GLOBAL_SIZE 0x20
+#define VARGOS_FAKE_STICKY_START 0x02106070
+#define VARGOS_FAKE_STICKY_SIZE sizeof(u64)
 # 105 "./drivers/char/argos/vargos_driver.c"
 #define VARGOS_MAILBOX_TIMEOUT (msecs_to_jiffies(500))
 
@@ -938,6 +940,8 @@ static int vargos_get_mappable_regions_cb(
        return_all)
     (*num_mappable_regions)++;
 
+  (*num_mappable_regions)++;
+
   *mappable_regions = kzalloc(
    sizeof(struct gasket_mappable_region) *
    *num_mappable_regions,
@@ -975,6 +979,12 @@ static int vargos_get_mappable_regions_cb(
 
 
 
+  (*mappable_regions)[output_index].start =
+   VARGOS_FAKE_STICKY_START;
+  (*mappable_regions)[output_index].length_bytes =
+   VARGOS_FAKE_STICKY_SIZE;
+  (*mappable_regions)[output_index].flags = VM_READ | VM_WRITE;
+  output_index++;
 
 
  } else if (bar_index == VARGOS_DRAM_BAR) {
