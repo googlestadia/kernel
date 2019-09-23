@@ -1451,10 +1451,9 @@ free_it:
 		 * Is there need to periodically free_page_list? It would
 		 * appear not as the counts should be low
 		 */
-		if (unlikely(PageTransHuge(page))) {
-			mem_cgroup_uncharge(page);
+		if (unlikely(PageTransHuge(page)))
 			(*get_compound_page_dtor(page))(page);
-		} else
+		else
 			list_add(&page->lru, &free_pages);
 		continue;
 
@@ -1852,7 +1851,6 @@ putback_inactive_pages(struct lruvec *lruvec, struct list_head *page_list)
 
 			if (unlikely(PageCompound(page))) {
 				spin_unlock_irq(&pgdat->lru_lock);
-				mem_cgroup_uncharge(page);
 				(*get_compound_page_dtor(page))(page);
 				spin_lock_irq(&pgdat->lru_lock);
 			} else
