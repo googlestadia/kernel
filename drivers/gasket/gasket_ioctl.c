@@ -368,7 +368,7 @@ static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg)
 
  return gasket_page_table_map(
   gasket_dev->page_table[ibuf.page_table_index],
-  ibuf.host_address, ibuf.device_address, ibuf.size / PAGE_SIZE);
+  ibuf.host_address, ibuf.device_address, ibuf.size);
 }
 
 
@@ -390,12 +390,7 @@ static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg)
  if (ibuf.page_table_index >= gasket_dev->num_page_tables)
   return -EFAULT;
 
- if (gasket_page_table_is_dev_addr_bad(
-      gasket_dev->page_table[ibuf.page_table_index],
-      ibuf.device_address, ibuf.size))
-  return -EINVAL;
-
  return gasket_page_table_unmap(
   gasket_dev->page_table[ibuf.page_table_index],
-  ibuf.device_address, ibuf.size / PAGE_SIZE);
+  ibuf.device_address, ibuf.size);
 }

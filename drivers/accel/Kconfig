@@ -8,4 +8,3 @@ config HW_ACCEL
 	  HW Accelerator class support for google. This option selects
 	  the framework / common code needed for the Google's hardware
 	  accelerator projects.
-

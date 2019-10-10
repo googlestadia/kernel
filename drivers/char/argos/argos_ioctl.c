@@ -231,8 +231,6 @@ static int argos_ioctl_disable_queue_ctx(
  if (ret)
   return ret;
 
- if (current->mm)
-  down_read(&current->mm->mmap_sem);
  mutex_lock(&queue_ctx->mutex);
  if (queue_ctx->owner == 0) {
   gasket_log_info(gasket_dev,
@@ -263,8 +261,6 @@ static int argos_ioctl_disable_queue_ctx(
  queue_owner = queue_ctx->owner;
  ret = argos_disable_queue_ctx(device_data, queue_ctx);
  mutex_unlock(&queue_ctx->mutex);
- if (current->mm)
-  up_read(&current->mm->mmap_sem);
 
  mutex_lock(&device_data->mutex);
  ret = tgid_hash_queue_remove(
@@ -277,9 +273,6 @@ static int argos_ioctl_disable_queue_ctx(
 
 early_exit:
  mutex_unlock(&queue_ctx->mutex);
- if (current->mm)
-  up_read(&current->mm->mmap_sem);
-
  return ret;
 }
 
@@ -420,7 +413,7 @@ int argos_check_gasket_ioctl_permissions(
   if (interrupt_data.interrupt >=
    device_data->gasket_driver_desc->num_interrupts)
    return -EINVAL;
-# 441 "./drivers/char/argos/argos_ioctl.c"
+# 434 "./drivers/char/argos/argos_ioctl.c"
   if (is_master)
    return 1;
   else if (interrupt_data.interrupt ==
