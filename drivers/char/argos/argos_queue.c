@@ -359,6 +359,8 @@ int argos_disable_queue_ctx(
  if (gasket_dev->status == GASKET_STATUS_DEAD)
   return 1;
 
+ if (current->mm)
+  down_read(&current->mm->mmap_sem);
  mutex_lock(&queue_ctx->direct_mappings_mutex);
  list_for_each_entry_safe(direct_mapping, next_direct_mapping,
      &queue_ctx->direct_mappings, list) {
@@ -369,6 +371,9 @@ int argos_disable_queue_ctx(
    gasket_dev->status = GASKET_STATUS_DEAD;
  }
  mutex_unlock(&queue_ctx->direct_mappings_mutex);
+ if (current->mm)
+  up_read(&current->mm->mmap_sem);
+
  if (dm_ret) {
 
 
@@ -399,13 +404,16 @@ int argos_disable_queue_ctx(
 
 
 
- if (queue_ctx->owner == current->tgid &&
-  gasket_dev->ownership.owner != current->tgid &&
-  !capable(CAP_SYS_ADMIN) && current->mm) {
-  remove_all_mmaps(
-   device_data,
-   device_data->device_desc->firmware_register_bar,
-   &map_region);
+ if (current->mm) {
+  down_read(&current->mm->mmap_sem);
+  if (queue_ctx->owner == current->tgid &&
+   gasket_dev->ownership.owner != current->tgid &&
+   !capable(CAP_SYS_ADMIN))
+   remove_all_mmaps(
+    device_data,
+    device_data->device_desc->firmware_register_bar,
+    &map_region);
+  up_read(&current->mm->mmap_sem);
  }
 
  if (queue_ctx->pg_tbl)
@@ -432,8 +440,6 @@ static void disable_owned_queues(
   hash_entry->tgid);
 
 
- if (current->mm)
-  down_read(&current->mm->mmap_sem);
  for (i = 0; i < device_data->device_desc->queue_ctx_count; i++) {
   if (tgid_hash_entry_queue_is_enabled(hash_entry, i)) {
    gasket_log_debug(gasket_dev, "Disabling queue %d", i);
@@ -446,8 +452,6 @@ static void disable_owned_queues(
    schedule_timeout_interruptible(msecs_to_jiffies(1));
   }
  }
- if (current->mm)
-  up_read(&current->mm->mmap_sem);
 
  tgid_hash_entry_clear_queues(hash_entry);
 }
@@ -522,8 +526,6 @@ int argos_disable_and_deallocate_all_queues(
 
 
  queue_ctxs = device_data->queue_ctxs;
- if (current->mm)
-  down_read(&current->mm->mmap_sem);
  for (i = 0; i < device_data->device_desc->queue_ctx_count; i++) {
 
   mutex_lock(&queue_ctxs[i].mutex);
@@ -549,8 +551,6 @@ int argos_disable_and_deallocate_all_queues(
   }
   mutex_unlock(&queue_ctxs[i].mutex);
  }
- if (current->mm)
-  up_read(&current->mm->mmap_sem);
 
  return ret;
 }
@@ -968,6 +968,11 @@ int argos_deallocate_direct_mapping(
   return ret;
 
  mutex_lock(&queue_ctx->mutex);
+
+
+
+ if (current->mm)
+  down_read(&current->mm->mmap_sem);
  mutex_lock(&queue_ctx->direct_mappings_mutex);
 
  if (!queue_is_enabled_by_current(device_data, queue_ctx)) {
@@ -1000,6 +1005,7 @@ int argos_deallocate_direct_mapping(
   removed_entry = true;
   break;
  }
+
  if (!removed_entry) {
   gasket_log_error(device_data->gasket_dev,
    "Failed to find a direct mapping to deallocate for queue %d of BAR%d [%#llx, %#llx], prot=%d",
@@ -1010,6 +1016,8 @@ int argos_deallocate_direct_mapping(
  }
 
 exit:
+ if (current->mm)
+  up_read(&current->mm->mmap_sem);
  mutex_unlock(&queue_ctx->direct_mappings_mutex);
  mutex_unlock(&queue_ctx->mutex);
  return ret;

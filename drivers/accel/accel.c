@@ -126,6 +126,11 @@ int accel_dev_register(struct accel_dev *adev)
   goto out_chrdev_unregister;
  }
 
+ adev->physical_functions =
+     kobject_create_and_add("physical_functions", &adev->dev.kobj);
+ adev->scalar_resources =
+     kset_create_and_add("resources", NULL, &adev->dev.kobj);
+
  dev_dbg(&adev->dev, "accel_dev registered");
  return 0;
 
@@ -134,11 +139,14 @@ out_chrdev_unregister:
  return ret;
 }
 EXPORT_SYMBOL(accel_dev_register);
-# 183 "./drivers/accel/accel.c"
+# 188 "./drivers/accel/accel.c"
 void accel_dev_unregister(struct accel_dev *adev)
 {
  if (!adev)
   return;
+
+ kset_unregister(adev->scalar_resources);
+ kobject_put(adev->physical_functions);
 
  accel_dev_chrdev_unregister(adev);
  dev_dbg(&adev->dev, "accel_dev unregistering");
@@ -152,7 +160,7 @@ static int accel_dev_match_devt(struct device *dev, const void *data)
 
  return dev->devt == *devt;
 }
-# 208 "./drivers/accel/accel.c"
+# 216 "./drivers/accel/accel.c"
 struct accel_dev *accel_dev_get_by_devt(dev_t devt)
 {
  struct device *dev;
@@ -172,7 +180,7 @@ static int accel_dev_match_parent(struct device *dev, const void *data)
 
  return dev->parent == parent;
 }
-# 235 "./drivers/accel/accel.c"
+# 243 "./drivers/accel/accel.c"
 struct accel_dev *accel_dev_get_by_parent(struct device *parent)
 {
  struct device *dev;
@@ -382,6 +390,30 @@ static struct class accel_class = {
  .dev_groups = accel_dev_groups,
  .dev_uevent = accel_dev_uevent,
 };
+# 460 "./drivers/accel/accel.c"
+int accel_add_physical_function(struct accel_dev *adev, struct device *dev)
+{
+ if (WARN_ON(adev == NULL || dev == NULL))
+  return -EINVAL;
+
+ return sysfs_create_link(adev->physical_functions,
+    &dev->kobj, dev_name(dev));
+}
+EXPORT_SYMBOL(accel_add_physical_function);
+
+
+
+
+
+
+void accel_remove_physical_function(struct accel_dev *adev, struct device *dev)
+{
+ if (WARN_ON(adev == NULL || dev == NULL))
+  return;
+
+ sysfs_remove_link(adev->physical_functions, dev_name(dev));
+}
+EXPORT_SYMBOL(accel_remove_physical_function);
 
 static int __init accel_init(void)
 {

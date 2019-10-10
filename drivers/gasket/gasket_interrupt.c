@@ -128,8 +128,12 @@ static int gasket_interrupt_setup(struct gasket_dev *gasket_dev);
 
 static int gasket_interrupt_msix_init(
  struct gasket_interrupt_data *interrupt_data);
+static int legacy_gasket_interrupt_msix_init(
+ struct gasket_dev *gasket_dev);
 static void gasket_interrupt_msix_teardown(
  struct gasket_interrupt_data *interrupt_data);
+static int gasket_interrupt_configure(
+ struct gasket_dev *gasket_dev, int interrupt);
 
 
 
@@ -304,7 +308,7 @@ int legacy_gasket_interrupt_init(struct gasket_dev *gasket_dev,
  if (ret)
   goto fail_allocate;
 
- ret = gasket_interrupt_msix_init(interrupt_data);
+ ret = legacy_gasket_interrupt_msix_init(gasket_dev);
  if (ret) {
   gasket_log_warn(gasket_dev, "Couldn't init msix: %d", ret);
   goto fail_msix_init;
@@ -326,6 +330,7 @@ fail_allocate:
  kfree(interrupt_data);
  return ret;
 }
+
 
 static int gasket_interrupt_msix_init(
  struct gasket_interrupt_data *interrupt_data)
@@ -355,9 +360,28 @@ static int gasket_interrupt_msix_init(
 
 
 
+static int legacy_gasket_interrupt_msix_init(
+ struct gasket_dev *gasket_dev)
+{
+ int ret = 0;
+ int i;
 
+ ret = gasket_interrupt_msix_init(gasket_dev->interrupt_data);
+ if (ret)
+  return ret;
 
+ for (i = 0; i < gasket_dev->interrupt_data->num_interrupts; i++) {
+  ret = gasket_interrupt_configure(gasket_dev, i);
+  if (ret)
+   goto fail_configure;
+ }
 
+ return 0;
+fail_configure:
+ gasket_interrupt_msix_teardown(gasket_dev->interrupt_data);
+ return ret;
+}
+# 389 "./drivers/gasket/gasket_interrupt.c"
 static void gasket_interrupt_clear_eventfd(
  struct gasket_interrupt_data *interrupt_data, int interrupt)
 {
@@ -437,7 +461,12 @@ int gasket_interrupt_reinit(struct gasket_dev *gasket_dev)
  gasket_interrupt_clear_all_eventfds(gasket_dev->interrupt_data);
  gasket_interrupt_msix_teardown(gasket_dev->interrupt_data);
 
- ret = gasket_interrupt_msix_init(gasket_dev->interrupt_data);
+ if (gasket_interrupt_is_legacy(gasket_dev->interrupt_data))
+  ret = legacy_gasket_interrupt_msix_init(
+   gasket_dev);
+ else
+  ret = gasket_interrupt_msix_init(gasket_dev->interrupt_data);
+
  if (ret) {
 
 
@@ -450,6 +479,7 @@ int gasket_interrupt_reinit(struct gasket_dev *gasket_dev)
   ret = legacy_gasket_interrupt_setup(gasket_dev);
  else
   ret = gasket_interrupt_setup(gasket_dev);
+
  return ret;
 }
 
@@ -505,7 +535,6 @@ int legacy_gasket_interrupt_setup(struct gasket_dev *gasket_dev)
  ulong value;
  struct gasket_interrupt_data *interrupt_data =
   gasket_dev->interrupt_data;
- int ret;
 
  if (!interrupt_data) {
   gasket_log_error(
@@ -520,12 +549,6 @@ int legacy_gasket_interrupt_setup(struct gasket_dev *gasket_dev)
  }
 
  gasket_log_debug(gasket_dev, "Running legacy interrupt setup.");
-
- for (i = 0; i < interrupt_data->num_interrupts; i++) {
-  ret = gasket_interrupt_configure(gasket_dev, i);
-  if (ret)
-   return ret;
- }
 
  for (i = 0; i < interrupt_data->num_interrupts; i++) {
 
@@ -621,6 +644,7 @@ void gasket_interrupt_cleanup(struct gasket_dev *gasket_dev)
 {
  struct gasket_interrupt_data *interrupt_data =
   gasket_dev->interrupt_data;
+ ulong flags;
  int i;
 
 
@@ -639,9 +663,9 @@ void gasket_interrupt_cleanup(struct gasket_dev *gasket_dev)
  kfree(interrupt_data->names);
  kfree(interrupt_data->configured_interrupts);
  kfree(interrupt_data->interrupt_counts);
- write_lock(&interrupt_data->eventfd_ctx_lock);
+ write_lock_irqsave(&interrupt_data->eventfd_ctx_lock, flags);
  kfree(interrupt_data->eventfd_ctxs);
- write_unlock(&interrupt_data->eventfd_ctx_lock);
+ write_unlock_irqrestore(&interrupt_data->eventfd_ctx_lock, flags);
  kfree(interrupt_data->msix_entries);
 }
 
@@ -782,6 +806,7 @@ static irqreturn_t gasket_interrupt_handler(int irq, void *dev_id)
 {
  struct eventfd_ctx *ctx;
  struct gasket_interrupt_data *interrupt_data = dev_id;
+ ulong flags;
  bool valid_irq = false;
  int interrupt = -1;
  int i;
@@ -813,11 +838,11 @@ static irqreturn_t gasket_interrupt_handler(int irq, void *dev_id)
 
 
 
- read_lock(&interrupt_data->eventfd_ctx_lock);
+ read_lock_irqsave(&interrupt_data->eventfd_ctx_lock, flags);
  ctx = interrupt_data->eventfd_ctxs[interrupt];
  if (ctx)
   eventfd_signal(ctx, 1);
- read_unlock(&interrupt_data->eventfd_ctx_lock);
+ read_unlock_irqrestore(&interrupt_data->eventfd_ctx_lock, flags);
 
  ++(interrupt_data->interrupt_counts[interrupt]);
 
