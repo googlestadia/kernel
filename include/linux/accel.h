@@ -10,13 +10,14 @@
 #include <linux/cdev.h>
 #include <linux/types.h>
 #include <linux/statfs.h>
+#include <linux/kobject.h>
 
 
 #define ACCEL_MAJOR 121
 #define ACCEL_BLOCK_MAJOR 121
 
 struct accel_dev;
-# 43 "./include/linux/accel.h"
+# 46 "./include/linux/accel.h"
 struct accel_dev {
 
  const char *accel_type;
@@ -39,6 +40,9 @@ struct accel_dev {
 
 
  const char *state;
+
+ struct kobject *physical_functions;
+ struct kset *scalar_resources;
 };
 
 static inline const char *accel_dev_name(const struct accel_dev *adev)
@@ -56,17 +60,28 @@ static inline struct accel_dev *accel_dev_get(struct accel_dev *adev)
   get_device(&adev->dev);
  return adev;
 }
-# 90 "./include/linux/accel.h"
+# 96 "./include/linux/accel.h"
 static inline void accel_dev_put(struct accel_dev *adev)
 {
  if (adev)
   put_device(&adev->dev);
 }
-# 107 "./include/linux/accel.h"
+# 113 "./include/linux/accel.h"
 static inline void accel_dev_set_state(struct accel_dev *adev,
            const char *state)
 {
  adev->state = state;
+}
+
+
+
+
+
+static inline const char *accel_dev_get_state(struct accel_dev *adev)
+{
+ if (WARN_ON(!adev))
+  return NULL;
+ return adev->state;
 }
 
 extern int accel_dev_init(struct accel_dev *dev, struct device *parent,
@@ -78,5 +93,48 @@ extern struct accel_dev *accel_dev_get_by_devt(dev_t devt);
 extern struct accel_dev *accel_dev_get_by_parent(struct device *parent);
 
 #define to_accel_dev(dev) ((struct accel_dev *)dev_get_drvdata(dev))
+
+
+
+
+
+
+
+struct accel_scalar_resource {
+ struct kobject kobj;
+ struct kobject *functions;
+ struct kobject *iommu_groups;
+};
+
+#define to_accel_scalar_resource(x) \
+ container_of(x, struct accel_scalar_resource, kobj)
+
+extern int accel_add_physical_function(struct accel_dev *adev,
+    struct device *dev);
+
+extern void accel_remove_physical_function(struct accel_dev *adev,
+     struct device *dev);
+
+extern struct accel_scalar_resource *accel_scalar_resource_add(
+ struct accel_dev *adev, int idx);
+
+extern void accel_scalar_resource_remove(
+ struct accel_scalar_resource *resource);
+
+extern int accel_scalar_resource_add_function(
+ struct accel_scalar_resource *resource,
+ struct device *dev);
+
+extern void accel_scalar_resource_remove_function(
+ struct accel_scalar_resource *resource,
+ struct device *dev);
+
+extern int accel_scalar_resource_add_iommu_group(
+ struct accel_scalar_resource *resource,
+ struct device *dev);
+
+extern int accel_scalar_resource_remove_iommu_group(
+ struct accel_scalar_resource *resource,
+ struct device *dev);
 
 #endif
