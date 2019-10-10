@@ -26,12 +26,13 @@ void gasket_page_table_cleanup(struct gasket_page_table *page_table);
 # 70 "./drivers/gasket/gasket_page_table.h"
 int gasket_page_table_partition(
  struct gasket_page_table *page_table, uint num_simple_entries);
-# 88 "./drivers/gasket/gasket_page_table.h"
+# 86 "./drivers/gasket/gasket_page_table.h"
 int gasket_page_table_map(struct gasket_page_table *page_table, ulong host_addr,
- ulong dev_addr, uint num_pages);
-# 102 "./drivers/gasket/gasket_page_table.h"
+ ulong dev_addr, ulong bytes);
+# 100 "./drivers/gasket/gasket_page_table.h"
 int gasket_page_table_unmap(
- struct gasket_page_table *page_table, ulong dev_addr, uint num_pages);
+ struct gasket_page_table *page_table, ulong dev_addr,
+ ulong bytes);
 
 
 
@@ -45,12 +46,12 @@ void gasket_page_table_unmap_all(struct gasket_page_table *page_table);
 
 
 void gasket_page_table_reset(struct gasket_page_table *page_table);
-# 125 "./drivers/gasket/gasket_page_table.h"
+# 124 "./drivers/gasket/gasket_page_table.h"
 void gasket_page_table_garbage_collect(struct gasket_page_table *page_table);
-# 140 "./drivers/gasket/gasket_page_table.h"
+# 139 "./drivers/gasket/gasket_page_table.h"
 int gasket_page_table_are_addrs_bad(struct gasket_page_table *page_table,
  ulong host_addr, ulong dev_addr, ulong bytes);
-# 155 "./drivers/gasket/gasket_page_table.h"
+# 154 "./drivers/gasket/gasket_page_table.h"
 int gasket_page_table_is_dev_addr_bad(
  struct gasket_page_table *page_table, ulong dev_addr, ulong bytes);
 

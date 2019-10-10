@@ -1683,8 +1683,7 @@ int gasket_mm_unmap_region(
 
  zap_vma_ptes(vma, vma->vm_start + virt_offset,
   DIV_ROUND_UP(mappable_region.length_bytes, PAGE_SIZE) *
-   PAGE_SIZE);
- return 0;
+   PAGE_SIZE); return 0;
 }
 EXPORT_SYMBOL(gasket_mm_unmap_region);
 
@@ -1839,8 +1838,8 @@ static int gasket_mmap(struct file *filp, struct vm_area_struct *vma)
 
   if ((req_perms & map_regions[i].flags) != req_perms) {
    gasket_log_info(gasket_dev,
-      "Skipping mappable region 0x%lx; perm mismatch want: 0x%lx, have: 0x%lx",
-      (ulong) map_regions[i].start,
+      "Skipping mappable region %d (0x%lx); perm mismatch want: 0x%lx, have: 0x%lx",
+      i, (ulong) map_regions[i].start,
       req_perms,
       map_regions[i].flags);
    continue;

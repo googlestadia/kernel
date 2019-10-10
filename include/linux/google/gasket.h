@@ -42,6 +42,7 @@ struct gasket_interrupt_mapping {
 
 struct gasket_page_table_ioctl {
  uint64_t page_table_index;
+
  uint64_t size;
  uint64_t host_address;
  uint64_t device_address;
