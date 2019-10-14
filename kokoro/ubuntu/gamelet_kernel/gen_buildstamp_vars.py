@@ -12,10 +12,16 @@ import os
 import re
 import time
 
-KOKORO_RELEASE_TRAIN_RE = re.compile(r"(\d{4}\.R+\d+)/release")
+# Regex to match a release train name from various strings. Legacy train names
+# have the format "yyyy.<number>" or "yyyy.R<number>". The current train name
+# format is "yyyy.K<number>".
+KOKORO_RELEASE_TRAIN_RE = re.compile(r"(\d{4}\.(R|K)?\d+)/release")
+RAPID_RELEASE_TRAIN_RE = re.compile(r"(\d{4}\.(R|K)?\d+)_RC\d+$")
+SCM_BRANCH_RELEASE_TRAIN_RE = re.compile(r"^release/gamelet/(\d{4}\.(R|K)?\d+)")
+
+# Regex to match a RC number from a Rapid candidate name. Candidate names have
+# the format "<name>_RC<number>".
 RAPID_RC_NUMBER_RE = re.compile(r"_RC(\d+)$")
-RAPID_RELEASE_TRAIN_RE = re.compile(r"(\d{4}\.R+\d+)_RC\d+$")
-SCM_BRANCH_RELEASE_TRAIN_RE = re.compile(r"^release/gamelet/(\d{4}\.R+\d+)")
 
 
 def main():
