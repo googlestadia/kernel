@@ -48,11 +48,11 @@ static inline int accel_lib_validate_ioctl(unsigned int cmd, unsigned long arg)
  if (_IOC_TYPE(cmd) != ACCEL_IOCTL)
   return -ENOTTY;
  if (_IOC_DIR(cmd) & _IOC_READ) {
-  if (!access_ok(VERIFY_WRITE, p, _IOC_SIZE(cmd)))
+  if (!access_ok(p, _IOC_SIZE(cmd)))
    return -EFAULT;
  }
  if (_IOC_DIR(cmd) & _IOC_WRITE) {
-  if (!access_ok(VERIFY_READ, p, _IOC_SIZE(cmd)))
+  if (!access_ok(p, _IOC_SIZE(cmd)))
    return -EFAULT;
  }
 
