@@ -248,6 +248,7 @@ typedef struct amdgim_vf2pf_info_v2 amdgim_vf2pf_info ;
 		} \
 	} while (0)
 
+#define MAX_AUTODUMP_NODE 3
 /* GPU virtualization */
 struct amdgpu_virt {
 	uint32_t			caps;
@@ -263,8 +264,18 @@ struct amdgpu_virt {
 	struct amdgpu_vf_error_buffer   vf_errors;
 	struct amdgpu_virt_fw_reserve	fw_reserve;
 	uint32_t gim_feature;
-	uint32_t reg_access_mode;
 	int req_init_data_ver;
+	struct {
+		struct task_struct *task;
+		pid_t tgid;
+		pid_t pid;
+		char process_name[TASK_COMM_LEN];
+		const char *ring_name;
+		int query;
+	} autodump;
+	struct completion dump_cpl;
+	struct mutex dump_mutex;
+	struct dentry *dump_dentries[MAX_AUTODUMP_NODE];
 };
 
 #define amdgpu_sriov_enabled(adev) \
@@ -314,4 +325,8 @@ int amdgpu_virt_fw_reserve_get_checksum(void *obj, unsigned long obj_size,
 					unsigned int chksum);
 void amdgpu_virt_init_data_exchange(struct amdgpu_device *adev);
 void amdgpu_detect_virtualization(struct amdgpu_device *adev);
+int amdgpu_virt_create_debugs(struct amdgpu_device *);
+void amdgpu_virt_remove_debugfs(struct amdgpu_device *);
+int amdgpu_virt_notify_booked(struct amdgpu_device *, struct amdgpu_job *);
+int amdgpu_virt_wait_dump(struct amdgpu_device *, unsigned long tmo);
 #endif

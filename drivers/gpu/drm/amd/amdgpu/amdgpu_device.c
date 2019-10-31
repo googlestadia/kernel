@@ -3402,6 +3402,7 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 		amdgpu_pmu_fini(adev);
 	if (amdgpu_discovery && adev->asic_type >= CHIP_NAVI10)
 		amdgpu_discovery_fini(adev);
+	amdgpu_virt_remove_debugfs(adev);
 }
 
 
@@ -3974,6 +3975,10 @@ static int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 {
 	int i, r = 0;
 	bool need_full_reset  = *need_full_reset_arg;
+
+	if (amdgpu_sriov_vf(adev))
+		if (!amdgpu_virt_notify_booked(adev, job))
+			amdgpu_virt_wait_dump(adev, MAX_SCHEDULE_TIMEOUT);
 
 	/* block all schedulers and reset given job's ring */
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
