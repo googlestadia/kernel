@@ -179,6 +179,7 @@ extern int sched_policy;
 #else
 static const int sched_policy = KFD_SCHED_POLICY_HWS;
 #endif
+extern int amdgpu_peermem_size;
 
 extern int amdgpu_tmz;
 
