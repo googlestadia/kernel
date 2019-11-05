@@ -9,7 +9,7 @@
 #include "argos_types.h"
 
 
-#define ARGOS_DRIVER_VERSION "0.13"
+#define ARGOS_DRIVER_VERSION "0.13-e097c241cb20"
 
 
 #define ARGOS_DEVICE_DRIVER_FIRMWARE_API_VERSION 1lu
