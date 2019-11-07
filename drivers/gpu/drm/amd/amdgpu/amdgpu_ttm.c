@@ -1713,13 +1713,26 @@ error_create:
 
 static int amdgpu_direct_gma_peer_init(struct amdgpu_device *adev)
 {
-	unsigned long psize;
+	unsigned long size;
+	int r;
 
 	if (!amdgpu_peermem_size)
 		return 0;
 
-	psize = amdgpu_peermem_size * 256;
-	return ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_PEER, psize);
+	size = (unsigned long)amdgpu_peermem_size << 20;
+	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_PEER,
+		size >> PAGE_SHIFT);
+	if (unlikely(r))
+		goto error_out;
+	DRM_INFO("amdgpu: %uM of Direct GMA peer memory ready.\n",
+		amdgpu_peermem_size);
+	return 0;
+
+error_out:
+	amdgpu_peermem_size = 0;
+	DRM_ERROR("Failed initializing Direct GMA peer heap.\n");
+	return r;
+
 }
 
 static int amdgpu_direct_gma_peer_fini(struct amdgpu_device *adev)
