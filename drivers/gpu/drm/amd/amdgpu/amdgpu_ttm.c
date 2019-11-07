@@ -1750,13 +1750,20 @@ static int amdgpu_ttm_fw_reserve_vram_init(struct amdgpu_device *adev)
 
 static int amdgpu_direct_gma_peer_init(struct amdgpu_device *adev)
 {
-       unsigned long psize;
-
-       if (!amdgpu_peermem_size)
-               return 0;
-
-       psize = amdgpu_peermem_size * 256;
-       return ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_PEER, psize);
+	uint64_t peer_size;
+	int r;
+	if (!amdgpu_peermem_size)
+		return 0;
+	peer_size = (uint64_t)amdgpu_peermem_size << 20;
+	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_PEER,
+			   peer_size >> PAGE_SHIFT);
+	if (r) {
+		DRM_ERROR("Failed initializing GMA peer heap.\n");
+		return r;
+	}
+	DRM_INFO("amdgpu: %uM of GMA peer memory ready.\n",
+		 (unsigned)(peer_size / (1024 * 1024)));
+	return 0;
 }
 
 static int amdgpu_direct_gma_peer_fini(struct amdgpu_device *adev)
