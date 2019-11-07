@@ -74,7 +74,8 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 			max_size -= atomic64_read(&adev->direct_gma.gart_usage);
 
 		if (size > max_size) {
-			DRM_DEBUG("Allocation size %ldMb bigger than %ldMb limit\n",
+			DRM_DEV_ERROR(adev->dev,
+				"Allocation size %ldMb bigger than %ldMb limit\n",
 				size >> 20, max_size >> 20);
 			return -ENOMEM;
 		}
@@ -102,8 +103,9 @@ retry:
 				initial_domain |= AMDGPU_GEM_DOMAIN_GTT;
 				goto retry;
 			}
-			DRM_DEBUG("Failed to allocate GEM object (%ld, %d, %u, %d)\n",
-				  size, initial_domain, alignment, r);
+			DRM_DEV_ERROR(adev->dev,
+				"Failed to allocate GEM object (%ld, %d, %u, %d)\n",
+				size, initial_domain, alignment, r);
 		}
 		return r;
 	}
@@ -395,20 +397,29 @@ static int amdgpu_gem_userptr_peermem(struct amdgpu_device *adev,
 	/* we only support user virual mapped with a vm_file backing */
 	if (!vma || !vma->vm_file || vma->vm_end < end) {
 		up_read(&mm->mmap_sem);
+		DRM_DEV_ERROR(adev->dev,
+			"invalid vma: vma=%p, vma->vm_file=%p, vma->vm_end=%lp, end=%lp\n",
+			vma, (vma) ? vma->vm_file : NULL, (vma) ? vma->vm_end : 0l, end);
 		return -EINVAL;
 	}
 
 	dma_addr = amdgpu_gem_peer_dma_addr(adev->dev, mm, vma);
 	up_read(&mm->mmap_sem);
 
-	if (!dma_addr)
+	if (!dma_addr) {
+		DRM_DEV_ERROR(adev->dev,
+			"amdgpu_gem_peer_dma_addr failed\n");
 		return -EINVAL;
+	}
 
 	r = amdgpu_gem_object_create(adev, args->size, 0,
 		AMDGPU_GEM_DOMAIN_DGMA_PEER, 0,
 		0, NULL, &gobj);
-	if (r)
+	if (r) {
+		DRM_DEV_ERROR(adev->dev,
+			"amdgpu_gem_object_create error: %d\n", r);
 		goto release_dma_addr;
+	}
 
 	abo = gem_to_amdgpu_bo(gobj);
 	abo->tbo.mem.bus.base = dma_addr[0];
@@ -417,8 +428,11 @@ static int amdgpu_gem_userptr_peermem(struct amdgpu_device *adev,
 
 	r = drm_gem_handle_create(filp, gobj, &handle);
 	kcl_drm_gem_object_put_unlocked(gobj);
-	if (r)
+	if (r) {
+		DRM_DEV_ERROR(adev->dev,
+			"drm_gem_handle_create failed: %d\n", r);
 		goto release_dma_addr;
+	}
 
 	args->handle = handle;
 	return 0;
