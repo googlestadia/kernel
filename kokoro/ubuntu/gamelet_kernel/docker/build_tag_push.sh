@@ -13,7 +13,7 @@ set -ex
 
 readonly SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 readonly GIT_ROOT=${SCRIPTPATH}/../../../..
-readonly IMAGE_TAG="gcr.io/google.com/stadia-engprod/build/kernel"
+readonly IMAGE_TAG="gcr.io/stadia-open-source/build/kernel"
 
 pushd ${GIT_ROOT}
 
