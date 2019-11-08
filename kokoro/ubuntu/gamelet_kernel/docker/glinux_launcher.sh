@@ -29,7 +29,7 @@ docker run \
   --env "DOCKER_SRC_DIR=/workspace/src/kernel" \
   --net=host \
   --privileged=true \
-  -t gcr.io/google.com/stadia-engprod/build/kernel@sha256:388ff48eea75ffcdd027bf7e7109e21aaae7f857ddd2880aa544f47f26f0c82d \
+  -t gcr.io/stadia-open-source/build/kernel@sha256:388ff48eea75ffcdd027bf7e7109e21aaae7f857ddd2880aa544f47f26f0c82d \
   /container_tools/fix_permissions.sh --user "$(id -u):$(id -g)" \
   -- \
   /workspace/src/kernel/kokoro/ubuntu/gamelet_kernel/build.sh
