@@ -60,7 +60,7 @@ function check_env() {
     exit 1
   fi
   export ARTIFACT_ROOT="${DOCKER_TMP_DIR%/}/build_output"
-  mkdir ${ARTIFACT_ROOT}
+  mkdir -p ${ARTIFACT_ROOT}
 
   if [[ ! -d ${DOCKER_ARTIFACTS_DIR} ]]; then
     echo "DOCKER_ARTIFACTS_DIR is not a valid directory path."
