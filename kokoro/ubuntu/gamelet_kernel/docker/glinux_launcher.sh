@@ -1,6 +1,9 @@
 #!/bin/bash
 
 # This script will build the gamelet_kernel on a gLinux workstation.
+# Args:
+#   1. Build directory. If omitted, will create and build in a temp directory.
+#      Provide this arg to reuse existing artifacts for an incremental build.
 #
 # In order to run this successfully, you must:
 # * Install and configure docker according to go/docker#installation
@@ -11,10 +14,14 @@ set -ex
 
 readonly SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 readonly GIT_ROOT=${SCRIPTPATH}/../../../..
-readonly BUILD_DIR=$(mktemp -d -t kernel_build_XXXXXXXX)
 
-mkdir "${BUILD_DIR}/tmp"
-mkdir "${BUILD_DIR}/artifacts"
+BUILD_DIR="$1"
+if [[ -z "${BUILD_DIR}" ]] ; then
+  BUILD_DIR=$(mktemp -d -t kernel_build_XXXXXXXX)
+fi
+
+mkdir -p "${BUILD_DIR}/tmp"
+mkdir -p "${BUILD_DIR}/artifacts"
 
 docker run \
   --volume ${BUILD_DIR}/tmp:/workspace/tmp \
