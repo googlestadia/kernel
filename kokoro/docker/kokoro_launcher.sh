@@ -25,7 +25,7 @@ mv "${KOKORO_GFILE_DIR}" "${KOKORO_NONBUILD_ARTIFACTS}/"
 rm -rf "${KOKORO_ARTIFACTS_DIR}"/*
 
 # Move the amdgpu firmware file to its canonical name for the build script.
-mv "${KOKORO_NONBUILD_ARTIFACTS}/gfile/amdgpu-firmware-2019.3.tar.gz" \
+mv "${KOKORO_NONBUILD_ARTIFACTS}/gfile/amdgpu-firmware-2019.4.tar.gz" \
   "${KOKORO_NONBUILD_ARTIFACTS}/gfile/amdgpu-firmware.tar.gz"
 
 # Authenticate to google cloud.
