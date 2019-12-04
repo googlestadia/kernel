@@ -246,6 +246,10 @@ struct amdgpu_vm {
 	struct rb_root_cached	va;
 #endif
 
+	/* Lock to prevent eviction while we are updating page tables */
+	struct mutex		eviction_lock;
+	bool			evicting;
+
 	/* BOs who needs a validation */
 	struct list_head	evicted;
 
