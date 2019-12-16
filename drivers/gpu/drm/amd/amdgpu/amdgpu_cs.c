@@ -1307,7 +1307,6 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 		}
 	}
 
-	job->owner = p->filp;
 	p->fence = dma_fence_get(&job->base.s_fence->finished);
 
 	amdgpu_ctx_add_fence(p->ctx, entity, p->fence, &seq);
