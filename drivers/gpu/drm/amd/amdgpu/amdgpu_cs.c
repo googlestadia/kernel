@@ -708,6 +708,7 @@ error_free_pages:
 
 static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 {
+	struct amdgpu_fpriv *fpriv = p->filp->driver_priv;
 	struct amdgpu_bo_list_entry *e;
 	int r;
 
@@ -715,7 +716,7 @@ static int amdgpu_cs_sync_rings(struct amdgpu_cs_parser *p)
 		struct amdgpu_bo *bo = ttm_to_amdgpu_bo(e->tv.bo);
 		struct dma_resv *resv = amdkcl_ttm_resvp(&bo->tbo);
 
-		r = amdgpu_sync_resv(p->adev, &p->job->sync, resv, p->filp,
+		r = amdgpu_sync_resv(p->adev, &p->job->sync, resv, &fpriv->vm,
 				     amdgpu_bo_explicit_sync(bo));
 
 		if (r)
@@ -1292,7 +1293,7 @@ static int amdgpu_cs_submit(struct amdgpu_cs_parser *p,
 	job = p->job;
 	p->job = NULL;
 
-	r = drm_sched_job_init(&job->base, entity, p->filp);
+	r = drm_sched_job_init(&job->base, entity, &fpriv->vm);
 	if (r)
 		goto error_unlock;
 
