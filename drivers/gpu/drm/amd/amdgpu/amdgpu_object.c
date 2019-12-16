@@ -1452,7 +1452,8 @@ int amdgpu_bo_sync_wait(struct amdgpu_bo *bo, void *owner, bool intr)
 	int r;
 
 	amdgpu_sync_create(&sync);
-	amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&bo->tbo), owner, false);
+	amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&bo->tbo),
+			 AMDGPU_SYNC_NE_OWNER, owner);
 	r = amdgpu_sync_wait(&sync, intr);
 	amdgpu_sync_free(&sync);
 
