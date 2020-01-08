@@ -23,7 +23,16 @@ fi
 mkdir -p "${BUILD_DIR}/tmp"
 mkdir -p "${BUILD_DIR}/artifacts"
 
-docker run \
+if hash podman 2>/dev/null; then
+  ENGINE_BIN="podman --runtime /usr/local/bin/crun"
+elif hash docker 2>/dev/null; then
+  ENGINE_BIN=docker
+else
+  echo "No available container engine. Install docker or podman with crun."
+  exit 1
+fi
+
+${ENGINE_BIN} run \
   --volume ${BUILD_DIR}/tmp:/workspace/tmp \
   --volume ${BUILD_DIR}/artifacts:/workspace/artifacts \
   --volume ${GIT_ROOT}:/workspace/src/kernel \
