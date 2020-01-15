@@ -797,7 +797,7 @@ static int amdgpu_vm_clear_bo(struct amdgpu_device *adev,
 	params.vm = vm;
 	params.direct = direct;
 
-	r = vm->update_funcs->prepare(&params, NULL, AMDGPU_SYNC_EXPLICIT);
+	r = vm->update_funcs->prepare(&params, AMDGPU_FENCE_OWNER_KFD, NULL);
 	if (r)
 		return r;
 
@@ -1293,7 +1293,7 @@ int amdgpu_vm_update_pdes(struct amdgpu_device *adev,
 	params.vm = vm;
 	params.direct = direct;
 
-	r = vm->update_funcs->prepare(&params, NULL, AMDGPU_SYNC_EXPLICIT);
+	r = vm->update_funcs->prepare(&params, AMDGPU_FENCE_OWNER_VM, NULL);
 	if (r)
 		return r;
 
@@ -1539,7 +1539,7 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
  * @adev: amdgpu_device pointer
  * @vm: requested vm
  * @direct: direct submission in a page fault
- * @resv: fences we need to sync to
+ * @exclusive: fence we need to sync to
  * @start: start of mapped range
  * @last: last mapped entry
  * @flags: flags for the entries
@@ -1554,14 +1554,14 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
  */
 static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 				       struct amdgpu_vm *vm, bool direct,
-				       struct dma_resv *resv,
+				       struct dma_fence *exclusive,
 				       uint64_t start, uint64_t last,
 				       uint64_t flags, uint64_t addr,
 				       dma_addr_t *pages_addr,
 				       struct dma_fence **fence)
 {
 	struct amdgpu_vm_update_params params;
-	enum amdgpu_sync_mode sync_mode;
+	void *owner = AMDGPU_FENCE_OWNER_VM;
 	int r;
 
 	memset(&params, 0, sizeof(params));
@@ -1570,13 +1570,9 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 	params.direct = direct;
 	params.pages_addr = pages_addr;
 
-	/* Implicitly sync to command submissions in the same VM before
-	 * unmapping. Sync to moving fences before mapping.
-	 */
+	/* sync to everything except eviction fences on unmapping */
 	if (!(flags & AMDGPU_PTE_VALID))
-		sync_mode = AMDGPU_SYNC_EQ_OWNER;
-	else
-		sync_mode = AMDGPU_SYNC_EXPLICIT;
+		owner = AMDGPU_FENCE_OWNER_KFD;
 
 	amdgpu_vm_eviction_lock(vm);
 	if (vm->evicting) {
@@ -1584,7 +1580,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 		goto error_unlock;
 	}
 
-	r = vm->update_funcs->prepare(&params, resv, sync_mode);
+	r = vm->update_funcs->prepare(&params, owner, exclusive);
 	if (r)
 		goto error_unlock;
 
@@ -1603,7 +1599,7 @@ error_unlock:
  * amdgpu_vm_bo_split_mapping - split a mapping into smaller chunks
  *
  * @adev: amdgpu_device pointer
- * @resv: fences we need to sync to
+ * @exclusive: fence we need to sync to
  * @pages_addr: DMA addresses to use for mapping
  * @vm: requested vm
  * @mapping: mapped range and flags to use for the update
@@ -1619,7 +1615,7 @@ error_unlock:
  * 0 for success, -EINVAL for failure.
  */
 static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
-				      struct dma_resv *resv,
+				      struct dma_fence *exclusive,
 				      dma_addr_t *pages_addr,
 				      struct amdgpu_vm *vm,
 				      struct amdgpu_bo_va_mapping *mapping,
@@ -1724,7 +1720,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 		}
 
 		last = min((uint64_t)mapping->last, start + max_entries - 1);
-		r = amdgpu_vm_bo_update_mapping(adev, vm, false, resv,
+		r = amdgpu_vm_bo_update_mapping(adev, vm, false, exclusive,
 						start, last, flags, addr,
 						dma_addr, fence);
 		if (r)
@@ -1763,8 +1759,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	dma_addr_t *pages_addr = NULL;
 	struct ttm_mem_reg *mem;
 	struct drm_mm_node *nodes;
-	struct dma_fence **last_update;
-	struct dma_resv *resv;
+	struct dma_fence *exclusive, **last_update;
 	uint64_t flags;
 	struct amdgpu_device *bo_adev = adev;
 	int r;
@@ -1772,6 +1767,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	if (clear || !bo) {
 		mem = NULL;
 		nodes = NULL;
+		exclusive = NULL;
 	} else {
 		struct ttm_dma_tt *ttm;
 
@@ -1783,6 +1779,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 		} else if (mem->mem_type == AMDGPU_PL_DGMA_IMPORT) {
 			pages_addr = (dma_addr_t *)bo_va->base.bo->tbo.mem.bus.addr;
 		}
+		exclusive = bo->tbo.moving;
 	}
 
 	if (bo) {
@@ -1792,10 +1789,8 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 			flags |= AMDGPU_PTE_TMZ;
 
 		bo_adev = amdgpu_ttm_adev(bo->tbo.bdev);
-		resv = amdkcl_ttm_resvp(&bo->tbo);
 	} else {
 		flags = 0x0;
-		resv = NULL;
 	}
 
 	if (clear || (bo && amdkcl_ttm_resvp(&bo->tbo) == amdkcl_ttm_resvp(&vm->root.base.bo->tbo)))
@@ -1812,7 +1807,7 @@ int amdgpu_vm_bo_update(struct amdgpu_device *adev, struct amdgpu_bo_va *bo_va,
 	}
 
 	list_for_each_entry(mapping, &bo_va->invalids, list) {
-		r = amdgpu_vm_bo_split_mapping(adev, resv, pages_addr, vm,
+		r = amdgpu_vm_bo_split_mapping(adev, exclusive, pages_addr, vm,
 					       mapping, flags, bo_adev,
 					       mem, last_update);
 		if (r)

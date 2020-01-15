@@ -1436,49 +1436,28 @@ void amdgpu_bo_fence(struct amdgpu_bo *bo, struct dma_fence *fence,
 }
 
 /**
- * amdgpu_bo_sync_wait_resv - Wait for BO reservation fences
+ * amdgpu_sync_wait_resv - Wait for BO reservation fences
  *
- * @adev: amdgpu device pointer
- * @resv: reservation object to sync to
- * @sync_mode: synchronization mode
+ * @bo: buffer object
  * @owner: fence owner
  * @intr: Whether the wait is interruptible
  *
- * Extract the fences from the reservation object and waits for them to finish.
- *
- * Returns:
- * 0 on success, errno otherwise.
- */
-int amdgpu_bo_sync_wait_resv(struct amdgpu_device *adev, struct dma_resv *resv,
-			     enum amdgpu_sync_mode sync_mode, void *owner,
-			     bool intr)
-{
-	struct amdgpu_sync sync;
-	int r;
-
-	amdgpu_sync_create(&sync);
-	amdgpu_sync_resv(adev, &sync, resv, sync_mode, owner);
-	r = amdgpu_sync_wait(&sync, true);
-	amdgpu_sync_free(&sync);
-	return r;
-}
-
-/**
- * amdgpu_bo_sync_wait - Wrapper for amdgpu_bo_sync_wait_resv
- * @bo: buffer object to wait for
- * @owner: fence owner
- * @intr: Whether the wait is interruptible
- *
- * Wrapper to wait for fences in a BO.
  * Returns:
  * 0 on success, errno otherwise.
  */
 int amdgpu_bo_sync_wait(struct amdgpu_bo *bo, void *owner, bool intr)
 {
 	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	struct amdgpu_sync sync;
+	int r;
 
-	return amdgpu_bo_sync_wait_resv(adev, amdkcl_ttm_resvp(&bo->tbo),
-					AMDGPU_SYNC_NE_OWNER, owner, intr);
+	amdgpu_sync_create(&sync);
+	amdgpu_sync_resv(adev, &sync, amdkcl_ttm_resvp(&bo->tbo),
+			 AMDGPU_SYNC_NE_OWNER, owner);
+	r = amdgpu_sync_wait(&sync, intr);
+	amdgpu_sync_free(&sync);
+
+	return r;
 }
 
 /**
