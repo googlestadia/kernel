@@ -63,7 +63,7 @@ static void pm_calc_rlib_size(struct packet_manager *pm,
 		max_proc_per_quantum = dev->max_proc_per_quantum;
 
 	if ((process_count > max_proc_per_quantum) ||
-	    compute_queue_count > get_queues_num(pm->dqm) ||
+	    compute_queue_count > get_cp_queues_num(pm->dqm) ||
 	    gws_queue_count > 1) {
 		*over_subscription = true;
 		pr_debug("Over subscribed runlist\n");
