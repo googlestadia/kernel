@@ -5101,6 +5101,19 @@ static void amdgpu_dm_connector_unregister(struct drm_connector *connector)
 
 	drm_dp_aux_unregister(&amdgpu_dm_connector->dm_dp_aux.aux);
 }
+
+static int
+amdgpu_dm_connector_late_register(struct drm_connector *connector)
+{
+	struct amdgpu_dm_connector *amdgpu_dm_connector =
+		to_amdgpu_dm_connector(connector);
+
+#if defined(CONFIG_DEBUG_FS)
+	connector_debugfs_init(amdgpu_dm_connector);
+#endif
+
+	return 0;
+}
 #endif
 
 static void amdgpu_dm_connector_destroy(struct drm_connector *connector)
@@ -5208,6 +5221,8 @@ amdgpu_dm_connector_atomic_duplicate_state(struct drm_connector *connector)
 	return &new_state->base;
 }
 
+
+
 static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 #if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0) && !defined(OS_NAME_SUSE_15_1)
 	.dpms = drm_atomic_helper_connector_dpms,
@@ -5222,6 +5237,7 @@ static const struct drm_connector_funcs amdgpu_dm_connector_funcs = {
 	.atomic_set_property = amdgpu_dm_connector_atomic_set_property,
 	.atomic_get_property = amdgpu_dm_connector_atomic_get_property,
 #if defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER)
+	.late_register = amdgpu_dm_connector_late_register,
 	.early_unregister = amdgpu_dm_connector_unregister
 #endif
 };
@@ -6675,9 +6691,13 @@ static int amdgpu_dm_connector_init(struct amdgpu_display_manager *dm,
 	drm_connector_attach_encoder(
 		&aconnector->base, &aencoder->base);
 
-#if defined(CONFIG_DEBUG_FS)
-	connector_debugfs_init(aconnector);
+
+
+#if !defined(HAVE_DRM_CONNECTOR_FUNCS_REGISTER) &&\
+	defined(CONFIG_DEBUG_FS)
+       connector_debugfs_init(aconnector);
 #endif
+
 
 	if (connector_type == DRM_MODE_CONNECTOR_DisplayPort
 		|| connector_type == DRM_MODE_CONNECTOR_eDP)
