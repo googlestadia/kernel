@@ -1077,6 +1077,9 @@ void connector_debugfs_init(struct amdgpu_dm_connector *connector)
 				   &force_yuv420_output_fops);
 #endif
 
+	connector->debugfs_dpcd_address = 0;
+	connector->debugfs_dpcd_size = 0;
+
 }
 
 /*
