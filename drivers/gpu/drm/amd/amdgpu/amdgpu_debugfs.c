@@ -33,6 +33,7 @@
 
 #include "amdgpu.h"
 #include "amdgpu_pm.h"
+#include "amdgpu_dm_debugfs.h"
 
 /**
  * amdgpu_debugfs_add_files - Add simple debugfs entries
@@ -1280,6 +1281,13 @@ int amdgpu_debugfs_init(struct amdgpu_device *adev)
 	r = amdgpu_debugfs_firmware_init(adev);
 	if (r)
 		DRM_ERROR("registering firmware debugfs failed (%d).\n", r);
+
+#if defined(CONFIG_DRM_AMD_DC)
+	if (amdgpu_device_has_dc_support(adev)) {
+		if (dtn_debugfs_init(adev))
+			DRM_ERROR("amdgpu: failed initialize dtn debugfs support.\n");
+	}
+#endif
 
 	return amdgpu_debugfs_add_files(adev, amdgpu_debugfs_list,
 					ARRAY_SIZE(amdgpu_debugfs_list));
