@@ -74,9 +74,6 @@ static int amdgpu_map_buffer(struct ttm_buffer_object *bo,
 			     struct amdgpu_ring *ring,
 			     uint64_t *addr);
 
-static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev);
-static void amdgpu_ttm_debugfs_fini(struct amdgpu_device *adev);
-
 static int amdgpu_invalidate_caches(struct ttm_bo_device *bdev, uint32_t flags)
 {
 	return 0;
@@ -2132,12 +2129,6 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 		return r;
 	}
 
-	/* Register debugfs entries for amdgpu_ttm */
-	r = amdgpu_ttm_debugfs_init(adev);
-	if (r) {
-		DRM_ERROR("Failed to init debugfs\n");
-		return r;
-	}
 	return 0;
 }
 
@@ -2159,7 +2150,6 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 	if (!adev->mman.initialized)
 		return;
 
-	amdgpu_ttm_debugfs_fini(adev);
 	amdgpu_ttm_training_reserve_vram_fini(adev);
 	/* return the IP Discovery TMR memory back to VRAM */
 	amdgpu_bo_free_kernel(&adev->discovery_memory, NULL, NULL);
@@ -2784,7 +2774,7 @@ static const struct {
 
 #endif
 
-static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
+int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 {
 #if defined(CONFIG_DEBUG_FS)
 	unsigned count;
@@ -2828,7 +2818,7 @@ static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 #endif
 }
 
-static void amdgpu_ttm_debugfs_fini(struct amdgpu_device *adev)
+void amdgpu_ttm_debugfs_fini(struct amdgpu_device *adev)
 {
 #if defined(CONFIG_DEBUG_FS)
 	unsigned i;
