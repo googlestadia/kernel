@@ -183,8 +183,6 @@ struct device_queue_manager {
 	unsigned int		processes_count;
 	unsigned int		active_queue_count;
 	unsigned int		active_cp_queue_count;
-	unsigned int		sdma_queue_count;
-	unsigned int		xgmi_sdma_queue_count;
 	unsigned int		gws_queue_count;
 	unsigned int		total_queue_count;
 	unsigned int		next_pipe_to_allocate;
