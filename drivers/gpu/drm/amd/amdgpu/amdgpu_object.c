@@ -1340,6 +1340,11 @@ void amdgpu_bo_release_notify(struct ttm_buffer_object *bo)
 	if (abo->kfd_bo)
 		amdgpu_amdkfd_unreserve_memory_limit(abo);
 
+	/* We only remove the fence if the resv has individualized. */
+	WARN_ON_ONCE(amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo));
+	if (amdkcl_ttm_resvp(bo) == &amdkcl_ttm_resv(bo))
+		amdgpu_amdkfd_remove_fence_on_pt_pd_bos(abo);
+
 	if (bo->mem.mem_type != TTM_PL_VRAM || !bo->mem.mm_node ||
 	    !(abo->flags & AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE))
 		return;
