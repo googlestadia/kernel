@@ -648,11 +648,15 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	if (((bp->flags & AMDGPU_GEM_CREATE_NO_EVICT) && amdgpu_no_evict) ||
 	    bp->domain & (AMDGPU_GEM_DOMAIN_DGMA | AMDGPU_GEM_DOMAIN_DGMA_IMPORT |
 						AMDGPU_GEM_DOMAIN_DGMA_PEER)) {
-		r = amdgpu_bo_reserve(bo, false);
-		if (unlikely(r != 0))
-			return r;
+
+		if (!bp->resv) {
+			r = amdgpu_bo_reserve(bo, false);
+			if (unlikely(r != 0))
+				return r;
+		}
 		r = amdgpu_bo_pin(bo, bp->domain);
-		amdgpu_bo_unreserve(bo);
+		if (!bp->resv)
+			amdgpu_bo_unreserve(bo);
 	}
 
 	return 0;
