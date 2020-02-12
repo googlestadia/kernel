@@ -130,6 +130,7 @@ struct dc_bug_wa {
 	bool dedcn20_305_wa;
 #endif
 	bool skip_clock_update;
+	bool lt_early_cr_pattern;
 };
 
 struct dc_dcc_surface_param {
