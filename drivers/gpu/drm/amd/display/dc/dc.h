@@ -416,6 +416,7 @@ struct dc_debug_options {
 	bool dmub_offload_enabled;
 	bool dmcub_emulation;
 	bool dmub_command_table; /* for testing only */
+	bool psr_on_dmub;
 	struct dc_bw_validation_profile bw_val_profile;
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	bool disable_fec;
