@@ -333,6 +333,7 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 
 static inline dma_addr_t *amdgpu_gem_peer_dma_addr(struct device *dev, struct mm_struct *mm, struct vm_area_struct *vma)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
 	unsigned long address = vma->vm_start;
 	dma_addr_t *dma_addr;
 	int idx = 0;
@@ -386,6 +387,9 @@ static inline dma_addr_t *amdgpu_gem_peer_dma_addr(struct device *dev, struct mm
 	}
 
 	return dma_addr;
+#else
+	return NULL;
+#endif
 }
 
 static int amdgpu_gem_userptr_peermem(struct amdgpu_device *adev,
