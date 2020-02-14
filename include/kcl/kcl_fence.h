@@ -150,4 +150,12 @@ static inline void dma_fence_set_error(struct dma_fence *fence,
 #define AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
 #endif
 
+#if !defined(HAVE_DMA_FENCE_GET_STUB)
+struct dma_fence *_kcl_dma_fence_get_stub(void);
+static inline struct dma_fence *dma_fence_get_stub(void)
+{
+	return _kcl_dma_fence_get_stub();
+}
+#endif
+
 #endif /* AMDKCL_FENCE_H */
