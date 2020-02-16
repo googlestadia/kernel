@@ -6,7 +6,12 @@ $(obj)/$(AMDGPU_CONFIG_H): $(srctree)/$(AMDGPU_CONFIG_PATH)/m4/* $(srctree)/$(AM
 	@cp -a $(srctree)/$(AMDGPU_CONFIG_PATH) $(obj)/dkms;
 	@cd $(obj)/dkms && \
 	./autogen.sh && \
-	./configure --enable-linux-builtin --with-linux=$(abspath $(srctree)) --with-linux-obj=$(abspath $(objtree));
+	CPPFLAGS="-I$(abspath $(srctree))/arch/$(SRCARCH)/include \
+		-I$(abspath $(srctree))/arch/$(SRCARCH)/include/generated \
+		-I$(abspath $(srctree))/include \
+		-I$(abspath $(srctree))/include/uapi \
+		-include linux/kconfig.h" \
+		./configure --enable-linux-builtin --with-linux=$(abspath $(srctree)) --with-linux-obj=$(abspath $(objtree));
 
 clean-files += $(objtree)/$(obj)/dkms
 
