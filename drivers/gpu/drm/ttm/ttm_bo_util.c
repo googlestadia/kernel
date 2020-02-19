@@ -516,6 +516,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 		amdkcl_ttm_resvp(&fbo->base) = &amdkcl_ttm_resv(&fbo->base);
 
 	dma_resv_init(&amdkcl_ttm_resv(&fbo->base));
+	fbo->base.base.dev = NULL;
 	ret = dma_resv_trylock(&amdkcl_ttm_resv(&fbo->base));
 	WARN_ON(!ret);
 
