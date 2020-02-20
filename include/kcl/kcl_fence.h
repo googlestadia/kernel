@@ -3,7 +3,7 @@
 
 #include <linux/version.h>
 #include <kcl/kcl_rcupdate.h>
-#if !defined(HAVE_DMA_FENCE_DEFINED)
+#if !defined(HAVE_LINUX_DMA_FENCE_H)
 #include <linux/fence.h>
 #include <kcl/kcl_fence_array.h>
 #else
@@ -11,7 +11,7 @@
 #include <linux/dma-fence-array.h>
 #endif
 
-#if !defined(HAVE_DMA_FENCE_DEFINED)
+#if !defined(HAVE_LINUX_DMA_FENCE_H)
 #define dma_fence_cb fence_cb
 #define dma_fence_ops fence_ops
 #define dma_fence_array fence_array
@@ -35,10 +35,10 @@
 #endif
 
 /* commit v4.5-rc3-715-gb47bcb93bbf2
- * fall back to HAVE_DMA_FENCE_DEFINED check directly
+ * fall back to HAVE_LINUX_DMA_FENCE_H check directly
  * as it's hard to detect the implementation in kernel
  */
-#if !defined(HAVE_DMA_FENCE_DEFINED)
+#if !defined(HAVE_LINUX_DMA_FENCE_H)
 static inline bool dma_fence_is_later(struct dma_fence *f1, struct dma_fence *f2)
 {
 	if (WARN_ON(f1->context != f2->context))
