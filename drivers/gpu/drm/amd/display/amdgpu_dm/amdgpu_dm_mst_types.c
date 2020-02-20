@@ -530,6 +530,7 @@ static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 					   aconnector->dc_sink);
 		dc_sink_release(aconnector->dc_sink);
 		aconnector->dc_sink = NULL;
+		aconnector->dc_link->cur_link_settings.lane_count = 0;
 	}
 #if defined(HAVE_DRM_CONNECTOR_PUT) || defined(HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT)
 	drm_connector_unregister(connector);
