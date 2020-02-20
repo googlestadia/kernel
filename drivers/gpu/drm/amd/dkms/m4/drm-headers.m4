@@ -117,31 +117,12 @@ AC_DEFUN([AC_AMDGPU_DRM_PROBE_HELPER_H], [
 ])
 
 dnl #
-dnl # drm: Extract drm_drv.h
-dnl #
-AC_DEFUN([AC_AMDGPU_DRM_DRV_H], [
-	AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drm_drv.h],[
-		AC_DEFINE(HAVE_DRM_DRV_H, 1, [drm/drm_drv.h is available])
-	])
-])
-
-dnl #
 dnl # commit e4672e55d6f3428ae9f27542e05c891f2af71051
 dnl # drm: Extract drm_device.h
 dnl #
 AC_DEFUN([AC_AMDGPU_DRM_DEVICE_H], [
 	AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drm_device.h],[
 		AC_DEFINE(HAVE_DRM_DEVICE_H, 1, [drm/drm_device.h is available])
-	])
-])
-
-dnl #
-dnl # commit 4e98f871bcffa322850c73d22c66bbd7af2a0374
-dnl # drm: delete drmP.h + drm_os_linux.h
-dnl #
-AC_DEFUN([AC_AMDGPU_DRMP_H], [
-	AC_KERNEL_TEST_HEADER_FILE_EXIST([drm/drmP.h], [
-		AC_DEFINE(HAVE_DRMP_H, 1, [include/drm/drmP.h is available])
 	])
 ])
 
@@ -188,9 +169,9 @@ AC_DEFUN([AC_AMDGPU_DRM_HEADERS], [
 	AC_AMDGPU_DRM_ATOMIC_UAPI_H
 	AC_AMDGPU_DRM_UTIL_H
 	AC_AMDGPU_DRM_PROBE_HELPER_H
-	AC_AMDGPU_DRM_DRV_H
+	AC_KERNEL_CHECK_HEADERS([drm/drm_drv.h])
 	AC_AMDGPU_DRM_DEVICE_H
-	AC_AMDGPU_DRMP_H
+	AC_KERNEL_CHECK_HEADERS([drm/drmP.h])
 	AC_AMDGPU_DRM_VBLANK_H
 	AC_AMDGPU_DRM_IOCTL_H
 	AC_AMDGPU_DRM_DEBUGFS_H
