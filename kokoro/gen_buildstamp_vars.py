@@ -41,8 +41,8 @@ def main():
   )
   parser.add_argument(
       "status_files",
-      metavar='<path>',
-      nargs='+',
+      metavar="<path>",
+      nargs="+",
       help="One or more files containing buildstamp status lines."
   )
   args = parser.parse_args()
@@ -54,11 +54,11 @@ def main():
       raise
   with io.open(args.template) as f:
     template = f.read()
-  status = ''
+  status = ""
   for status_file in args.status_files:
     with io.open(status_file) as f:
       status += f.read()
-  vars = {
+  vars_dict = {
       "BUILD_EMBED_LABEL": "",
       "BUILD_HOST": "",
       "BUILD_TIMESTAMP": "0",
@@ -76,34 +76,34 @@ def main():
   }
   for l in status.splitlines():
     k, v = l.split(" ", 1)
-    vars[k] = v
+    vars_dict[k] = v
   # Extract information from STABLE_KOKORO_JOB_NAME.
-  if vars["STABLE_KOKORO_JOB_NAME"]:
-    m = KOKORO_RELEASE_TRAIN_RE.search(vars["STABLE_KOKORO_JOB_NAME"])
+  if vars_dict["STABLE_KOKORO_JOB_NAME"]:
+    m = KOKORO_RELEASE_TRAIN_RE.search(vars_dict["STABLE_KOKORO_JOB_NAME"])
     if m:
-      vars["STABLE_RELEASE_TRAIN"] = m.group(1)
+      vars_dict["STABLE_RELEASE_TRAIN"] = m.group(1)
   # Extract information from STABLE_RAPID_CANDIDATE_NAME.
-  if vars["STABLE_RAPID_CANDIDATE_NAME"]:
+  if vars_dict["STABLE_RAPID_CANDIDATE_NAME"]:
     m = RAPID_RC_NUMBER_RE.search(vars["STABLE_RAPID_CANDIDATE_NAME"])
     if m:
-      vars["STABLE_RELEASE_CANDIDATE_NUMBER"] = m.group(1)
-    m = RAPID_RELEASE_TRAIN_RE.search(vars["STABLE_RAPID_CANDIDATE_NAME"])
+      vars_dict["STABLE_RELEASE_CANDIDATE_NUMBER"] = m.group(1)
+    m = RAPID_RELEASE_TRAIN_RE.search(vars_dict["STABLE_RAPID_CANDIDATE_NAME"])
     if m:
-      vars["STABLE_RELEASE_TRAIN"] = m.group(1)
+      vars_dict["STABLE_RELEASE_TRAIN"] = m.group(1)
   # Extract information from STABLE_BUILD_SCM_BRANCH.
-  if vars["STABLE_BUILD_SCM_BRANCH"]:
-    m = SCM_BRANCH_RELEASE_TRAIN_RE.search(vars["STABLE_BUILD_SCM_BRANCH"])
+  if vars_dict["STABLE_BUILD_SCM_BRANCH"]:
+    m = SCM_BRANCH_RELEASE_TRAIN_RE.search(vars_dict["STABLE_BUILD_SCM_BRANCH"])
     if m:
-      vars["STABLE_RELEASE_TRAIN"] = m.group(1)
+      vars_dict["STABLE_RELEASE_TRAIN"] = m.group(1)
   # Format BUILD_TIMESTAMP and store as BUILD_TIMESTAMP_FMT.
-  vars["BUILD_TIMESTAMP_FMT"] = time.strftime(
-      "%c %Z", time.localtime(int(vars["BUILD_TIMESTAMP"])))
+  vars_dict["BUILD_TIMESTAMP_FMT"] = time.strftime(
+      "%c %Z", time.localtime(int(vars_dict["BUILD_TIMESTAMP"])))
   # Process the template and output the result.
   print("INFO: Formatting buildstamp variables with format: " + args.var_format)
   vars_str = "\n".join(
-      args.var_format.format(k, v) for k, v in sorted(vars.items()))
+      args.var_format.format(k, v) for k, v in sorted(vars_dict.items()))
   with io.open(args.output, "w+", encoding="utf-8") as f:
-    f.write(template.format(vars=vars_str, **vars))
+    f.write(template.format(vars=vars_str, **vars_dict))
 
 
 if __name__ == "__main__":
