@@ -182,45 +182,45 @@ function build_modules() {
   popd
 }
 
-function build_dkms_modules() {
+function build_amdgpu_external_module() {
   pushd "${SRC_DIR}"
-  local -r dkms_kbuild="${KBUILD_OUTPUT}"/amdgpu-dkms
-  rm -rf "${dkms_kbuild}"
-  mkdir "${dkms_kbuild}" "${dkms_kbuild}"/include
+  local -r amdgpu_ext_kbuild="${KBUILD_OUTPUT}"/amdgpu-external
+  rm -rf "${amdgpu_ext_kbuild}"
+  mkdir "${amdgpu_ext_kbuild}" "${amdgpu_ext_kbuild}"/include
   rsync -a \
-    dkms/drivers/gpu/drm/amd \
-    dkms/drivers/gpu/drm/radeon \
-    dkms/drivers/gpu/drm/scheduler \
-    dkms/drivers/gpu/drm/ttm \
-    dkms/drivers/gpu/drm/amd/dkms/ \
-    "${dkms_kbuild}"/
+    external/amd-cloudgpu/drivers/gpu/drm/amd \
+    external/amd-cloudgpu/drivers/gpu/drm/radeon \
+    external/amd-cloudgpu/drivers/gpu/drm/scheduler \
+    external/amd-cloudgpu/drivers/gpu/drm/ttm \
+    external/amd-cloudgpu/drivers/gpu/drm/amd/dkms/ \
+    "${amdgpu_ext_kbuild}"/
   rsync -a \
-    dkms/include/kcl \
-    "${dkms_kbuild}"/include/
-  mkdir -p "${dkms_kbuild}"/include/drm/
+    external/amd-cloudgpu/include/kcl \
+    "${amdgpu_ext_kbuild}"/include/
+  mkdir -p "${amdgpu_ext_kbuild}"/include/drm/
   rsync -a \
-    dkms/include/drm/amd_rdma.h \
-    dkms/include/drm/gpu_scheduler.h \
-    dkms/include/drm/spsc_queue.h \
-    dkms/include/drm/ttm \
-    "${dkms_kbuild}"/include/drm/
-  mkdir -p "${dkms_kbuild}"/include/uapi/drm/
+    external/amd-cloudgpu/include/drm/amd_rdma.h \
+    external/amd-cloudgpu/include/drm/gpu_scheduler.h \
+    external/amd-cloudgpu/include/drm/spsc_queue.h \
+    external/amd-cloudgpu/include/drm/ttm \
+    "${amdgpu_ext_kbuild}"/include/drm/
+  mkdir -p "${amdgpu_ext_kbuild}"/include/uapi/drm/
   rsync -a \
-    dkms/include/uapi/drm/amdgpu_drm.h \
-    "${dkms_kbuild}"/include/uapi/drm/
-  mkdir -p "${dkms_kbuild}"/include/uapi/linux
+    external/amd-cloudgpu/include/uapi/drm/amdgpu_drm.h \
+    "${amdgpu_ext_kbuild}"/include/uapi/drm/
+  mkdir -p "${amdgpu_ext_kbuild}"/include/uapi/linux
   rsync -a \
-    dkms/include/uapi/linux/kfd_ioctl.h \
-    "${dkms_kbuild}"/include/uapi/linux
+    external/amd-cloudgpu/include/uapi/linux/kfd_ioctl.h \
+    "${amdgpu_ext_kbuild}"/include/uapi/linux
   popd
-  pushd "${dkms_kbuild}"
-  patch -p1 < "${SCRIPT_DIR}"/dkms.patch
+  pushd "${amdgpu_ext_kbuild}"
+  patch -p1 < "${SCRIPT_DIR}"/amd-cloudgpu.patch
   ./pre-build.sh 4.19
   make -j "$(nproc)" -C "${KBUILD_OUTPUT}" \
-    M="${dkms_kbuild}" "${MAKE_ARGS[@]}"
+    M="${amdgpu_ext_kbuild}" "${MAKE_ARGS[@]}"
   local -r mod_install_usr_dir="${MOD_INSTALL_DIR}/usr"
   make -j "$(nproc)" -C "${KBUILD_OUTPUT}" \
-    M="${dkms_kbuild}" \
+    M="${amdgpu_ext_kbuild}" \
     modules_install "${MAKE_ARGS[@]}" \
     INSTALL_MOD_PATH="${mod_install_usr_dir}" \
     INSTALL_MOD_STRIP=1
@@ -396,7 +396,7 @@ function build() {
   finalize_config
   build_bzimage_and_headers
   build_modules
-  build_dkms_modules
+  build_amdgpu_external_module
   build_perf
   build_kernel_rootfs
   build_initramfs

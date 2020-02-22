@@ -1,4 +1,4 @@
 [submodule "dkms"]
-	path = dkms
+	path = external/amd-cloudgpu
 	url = ./
 	branch = amd/19.20-patch
