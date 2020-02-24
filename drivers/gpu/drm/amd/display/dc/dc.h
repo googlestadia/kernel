@@ -1073,6 +1073,11 @@ struct dc_sink_dsc_caps {
 };
 #endif
 
+struct dc_sink_fec_caps {
+	bool is_rx_fec_supported;
+	bool is_topology_fec_supported;
+};
+
 /*
  * The sink structure contains EDID and other display device properties
  */
@@ -1087,7 +1092,8 @@ struct dc_sink {
 	bool converter_disable_audio;
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-	struct dc_sink_dsc_caps sink_dsc_caps;
+	struct dc_sink_dsc_caps dsc_caps;
+	struct dc_sink_fec_caps fec_caps;
 #endif
 
 	/* private to DC core */

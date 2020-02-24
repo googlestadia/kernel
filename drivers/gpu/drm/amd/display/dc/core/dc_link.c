@@ -3428,7 +3428,7 @@ uint32_t dc_link_bandwidth_kbps(
 	link_bw_kbps *= link_setting->lane_count;
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-	if (dc_link_is_fec_supported(link)) {
+	if (dc_link_is_fec_supported(link) && !link->dc->debug.disable_fec) {
 		/* Account for FEC overhead.
 		 * We have to do it based on caps,
 		 * and not based on FEC being set ready,
@@ -3479,7 +3479,6 @@ bool dc_link_is_fec_supported(const struct dc_link *link)
 	return (dc_is_dp_signal(link->connector_signal) &&
 			link->link_enc->features.fec_supported &&
 			link->dpcd_caps.fec_cap.bits.FEC_CAPABLE &&
-			!link->dc->debug.disable_fec &&
 			!IS_FPGA_MAXIMUS_DC(link->ctx->dce_environment));
 }
 #endif
