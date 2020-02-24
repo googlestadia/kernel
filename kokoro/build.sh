@@ -3,7 +3,7 @@ set -xe
 
 readonly SCRIPT_DIR=$(dirname "$(readlink -f "${0}")")
 readonly SRC_DIR=${DOCKER_SRC_DIR}
-readonly INITRAMFS_BIN_URL="gs://stadia_kernels/initramfs/initramfs-20190312.tar.gz"
+readonly INITRAMFS_BIN_URL="https://storage.googleapis.com/stadia_kernel_public/initramfs/initramfs-20190312.tar.gz"
 readonly INITRAMFS_BIN_SHA256="9790f1a9a859eca95c8ca036416f0ca7d76fdd0bc41c273fcad4636caf4681d3"
 readonly AMDGPU_FIRMWARE_URL="gs://stadia_kernels/amdgpu-firmware/amdgpu-firmware-2019.3.tar.gz"
 readonly AMDGPU_FIRMWARE_SHA256="cc904ee1a9c89c2b0f80800dc43f26cf92b5fb8afc354514e85593026e12072a"
@@ -49,6 +49,36 @@ function download_gcs() {
         return 1
       fi
     fi
+  fi
+
+  echo "${dst_path}"
+}
+
+# Downloads a file and verifies its authenticity using a checksum.
+function download_wget() {
+  local -r url="$1"
+  local dst_path="$2"
+  local -r sha256sum="$3"
+
+  if [[ -d "${dst_path}" ]]; then
+    dst_path="${dst_path%/}/$(basename "${url}")"
+  fi
+
+  if [[ -f "${dst_path}" ]]; then
+    echo "${sha256sum}  ${dst_path}" | sha256sum --quiet -c
+    if [[ $? -eq 0 ]]; then
+      echo "${dst_path}"
+      return
+    fi
+  fi
+
+  wget -q -O "${dst_path}" "${url}"
+  if [[ $? -ne 0 ]]; then
+    return 1
+  fi
+  echo "${sha256sum}  ${dst_path}" | sha256sum --quiet -c
+  if [[ $? -ne 0 ]]; then
+    return 1
   fi
 
   echo "${dst_path}"
@@ -101,7 +131,7 @@ function download_initramfs_artifacts() {
   rm -rf "${TMP_INITRAMFS_DIR}"
   mkdir "${TMP_INITRAMFS_DIR}"
 
-  local -r initramfs_bin_archive="$(download_gcs "${INITRAMFS_BIN_URL}" "${ARTIFACT_ROOT}" "${INITRAMFS_BIN_SHA256}")"
+  local -r initramfs_bin_archive="$(download_wget "${INITRAMFS_BIN_URL}" "${ARTIFACT_ROOT}" "${INITRAMFS_BIN_SHA256}")"
   tar -xf "${initramfs_bin_archive}" -C "${TMP_INITRAMFS_DIR}/"
 }
 
