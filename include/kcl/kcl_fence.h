@@ -122,6 +122,10 @@ _kcl_fence_get_rcu_safe(struct dma_fence __rcu **fencep)
 #if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
 #define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING
 bool _kcl_fence_enable_signaling(struct dma_fence *f);
+#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL \
+	.enable_signaling = _kcl_fence_enable_signaling,
+#else
+#define AMDKCL_DMA_FENCE_OPS_ENABLE_SIGNALING_OPTIONAL
 #endif
 
 #if !defined(HAVE_DMA_FENCE_SET_ERROR)
@@ -133,6 +137,17 @@ static inline void dma_fence_set_error(struct dma_fence *fence,
 
 	fence->status = error;
 }
+#endif
+
+/*
+ * commit v4.18-rc2-533-g418cc6ca0607
+ * dma-fence: Make ->wait callback optional
+ */
+#if DRM_VERSION_CODE < DRM_VERSION(4, 19, 0)
+#define AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL \
+	.wait = dma_fence_default_wait,
+#else
+#define AMDKCL_DMA_FENCE_OPS_WAIT_OPTIONAL
 #endif
 
 #endif /* AMDKCL_FENCE_H */
