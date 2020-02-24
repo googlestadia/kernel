@@ -2,18 +2,24 @@
 
 # Move all non-build artifacts out of $KOKORO_ARTIFACTS_DIR
 
-readonly KOKORO_NONBUILD_ARTIFACTS=${KOKORO_ROOT}/nonbuild
-mkdir ${KOKORO_NONBUILD_ARTIFACTS}
-mkdir -p ${KOKORO_NONBUILD_ARTIFACTS}/git
+readonly KOKORO_NONBUILD_ARTIFACTS="${KOKORO_ROOT}/nonbuild"
+mkdir "${KOKORO_NONBUILD_ARTIFACTS}"
+mkdir -p "${KOKORO_NONBUILD_ARTIFACTS}/git"
 
-mv ${KOKORO_ARTIFACTS_DIR}/git/gamelet_kernel ${KOKORO_NONBUILD_ARTIFACTS}/git
-mv ${KOKORO_ARTIFACTS_DIR}/keystore ${KOKORO_NONBUILD_ARTIFACTS}
+mv "${KOKORO_ARTIFACTS_DIR}/git/gamelet_kernel" \
+  "${KOKORO_NONBUILD_ARTIFACTS}/git"
+mv "${KOKORO_KEYSTORE_DIR}" "${KOKORO_NONBUILD_ARTIFACTS}"
+mv "${KOKORO_GFILE_DIR}" "${KOKORO_NONBUILD_ARTIFACTS}"
 
-rm -rf ${KOKORO_ARTIFACTS_DIR}/*
+rm -rf "${KOKORO_ARTIFACTS_DIR}"/*
 
-gcloud auth activate-service-account \
-  --key-file ${KOKORO_NONBUILD_ARTIFACTS}/keystore/71274_kokoro_service_key_json
+# Move the amdgpu firmware file to its canonical name for the build script.
+mv "${KOKORO_NONBUILD_ARTIFACTS}/gfile/amdgpu-firmware-2019.3.tar.gz" \
+  "${KOKORO_NONBUILD_ARTIFACTS}/gfile/amdgpu-firmware.tar.gz"
 
+# Authenticate to google cloud.
+gcloud auth activate-service-account --key-file \
+  "${KOKORO_NONBUILD_ARTIFACTS}/keystore/71274_kokoro_service_key_json"
 gcloud auth configure-docker
 
 docker run \
@@ -21,6 +27,7 @@ docker run \
   --volume ${KOKORO_ARTIFACTS_DIR}:/workspace/artifacts \
   --volume ${KOKORO_NONBUILD_ARTIFACTS}/git/gamelet_kernel:/workspace/src/kernel \
   --volume ${KOKORO_NONBUILD_ARTIFACTS}/keystore:/workspace/keystore \
+  --volume ${KOKORO_NONBUILD_ARTIFACTS}/gfile:/workspace/gfile \
   --volume ${HOME}:/workspace/home \
   --volume /dev:/dev \
   --env "HOME=/workspace/home" \
@@ -28,7 +35,8 @@ docker run \
   --env "DOCKER_ARTIFACTS_DIR=/workspace/artifacts" \
   --env "DOCKER_TMP_DIR=/workspace/tmp" \
   --env "DOCKER_SRC_DIR=/workspace/src/kernel" \
-  --env "DOCKER_GCLOUD_KEY_FILE=/workspace/keystore/71274_kokoro_service_key_json" \
+  --env "DOCKER_GFILE_DIR=/workspace/gfile" \
+  --env "DOCKER_KEYSTORE_DIR=/workspace/keystore" \
   --env "KOKORO_BUILD_ID=${KOKORO_BUILD_ID}" \
   --env "KOKORO_BUILD_NUMBER=${KOKORO_BUILD_NUMBER}" \
   --env "KOKORO_JOB_NAME=${KOKORO_JOB_NAME}" \
