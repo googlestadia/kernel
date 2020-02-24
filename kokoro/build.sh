@@ -132,11 +132,7 @@ function create_initramfs_install_dir() {
 function finalize_config() {
   pushd "${SRC_DIR}"
   readonly KCONFIG_CONFIG="${KBUILD_OUTPUT}/.config"
-  readonly SRC_CONFIG_FILE=${SCRIPT_DIR}/kernel_configs/${CONFIG_NAME:-release}
-  if [[ ! -e "${SRC_CONFIG_FILE}" ]]; then
-    echo "There is no config file named ${CONFIG_NAME}."
-    exit 1
-  fi
+  readonly SRC_CONFIG_FILE="${SCRIPT_DIR}/config"
   cp "${SRC_CONFIG_FILE}" "${KCONFIG_CONFIG}"
   readonly ARCH="x86_64"
   declare -rga MAKE_ARGS=(
