@@ -8,7 +8,6 @@ RUN apt-get update && apt-get install -y \
   gnupg2 \
   && rm -rf /var/lib/apt/lists/*
 
-
 # Add the Cloud SDK distribution URI as a package source
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
 
@@ -40,4 +39,5 @@ RUN apt-get update && apt-get install -y \
   rsync \
   squashfs-tools \
   strace \
+  wget \
   && rm -rf /var/lib/apt/lists/*
