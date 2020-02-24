@@ -5,84 +5,8 @@ readonly SCRIPT_DIR=$(dirname "$(readlink -f "${0}")")
 readonly SRC_DIR=${DOCKER_SRC_DIR}
 readonly INITRAMFS_BIN_URL="https://storage.googleapis.com/stadia_kernel_public/initramfs/initramfs-20190312.tar.gz"
 readonly INITRAMFS_BIN_SHA256="9790f1a9a859eca95c8ca036416f0ca7d76fdd0bc41c273fcad4636caf4681d3"
-readonly AMDGPU_FIRMWARE_URL="gs://stadia_kernels/amdgpu-firmware/amdgpu-firmware-2019.3.tar.gz"
-readonly AMDGPU_FIRMWARE_SHA256="cc904ee1a9c89c2b0f80800dc43f26cf92b5fb8afc354514e85593026e12072a"
 
-# Downloads a file from GCS and verifies its authenticity using a checksum.
-function download_gcs() {
-  local -r url=$1
-  local dst_path=$2
-  local -r sha256sum=$3
-
-  if ! hash gsutil 2>/dev/null; then
-    return 1
-  fi
-
-  if [[ -d "${dst_path}" ]]; then
-    dst_path="${dst_path%/}/$(basename "${url}")"
-  fi
-
-  if [[ -f "${dst_path}" ]]; then
-    local -r remote_hash="$(gsutil hash -h "${url}" \
-      | grep -oP '\s+Hash \(md5\):\s+\K\w+')"
-    local -r local_hash="$(md5sum "${dst_path}" | cut -d' ' -f1)"
-  else
-    local -r remote_hash="0"
-    local -r local_hash="1"
-  fi
-
-  if [[ "${local_hash}" != "${remote_hash}" ]]; then
-    gsutil -m -q cp -r "${url}" "${dst_path}"
-    if [[ $? -gt 0 ]]; then
-      rm -f "${dst_path}"
-      return 1
-    fi
-  fi
-
-  if [[ -n ${sha256sum} ]]; then
-    echo "${sha256sum}  ${dst_path}" | sha256sum --quiet -c
-    if [[ $? -ne 0 ]]; then
-      rm -f "${dst_path}"
-      if [[ ${local_hash} == "${remote_hash}" ]]; then
-        download_gcs "${url}" "${dst_path}" "${sha256sum}"
-      else
-        return 1
-      fi
-    fi
-  fi
-
-  echo "${dst_path}"
-}
-
-# Downloads a file and verifies its authenticity using a checksum.
-function download_wget() {
-  local -r url="$1"
-  local dst_path="$2"
-  local -r sha256sum="$3"
-
-  if [[ -d "${dst_path}" ]]; then
-    dst_path="${dst_path%/}/$(basename "${url}")"
-  fi
-
-  if [[ -f "${dst_path}" ]]; then
-    echo "${sha256sum}  ${dst_path}" | sha256sum --quiet -c
-    if [[ $? -eq 0 ]]; then
-      echo "${dst_path}"
-      return
-    fi
-  fi
-
-  wget -q -O "${dst_path}" "${url}"
-  if [[ $? -ne 0 ]]; then
-    return 1
-  fi
-  echo "${sha256sum}  ${dst_path}" | sha256sum --quiet -c
-  if [[ $? -ne 0 ]]; then
-    return 1
-  fi
-
-  echo "${dst_path}"
-}
+source "${SCRIPT_DIR}/wget.sh"
 
 function check_env() {
   if [[ ! -d ${DOCKER_TMP_DIR} ]]; then
@@ -115,17 +39,6 @@ function set_LOCALVERSION_from_buildstamp() {
   popd
 }
 
-function setup_gcloud() {
-  # If a key file is specified, then we're running in a CI job that needs the
-  # corresponding service account to be activated.
-  # If not, we're assuming that we're running locally, and the user has their
-  # home directory mounted at $HOME, with a gcloud config that is already
-  # authenticated.
-  if [[ -e "${DOCKER_GCLOUD_KEY_FILE}" ]]; then
-    gcloud auth activate-service-account --key-file "${DOCKER_GCLOUD_KEY_FILE}"
-  fi
-}
-
 function download_initramfs_artifacts() {
   readonly TMP_INITRAMFS_DIR="${ARTIFACT_ROOT}/initramfs"
   rm -rf "${TMP_INITRAMFS_DIR}"
@@ -135,8 +48,9 @@ function download_initramfs_artifacts() {
   tar -xf "${initramfs_bin_archive}" -C "${TMP_INITRAMFS_DIR}/"
 }
 
-function download_firmware() {
+function install_firmware() {
   readonly FIRMWARE_INSTALL_DIR="${ARTIFACT_ROOT}/firmware-install"
+  rm -rf "${FIRMWARE_INSTALL_DIR}"
   mkdir -p "${FIRMWARE_INSTALL_DIR}"
 
   local -r firmware_install_usr_dir="${FIRMWARE_INSTALL_DIR}/usr/lib/firmware"
@@ -144,8 +58,8 @@ function download_firmware() {
 
   local -r amdgpu_firmware_dir="${firmware_install_usr_dir}/amdgpu"
   mkdir -p "${amdgpu_firmware_dir}"
-  local -r amdgpu_firmware_archive="$(download_gcs "${AMDGPU_FIRMWARE_URL}" "${ARTIFACT_ROOT}" "${AMDGPU_FIRMWARE_SHA256}")"
-  tar -xf "${amdgpu_firmware_archive}" -C "${amdgpu_firmware_dir}"/
+  tar -xf "${DOCKER_GFILE_DIR}/amdgpu-firmware.tar.gz" \
+    -C "${amdgpu_firmware_dir}"/
 }
 
 function create_kbuild_output() {
@@ -369,9 +283,8 @@ function stage_artifacts() {
 function build() {
   check_env
   set_LOCALVERSION_from_buildstamp
-  setup_gcloud
   download_initramfs_artifacts
-  download_firmware
+  install_firmware
   create_kbuild_output
   create_initramfs_install_dir
   finalize_config
