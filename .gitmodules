@@ -1,4 +1,4 @@
-[submodule "dkms"]
+[submodule "external/amd-cloudgpu"]
 	path = external/amd-cloudgpu
 	url = ./
-	branch = amd/19.20-patch
+	branch = stadia-cloudgpu/2019_Q3_RC7_Release
