@@ -137,6 +137,8 @@ static inline unsigned amdgpu_mem_type_to_domain(u32 mem_type)
 		return AMDGPU_GEM_DOMAIN_DGMA;
 	case AMDGPU_PL_DGMA_IMPORT:
 		return AMDGPU_GEM_DOMAIN_DGMA_IMPORT;
+	case AMDGPU_PL_DGMA_PEER:
+		return AMDGPU_GEM_DOMAIN_DGMA_PEER;
 	default:
 		break;
 	}

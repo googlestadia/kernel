@@ -1713,13 +1713,26 @@ error_create:
 
 static int amdgpu_direct_gma_peer_init(struct amdgpu_device *adev)
 {
-	unsigned long psize;
+	unsigned long size;
+	int r;
 
 	if (!amdgpu_peermem_size)
 		return 0;
 
-	psize = amdgpu_peermem_size * 256;
-	return ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_PEER, psize);
+	size = (unsigned long)amdgpu_peermem_size << 20;
+	r = ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_PEER,
+		size >> PAGE_SHIFT);
+	if (unlikely(r))
+		goto error_out;
+	DRM_INFO("amdgpu: %uM of Direct GMA peer memory ready.\n",
+		amdgpu_peermem_size);
+	return 0;
+
+error_out:
+	amdgpu_peermem_size = 0;
+	DRM_ERROR("Failed initializing Direct GMA peer heap.\n");
+	return r;
+
 }
 
 static int amdgpu_direct_gma_peer_fini(struct amdgpu_device *adev)
@@ -2403,9 +2416,6 @@ static int amdgpu_mm_dump_table(struct seq_file *m, void *data)
 #endif
 }
 
-static int ttm_pl_dgma = AMDGPU_PL_DGMA;
-static int ttm_pl_dgma_import = AMDGPU_PL_DGMA_IMPORT;
-
 static const struct drm_info_list amdgpu_ttm_debugfs_list[] = {
 	{"amdgpu_vram_mm", amdgpu_mm_dump_table, 0, (void *)TTM_PL_VRAM},
 	{"amdgpu_gtt_mm", amdgpu_mm_dump_table, 0, (void *)TTM_PL_TT},
@@ -2419,8 +2429,12 @@ static const struct drm_info_list amdgpu_ttm_debugfs_list[] = {
 };
 
 static const struct drm_info_list amdgpu_ttm_dgma_debugfs_list[] = {
-	{"amdgpu_dgma_mm", amdgpu_mm_dump_table, 0, &ttm_pl_dgma},
-	{"amdgpu_dgma_import_mm", amdgpu_mm_dump_table, 0, &ttm_pl_dgma_import}
+	{"amdgpu_dgma_mm", amdgpu_mm_dump_table, 0, (void *)AMDGPU_PL_DGMA},
+	{"amdgpu_dgma_import_mm", amdgpu_mm_dump_table, 0, (void *)AMDGPU_PL_DGMA_IMPORT}
+};
+
+static const struct drm_info_list amdgpu_ttm_dgma_peer_debugfs_list[] = {
+	{ "amdgpu_dgma_peer_mm", amdgpu_mm_dump_table, 0, (void *)AMDGPU_PL_DGMA_PEER }
 };
 
 /**
@@ -2738,6 +2752,14 @@ static int amdgpu_ttm_debugfs_init(struct amdgpu_device *adev)
 	if (amdgpu_direct_gma_size) {
 		r = amdgpu_debugfs_add_files(adev, amdgpu_ttm_dgma_debugfs_list,
 					ARRAY_SIZE(amdgpu_ttm_dgma_debugfs_list));
+		if (unlikely(r))
+			return r;
+	}
+
+	if (amdgpu_peermem_size) {
+		r = amdgpu_debugfs_add_files(
+			adev, amdgpu_ttm_dgma_peer_debugfs_list,
+			ARRAY_SIZE(amdgpu_ttm_dgma_peer_debugfs_list));
 		if (unlikely(r))
 			return r;
 	}

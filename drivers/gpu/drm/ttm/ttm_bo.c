@@ -103,9 +103,9 @@ static void ttm_bo_mem_space_debug(struct ttm_buffer_object *bo,
 	struct drm_printer p = drm_debug_printer(TTM_PFX);
 	int i, ret, mem_type;
 
-	drm_printf(&p, "No space for %p (%lu pages, %luK, %luM)\n",
+	drm_printf(&p, "No space for %p (%lu pages, %luK, %luM) num_placement=%d\n",
 		   bo, bo->mem.num_pages, bo->mem.size >> 10,
-		   bo->mem.size >> 20);
+		   bo->mem.size >> 20, placement->num_placement);
 	for (i = 0; i < placement->num_placement; i++) {
 		ret = ttm_mem_type_from_place(&placement->placement[i],
 						&mem_type);
@@ -1169,8 +1169,10 @@ int ttm_bo_validate(struct ttm_buffer_object *bo,
 	 */
 	if (!ttm_bo_mem_compat(placement, &bo->mem, &new_flags)) {
 		ret = ttm_bo_move_buffer(bo, placement, ctx);
-		if (ret)
+		if (ret) {
+			ttm_bo_mem_space_debug(bo, placement);
 			return ret;
+		}
 	} else {
 		/*
 		 * Use the access and other non-mapping-related flag bits from

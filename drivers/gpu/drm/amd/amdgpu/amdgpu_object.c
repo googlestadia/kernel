@@ -436,8 +436,9 @@ static bool amdgpu_bo_validate_size(struct amdgpu_device *adev,
 	return true;
 
 fail:
-	DRM_DEBUG("BO size %lu > total memory in domain: %llu\n", size,
-		  man->size << PAGE_SHIFT);
+	DRM_DEV_ERROR(adev->dev,
+		"BO size > domain size: size=%lu, domain size=%llu, domain=%u\n",
+		size, man->size << PAGE_SHIFT, domain);
 	return false;
 }
 
@@ -471,8 +472,10 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 		size = ALIGN(size, PAGE_SIZE);
 	}
 
-	if (!amdgpu_bo_validate_size(adev, size, bp->domain))
+	if (!amdgpu_bo_validate_size(adev, size, bp->domain)) {
+		DRM_DEV_ERROR(adev->dev, "amdgpu_bo_validate_size failed\n");
 		return -ENOMEM;
+	}
 
 	*bo_ptr = NULL;
 
@@ -530,8 +533,10 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	r = ttm_bo_init_reserved(&adev->mman.bdev, &bo->tbo, size, bp->type,
 				 &bo->placement, page_align, &ctx, acc_size,
 				 NULL, bp->resv, &amdgpu_bo_destroy);
-	if (unlikely(r != 0))
+	if (unlikely(r != 0)) {
+		DRM_DEV_ERROR(adev->dev, "ttm_bo_init_reserved error: %d\n", r);
 		return r;
+	}
 
 	if (!amdgpu_gmc_vram_full_visible(&adev->gmc) &&
 	    bo->tbo.mem.mem_type == TTM_PL_VRAM &&
@@ -549,8 +554,11 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 		struct dma_fence *fence;
 
 		r = amdgpu_fill_buffer(bo, 0, bo->tbo.resv, &fence);
-		if (unlikely(r))
+		if (unlikely(r)) {
+			DRM_DEV_ERROR(adev->dev,
+				"amdgpu_fill_buffer error: %d\n", r);
 			goto fail_unreserve;
+		}
 
 #if defined(BUILD_AS_DKMS)
 		dma_fence_wait(fence, false);
@@ -575,9 +583,16 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 	    bp->domain & (AMDGPU_GEM_DOMAIN_DGMA | AMDGPU_GEM_DOMAIN_DGMA_IMPORT |
 						AMDGPU_GEM_DOMAIN_DGMA_PEER)) {
 		r = amdgpu_bo_reserve(bo, false);
-		if (unlikely(r != 0))
+		if (unlikely(r != 0)) {
+			DRM_DEV_ERROR(adev->dev,
+				"amdgpu_bo_reserve error: %d\n", r);
 			return r;
+		}
 		r = amdgpu_bo_pin(bo, bp->domain);
+		if (unlikely(r != 0)) {
+			DRM_DEV_ERROR(adev->dev,
+				"amdgpu_bo_pin error: %d\n", r);
+		}
 		amdgpu_bo_unreserve(bo);
 	}
 
