@@ -955,4 +955,5 @@ const struct kfd2kgd_calls gfx_v10_kfd2kgd = {
 	.set_wave_launch_mode = kgd_gfx_v10_set_wave_launch_mode,
 	.get_iq_wait_times = kgd_gfx_v10_get_iq_wait_times,
 	.build_grace_period_packet_info = kgd_gfx_v10_build_grace_period_packet_info,
+	.get_unique_id = amdgpu_amdkfd_get_unique_id,
 };
