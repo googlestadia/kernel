@@ -92,7 +92,8 @@ static int smu_v11_0_wait_for_response(struct smu_context *smu)
 int
 smu_v11_0_send_msg_with_param(struct smu_context *smu,
 			      enum smu_message_type msg,
-			      uint32_t param)
+			      uint32_t param,
+			      uint32_t *read_arg)
 {
 	struct amdgpu_device *adev = smu->adev;
 	int ret = 0, index = 0;
@@ -115,11 +116,21 @@ smu_v11_0_send_msg_with_param(struct smu_context *smu,
 	smu_v11_0_send_msg_without_waiting(smu, (uint16_t)index);
 
 	ret = smu_v11_0_wait_for_response(smu);
-	if (ret)
+	if (ret) {
 		pr_err("failed send message: %10s (%d) \tparam: 0x%08x response %#x\n",
 		       smu_get_message_name(smu, msg), index, param, ret);
+		return ret;
+	}
+	if (read_arg) {
+		ret = smu_v11_0_read_arg(smu, read_arg);
+		if (ret) {
+			pr_err("failed to read message arg: %10s (%d) \tparam: 0x%08x response %#x\n",
+			       smu_get_message_name(smu, msg), index, param, ret);
+			return ret;
+		}
+	}
 
-	return ret;
+	return 0;
 }
 
 int smu_v11_0_init_microcode(struct smu_context *smu)
@@ -674,12 +685,14 @@ int smu_v11_0_notify_memory_pool_location(struct smu_context *smu)
 
 	ret = smu_send_smc_msg_with_param(smu,
 					  SMU_MSG_SetSystemVirtualDramAddrHigh,
-					  address_high);
+					  address_high,
+					  NULL);
 	if (ret)
 		return ret;
 	ret = smu_send_smc_msg_with_param(smu,
 					  SMU_MSG_SetSystemVirtualDramAddrLow,
-					  address_low);
+					  address_low,
+					  NULL);
 	if (ret)
 		return ret;
 
@@ -688,15 +701,15 @@ int smu_v11_0_notify_memory_pool_location(struct smu_context *smu)
 	address_low  = (uint32_t)lower_32_bits(address);
 
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DramLogSetDramAddrHigh,
-					  address_high);
+					  address_high, NULL);
 	if (ret)
 		return ret;
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DramLogSetDramAddrLow,
-					  address_low);
+					  address_low, NULL);
 	if (ret)
 		return ret;
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_DramLogSetDramSize,
-					  (uint32_t)memory_pool->size);
+					  (uint32_t)memory_pool->size, NULL);
 	if (ret)
 		return ret;
 
@@ -760,7 +773,7 @@ int smu_v11_0_set_deep_sleep_dcefclk(struct smu_context *smu, uint32_t clk)
 	int ret;
 
 	ret = smu_send_smc_msg_with_param(smu,
-					  SMU_MSG_SetMinDeepSleepDcefclk, clk);
+					  SMU_MSG_SetMinDeepSleepDcefclk, clk, NULL);
 	if (ret)
 		pr_err("SMU11 attempt to set divider for DCEFCLK Failed!");
 
@@ -787,11 +800,13 @@ int smu_v11_0_set_driver_table_location(struct smu_context *smu)
 	if (driver_table->mc_address) {
 		ret = smu_send_smc_msg_with_param(smu,
 				SMU_MSG_SetDriverDramAddrHigh,
-				upper_32_bits(driver_table->mc_address));
+				upper_32_bits(driver_table->mc_address),
+				NULL);
 		if (!ret)
 			ret = smu_send_smc_msg_with_param(smu,
 				SMU_MSG_SetDriverDramAddrLow,
-				lower_32_bits(driver_table->mc_address));
+				lower_32_bits(driver_table->mc_address),
+				NULL);
 	}
 
 	return ret;
@@ -805,11 +820,13 @@ int smu_v11_0_set_tool_table_location(struct smu_context *smu)
 	if (tool_table->mc_address) {
 		ret = smu_send_smc_msg_with_param(smu,
 				SMU_MSG_SetToolsDramAddrHigh,
-				upper_32_bits(tool_table->mc_address));
+				upper_32_bits(tool_table->mc_address),
+				NULL);
 		if (!ret)
 			ret = smu_send_smc_msg_with_param(smu,
 				SMU_MSG_SetToolsDramAddrLow,
-				lower_32_bits(tool_table->mc_address));
+				lower_32_bits(tool_table->mc_address),
+				NULL);
 	}
 
 	return ret;
@@ -822,7 +839,7 @@ int smu_v11_0_init_display_count(struct smu_context *smu, uint32_t count)
 	if (!smu->pm_enabled)
 		return ret;
 
-	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_NumOfDisplays, count);
+	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_NumOfDisplays, count, NULL);
 	return ret;
 }
 
@@ -840,12 +857,12 @@ int smu_v11_0_set_allowed_mask(struct smu_context *smu)
 	bitmap_copy((unsigned long *)feature_mask, feature->allowed, 64);
 
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetAllowedFeaturesMaskHigh,
-					  feature_mask[1]);
+					  feature_mask[1], NULL);
 	if (ret)
 		goto failed;
 
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetAllowedFeaturesMaskLow,
-					  feature_mask[0]);
+					  feature_mask[0], NULL);
 	if (ret)
 		goto failed;
 
@@ -865,17 +882,11 @@ int smu_v11_0_get_enabled_mask(struct smu_context *smu,
 		return -EINVAL;
 
 	if (bitmap_empty(feature->enabled, feature->feature_num)) {
-		ret = smu_send_smc_msg(smu, SMU_MSG_GetEnabledSmuFeaturesHigh);
-		if (ret)
-			return ret;
-		ret = smu_read_smc_arg(smu, &feature_mask_high);
+		ret = smu_send_smc_msg(smu, SMU_MSG_GetEnabledSmuFeaturesHigh, &feature_mask_high);
 		if (ret)
 			return ret;
 
-		ret = smu_send_smc_msg(smu, SMU_MSG_GetEnabledSmuFeaturesLow);
-		if (ret)
-			return ret;
-		ret = smu_read_smc_arg(smu, &feature_mask_low);
+		ret = smu_send_smc_msg(smu, SMU_MSG_GetEnabledSmuFeaturesLow, &feature_mask_low);
 		if (ret)
 			return ret;
 
@@ -897,7 +908,7 @@ int smu_v11_0_system_features_control(struct smu_context *smu,
 	int ret = 0;
 
 	ret = smu_send_smc_msg(smu, (en ? SMU_MSG_EnableAllSmuFeatures :
-				     SMU_MSG_DisableAllSmuFeatures));
+				     SMU_MSG_DisableAllSmuFeatures), NULL);
 	if (ret)
 		return ret;
 
@@ -926,7 +937,7 @@ int smu_v11_0_notify_display_change(struct smu_context *smu)
 		return ret;
 	if (smu_feature_is_enabled(smu, SMU_FEATURE_DPM_UCLK_BIT) &&
 	    smu->adev->gmc.vram_type == AMDGPU_VRAM_TYPE_HBM)
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetUclkFastSwitch, 1);
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetUclkFastSwitch, 1, NULL);
 
 	return ret;
 }
@@ -950,30 +961,24 @@ smu_v11_0_get_max_sustainable_clock(struct smu_context *smu, uint32_t *clock,
 		return -EINVAL;
 
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetDcModeMaxDpmFreq,
-					  clk_id << 16);
+					  clk_id << 16, clock);
 	if (ret) {
 		pr_err("[GetMaxSustainableClock] Failed to get max DC clock from SMC!");
 		return ret;
 	}
-
-	ret = smu_read_smc_arg(smu, clock);
-	if (ret)
-		return ret;
 
 	if (*clock != 0)
 		return 0;
 
 	/* if DC limit is zero, return AC limit */
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetMaxDpmFreq,
-					  clk_id << 16);
+					  clk_id << 16, clock);
 	if (ret) {
 		pr_err("[GetMaxSustainableClock] failed to get max AC clock from SMC!");
 		return ret;
 	}
 
-	ret = smu_read_smc_arg(smu, clock);
-
-	return ret;
+	return 0;
 }
 
 int smu_v11_0_init_max_sustainable_clocks(struct smu_context *smu)
@@ -1109,7 +1114,7 @@ int smu_v11_0_set_power_limit(struct smu_context *smu, uint32_t n)
 		return -EOPNOTSUPP;
 	}
 
-	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetPptLimit, n);
+	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetPptLimit, n, NULL);
 	if (ret) {
 		pr_err("[%s] Set power limit Failed!\n", __func__);
 		return ret;
@@ -1139,11 +1144,7 @@ int smu_v11_0_get_current_clk_freq(struct smu_context *smu,
 		ret =  smu_get_current_clk_freq_by_table(smu, clk_id, &freq);
 	else {
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetDpmClockFreq,
-						  (asic_clk_id << 16));
-		if (ret)
-			return ret;
-
-		ret = smu_read_smc_arg(smu, &freq);
+						  (asic_clk_id << 16), &freq);
 		if (ret)
 			return ret;
 	}
@@ -1378,9 +1379,9 @@ int smu_v11_0_gfx_off_control(struct smu_context *smu, bool enable)
 		if (!(adev->pm.pp_feature & PP_GFXOFF_MASK))
 			return 0;
 		if (enable)
-			ret = smu_send_smc_msg(smu, SMU_MSG_AllowGfxOff);
+			ret = smu_send_smc_msg(smu, SMU_MSG_AllowGfxOff, NULL);
 		else
-			ret = smu_send_smc_msg(smu, SMU_MSG_DisallowGfxOff);
+			ret = smu_send_smc_msg(smu, SMU_MSG_DisallowGfxOff, NULL);
 		break;
 	default:
 		break;
@@ -1518,7 +1519,8 @@ int smu_v11_0_set_xgmi_pstate(struct smu_context *smu,
 	int ret = 0;
 	ret = smu_send_smc_msg_with_param(smu,
 					  SMU_MSG_SetXgmiMode,
-					  pstate ? XGMI_MODE_PSTATE_D0 : XGMI_MODE_PSTATE_D3);
+					  pstate ? XGMI_MODE_PSTATE_D0 : XGMI_MODE_PSTATE_D3,
+					  NULL);
 	return ret;
 }
 
@@ -1631,14 +1633,14 @@ int smu_v11_0_set_azalia_d3_pme(struct smu_context *smu)
 {
 	int ret = 0;
 
-	ret = smu_send_smc_msg(smu, SMU_MSG_BacoAudioD3PME);
+	ret = smu_send_smc_msg(smu, SMU_MSG_BacoAudioD3PME, NULL);
 
 	return ret;
 }
 
 static int smu_v11_0_baco_set_armd3_sequence(struct smu_context *smu, enum smu_v11_0_baco_seq baco_seq)
 {
-	return smu_send_smc_msg_with_param(smu, SMU_MSG_ArmD3, baco_seq);
+	return smu_send_smc_msg_with_param(smu, SMU_MSG_ArmD3, baco_seq, NULL);
 }
 
 bool smu_v11_0_baco_is_support(struct smu_context *smu)
@@ -1707,12 +1709,12 @@ int smu_v11_0_baco_set_state(struct smu_context *smu, enum smu_baco_state state)
 			data |= 0x80000000;
 			WREG32_SOC15(THM, 0, mmTHM_BACO_CNTL, data);
 
-			ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnterBaco, 0);
+			ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnterBaco, 0, NULL);
 		} else {
-			ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnterBaco, 1);
+			ret = smu_send_smc_msg_with_param(smu, SMU_MSG_EnterBaco, 1, NULL);
 		}
 	} else {
-		ret = smu_send_smc_msg(smu, SMU_MSG_ExitBaco);
+		ret = smu_send_smc_msg(smu, SMU_MSG_ExitBaco, NULL);
 		if (ret)
 			goto out;
 
@@ -1780,19 +1782,13 @@ int smu_v11_0_get_dpm_ultimate_freq(struct smu_context *smu, enum smu_clk_type c
 	param = (clk_id & 0xffff) << 16;
 
 	if (max) {
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetMaxDpmFreq, param);
-		if (ret)
-			goto failed;
-		ret = smu_read_smc_arg(smu, max);
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetMaxDpmFreq, param, max);
 		if (ret)
 			goto failed;
 	}
 
 	if (min) {
-		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetMinDpmFreq, param);
-		if (ret)
-			goto failed;
-		ret = smu_read_smc_arg(smu, min);
+		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetMinDpmFreq, param, min);
 		if (ret)
 			goto failed;
 	}
@@ -1819,7 +1815,7 @@ int smu_v11_0_set_soft_freq_limited_range(struct smu_context *smu, enum smu_clk_
 	if (max > 0 && max <=  max_freq) {
 		param = (uint32_t)((clk_id << 16) | (max & 0xffff));
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetSoftMaxByFreq,
-						  param);
+						  param, NULL);
 		if (ret)
 			return ret;
 	}
@@ -1827,7 +1823,7 @@ int smu_v11_0_set_soft_freq_limited_range(struct smu_context *smu, enum smu_clk_
 	if (min > 0 && min >= min_freq) {
 		param = (uint32_t)((clk_id << 16) | (min & 0xffff));
 		ret = smu_send_smc_msg_with_param(smu, SMU_MSG_SetSoftMinByFreq,
-						  param);
+						  param, NULL);
 		if (ret)
 			return ret;
 	}
