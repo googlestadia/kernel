@@ -256,6 +256,9 @@ void amdgpu_amdkfd_gpuvm_init_mem_limits(void);
 void amdgpu_amdkfd_unreserve_memory_limit(struct amdgpu_bo *bo);
 void amdgpu_amdkfd_debug_mem_fence(struct kgd_dev *kgd);
 
+int amdgpu_amdkfd_get_tile_config(struct kgd_dev *kgd,
+				struct tile_config *config);
+
 /* KGD2KFD callbacks */
 int kgd2kfd_init(void);
 void kgd2kfd_exit(void);

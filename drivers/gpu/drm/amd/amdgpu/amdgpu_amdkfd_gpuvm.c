@@ -2534,3 +2534,25 @@ validate_fail:
 	ttm_eu_backoff_reservation(&ticket, &list);
 	return r;
 }
+
+/* Returns GPU-specific tiling mode information */
+int amdgpu_amdkfd_get_tile_config(struct kgd_dev *kgd,
+				struct tile_config *config)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+
+	config->gb_addr_config = adev->gfx.config.gb_addr_config;
+	config->tile_config_ptr = adev->gfx.config.tile_mode_array;
+	config->num_tile_configs =
+			ARRAY_SIZE(adev->gfx.config.tile_mode_array);
+	config->macro_tile_config_ptr =
+			adev->gfx.config.macrotile_mode_array;
+	config->num_macro_tile_configs =
+			ARRAY_SIZE(adev->gfx.config.macrotile_mode_array);
+
+	/* Those values are not set from GFX9 onwards */
+	config->num_banks = adev->gfx.config.num_banks;
+	config->num_ranks = adev->gfx.config.num_ranks;
+
+	return 0;
+}
