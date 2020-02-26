@@ -7,7 +7,8 @@ $(obj)/$(AMDGPU_CONFIG_H): $(srctree)/$(AMDGPU_CONFIG_PATH)/m4/* $(srctree)/$(AM
 	@cd $(obj)/dkms && \
 	./autogen.sh && \
 	CPPFLAGS="-I$(abspath $(srctree))/arch/$(SRCARCH)/include \
-		-I$(abspath $(srctree))/arch/$(SRCARCH)/include/generated \
+		-I$(abspath $(objtree))/arch/$(SRCARCH)/include/generated \
+		-I$(abspath $(objtree))/include \
 		-I$(abspath $(srctree))/include \
 		-I$(abspath $(srctree))/include/uapi \
 		-include linux/kconfig.h" \
