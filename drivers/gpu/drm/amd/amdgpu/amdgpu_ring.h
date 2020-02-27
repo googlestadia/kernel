@@ -223,6 +223,7 @@ struct amdgpu_ring {
 	struct mutex		priority_mutex;
 	/* protected by priority_mutex */
 	int			priority;
+	bool			has_high_prio;
 
 #if defined(CONFIG_DEBUG_FS)
 	struct dentry *ent;
