@@ -1847,9 +1847,9 @@ static int gfx_v9_0_rlc_init(struct amdgpu_device *adev)
 		break;
 	}
 
-    /* init spm vmid with 0xf */
-    if (adev->gfx.rlc.funcs->update_spm_vmid)
-        adev->gfx.rlc.funcs->update_spm_vmid(adev, 0xf);
+	/* init spm vmid with 0xf */
+	if (adev->gfx.rlc.funcs->update_spm_vmid)
+		adev->gfx.rlc.funcs->update_spm_vmid(adev, 0xf);
 
 	return 0;
 }
