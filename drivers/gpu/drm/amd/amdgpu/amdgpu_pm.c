@@ -3471,6 +3471,7 @@ void amdgpu_pm_sysfs_fini(struct amdgpu_device *adev)
 	device_remove_file(adev->dev, &dev_attr_pp_cur_state);
 	device_remove_file(adev->dev, &dev_attr_pp_force_state);
 	device_remove_file(adev->dev, &dev_attr_pp_table);
+	device_remove_file(adev->dev, &dev_attr_pp_sclk);
 
 	device_remove_file(adev->dev, &dev_attr_pp_dpm_sclk);
 	device_remove_file(adev->dev, &dev_attr_pp_dpm_mclk);
