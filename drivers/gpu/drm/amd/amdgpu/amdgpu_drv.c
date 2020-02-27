@@ -1181,7 +1181,6 @@ static void
 amdgpu_pci_remove(struct pci_dev *pdev)
 {
 	struct drm_device *dev = pci_get_drvdata(pdev);
-	struct amdgpu_device *adev = dev->dev_private;
 
 #ifdef MODULE
 	if (THIS_MODULE->state != MODULE_STATE_GOING)
