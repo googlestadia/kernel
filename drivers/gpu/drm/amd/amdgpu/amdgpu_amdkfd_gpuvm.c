@@ -2516,7 +2516,7 @@ int amdgpu_amdkfd_copy_mem_to_mem(struct kgd_dev *kgd, struct kgd_mem *src_mem,
 	}
 
 
-	r = amdgpu_ttm_copy_mem_to_mem(adev, &src, &dst, size, NULL,
+	r = amdgpu_ttm_copy_mem_to_mem(adev, &src, &dst, size, false, NULL,
 				       &fence);
 	if (r)
 		pr_err("Copy buffer failed %d\n", r);
