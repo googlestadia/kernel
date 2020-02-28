@@ -137,11 +137,7 @@ static void amdgpu_mn_destroy(struct work_struct *work)
 	}
 	up_write(&amn->lock);
 	mutex_unlock(&adev->mn_lock);
-#ifdef HAVE_MMU_NOTIFIER_PUT
-        mmu_notifier_put(&amn->mn);
-#else
 	mmu_notifier_unregister_no_release(&amn->mn, amn->mm);
-#endif
 	kfree(amn);
 }
 
