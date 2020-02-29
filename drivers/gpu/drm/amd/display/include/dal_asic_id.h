@@ -136,6 +136,8 @@
 #define RAVEN2_A0 0x81
 #define RAVEN2_15D8_REV_94 0x94
 #define RAVEN2_15D8_REV_95 0x95
+#define RAVEN2_15D8_REV_E3 0xE3
+#define RAVEN2_15D8_REV_E4 0xE4
 #define RAVEN2_15D8_REV_E9 0xE9
 #define RAVEN2_15D8_REV_EA 0xEA
 #define RAVEN2_15D8_REV_EB 0xEB
@@ -144,16 +146,14 @@
 #ifndef ASICREV_IS_RAVEN
 #define ASICREV_IS_RAVEN(eChipRev) ((eChipRev >= RAVEN_A0) && eChipRev < RAVEN_UNKNOWN)
 #endif
-#define PRID_DALI_DE 0xDE
-#define PRID_DALI_DF 0xDF
-#define PRID_DALI_E3 0xE3
-#define PRID_DALI_E4 0xE4
 
 #define ASICREV_IS_PICASSO(eChipRev) ((eChipRev >= PICASSO_A0) && (eChipRev < RAVEN2_A0))
 #ifndef ASICREV_IS_RAVEN2
-#define ASICREV_IS_RAVEN2(eChipRev) ((eChipRev >= RAVEN2_A0) && (eChipRev < RENOIR_A0))
+#define ASICREV_IS_RAVEN2(eChipRev) ((eChipRev >= RAVEN2_A0) && (eChipRev < RAVEN1_F0))
 #endif
 #define ASICREV_IS_RV1_F0(eChipRev) ((eChipRev >= RAVEN1_F0) && (eChipRev < RAVEN_UNKNOWN))
+#define ASICREV_IS_DALI(eChipRev) ((eChipRev == RAVEN2_15D8_REV_E3) \
+		|| (eChipRev == RAVEN2_15D8_REV_E4))
 #define ASICREV_IS_POLLOCK(eChipRev) (eChipRev == RAVEN2_15D8_REV_94 \
 		|| eChipRev == RAVEN2_15D8_REV_95 \
 			|| eChipRev == RAVEN2_15D8_REV_E9 \
@@ -180,7 +180,7 @@ enum {
 #if defined(CONFIG_DRM_AMD_DC_DCN2_1)
 #define RENOIR_A0 0x91
 #define DEVICE_ID_RENOIR_1636 0x1636   // Renoir
-#define ASICREV_IS_RENOIR(eChipRev) ((eChipRev >= RENOIR_A0) && (eChipRev < RAVEN1_F0))
+#define ASICREV_IS_RENOIR(eChipRev) ((eChipRev >= RENOIR_A0) && (eChipRev < 0xFF))
 #endif
 
 /*
