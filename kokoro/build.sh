@@ -154,7 +154,6 @@ function build_amdgpu_external_module() {
     "${amdgpu_ext_kbuild}"/include/uapi/linux
   popd
   pushd "${amdgpu_ext_kbuild}"
-  patch -p1 < "${SCRIPT_DIR}"/amd-cloudgpu.patch
   ./pre-build.sh 4.19
   make -j "$(nproc)" -C "${KBUILD_OUTPUT}" \
     M="${amdgpu_ext_kbuild}" "${MAKE_ARGS[@]}"
