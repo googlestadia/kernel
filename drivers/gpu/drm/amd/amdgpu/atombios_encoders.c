@@ -274,7 +274,7 @@ amdgpu_atombios_encoder_fini_backlight(struct amdgpu_encoder *amdgpu_encoder)
 
 #else /* !CONFIG_BACKLIGHT_CLASS_DEVICE */
 
-void amdgpu_atombios_encoder_init_backlight(struct amdgpu_encoder *encoder)
+void amdgpu_atombios_encoder_init_backlight(struct amdgpu_encoder *encoder, struct drm_connector *drm_connector)
 {
 }
 
