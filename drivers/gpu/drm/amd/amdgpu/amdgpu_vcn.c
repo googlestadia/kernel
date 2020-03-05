@@ -497,10 +497,6 @@ int amdgpu_vcn_dec_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 	struct dma_fence *fence;
 	long r;
 
-	/* temporarily disable ib test for sriov */
-	if (amdgpu_sriov_vf(adev))
-		return 0;
-
 	r = amdgpu_vcn_dec_get_create_msg(ring, 1, NULL);
 	if (r)
 		goto error;
@@ -526,6 +522,9 @@ int amdgpu_vcn_enc_ring_test_ring(struct amdgpu_ring *ring)
 	uint32_t rptr;
 	unsigned i;
 	int r;
+
+	if (amdgpu_sriov_vf(adev))
+		return 0;
 
 	r = amdgpu_ring_alloc(ring, 16);
 	if (r)
@@ -660,10 +659,6 @@ int amdgpu_vcn_enc_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 	struct dma_fence *fence = NULL;
 	struct amdgpu_bo *bo = NULL;
 	long r;
-
-	/* temporarily disable ib test for sriov */
-	if (amdgpu_sriov_vf(adev))
-		return 0;
 
 	r = amdgpu_bo_create_reserved(ring->adev, 128 * 1024, PAGE_SIZE,
 				      AMDGPU_GEM_DOMAIN_VRAM,
