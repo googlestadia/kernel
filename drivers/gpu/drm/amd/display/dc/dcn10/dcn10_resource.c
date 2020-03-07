@@ -552,10 +552,7 @@ static const struct dc_plane_cap plane_cap = {
 	.pixel_format_support = {
 			.argb8888 = true,
 			.nv12 = true,
-#ifdef DRM_FORMAT_P010
-			.fp16 = true,
-			.p010 = true
-#endif
+			.fp16 = true
 	},
 
 	.max_upscale_factor = {
