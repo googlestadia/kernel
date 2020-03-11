@@ -34,6 +34,7 @@
 #include "amdgpu.h"
 #include "amdgpu_pm.h"
 #include "amdgpu_dm_debugfs.h"
+#include "amdgpu_ras.h"
 
 /**
  * amdgpu_debugfs_add_files - Add simple debugfs entries
@@ -1315,7 +1316,6 @@ DEFINE_SIMPLE_ATTRIBUTE(fops_ib_preempt, NULL,
 DEFINE_SIMPLE_ATTRIBUTE(fops_sclk_set, NULL,
 			amdgpu_debugfs_sclk_set, "%llu\n");
 
-extern void amdgpu_ras_debugfs_create_all(struct amdgpu_device *adev);
 int amdgpu_debugfs_init(struct amdgpu_device *adev)
 {
 	int r, i;
