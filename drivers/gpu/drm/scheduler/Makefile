@@ -33,9 +33,5 @@ $(SCHED_NAME)-y := sched_main.o sched_fence.o sched_entity.o
 obj-$(CONFIG_DRM_SCHED) += $(SCHED_NAME).o
 gpu-sched-y := sched_main.o sched_fence.o sched_entity.o
 
-ifeq (,$(BUILD_AS_DKMS))
-SCHED_FULL_PATH = $(srctree)/$(src)
-else
-SCHED_FULL_PATH = $(src)
-endif
+SCHED_FULL_PATH := $(realpath $(src))
 include $(SCHED_FULL_PATH)/backport/Makefile

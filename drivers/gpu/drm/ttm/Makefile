@@ -16,11 +16,7 @@ $(TTM_NAME)-$(CONFIG_DRM_TTM_DMA_PAGE_POOL) += ttm_page_alloc_dma.o
 
 obj-$(CONFIG_DRM_TTM) += $(TTM_NAME).o
 
-ifeq (,$(BUILD_AS_DKMS))
-TTM_FULL_PATH = $(srctree)/$(src)
-else
-TTM_FULL_PATH = $(src)
-endif
+TTM_FULL_PATH := $(realpath $(src))
 include $(TTM_FULL_PATH)/backport/Makefile
 
 #if defined(BUILD_AS_DKMS)
