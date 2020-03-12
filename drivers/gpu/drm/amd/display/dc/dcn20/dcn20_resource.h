@@ -49,7 +49,6 @@ unsigned int dcn20_calc_max_scaled_time(
 		unsigned int time_per_pixel,
 		enum mmhubbub_wbif_mode mode,
 		unsigned int urgent_watermark);
-int get_num_odm_splits(struct pipe_ctx *pipe);
 int dcn20_populate_dml_pipes_from_context(
 		struct dc *dc, struct dc_state *context, display_e2e_pipe_params_st *pipes);
 struct pipe_ctx *dcn20_acquire_idle_pipe_for_layer(
@@ -162,7 +161,7 @@ enum dc_status dcn20_build_mapped_resource(const struct dc *dc, struct dc_state 
 enum dc_status dcn20_add_stream_to_ctx(struct dc *dc, struct dc_state *new_ctx, struct dc_stream_state *dc_stream);
 enum dc_status dcn20_add_dsc_to_stream_resource(struct dc *dc, struct dc_state *dc_ctx, struct dc_stream_state *dc_stream);
 enum dc_status dcn20_remove_stream_from_ctx(struct dc *dc, struct dc_state *new_ctx, struct dc_stream_state *dc_stream);
-enum dc_status dcn20_get_default_swizzle_mode(struct dc_plane_state *plane_state);
+enum dc_status dcn20_patch_unknown_plane_state(struct dc_plane_state *plane_state);
 
 void dcn20_patch_bounding_box(
 		struct dc *dc,

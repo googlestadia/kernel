@@ -141,9 +141,10 @@ extern "C" {
 /* Flag that BO sharing will be explicitly synchronized */
 #define AMDGPU_GEM_CREATE_EXPLICIT_SYNC		(1 << 7)
 /* Flag that indicates allocating MQD gart on GFX9, where the mtype
- * for the second page onward should be set to NC.
+ * for the second page onward should be set to NC. It should never
+ * be used by user space applications.
  */
-#define AMDGPU_GEM_CREATE_MQD_GFX9		(1 << 8)
+#define AMDGPU_GEM_CREATE_CP_MQD_GFX9		(1 << 8)
 /* Flag that BO may contain sensitive data that must be wiped before
  * releasing the memory
  */
@@ -615,9 +616,6 @@ struct drm_amdgpu_cs_chunk {
 	__u64		chunk_data;
 };
 
-/* Flag the command submission as secure */
-#define AMDGPU_CS_FLAGS_SECURE          (1 << 0)
-
 struct drm_amdgpu_cs_in {
 	/** Rendering context id */
 	__u32		ctx_id;
@@ -657,6 +655,10 @@ union drm_amdgpu_cs {
  * This will reset wave ID counters for the IB.
  */
 #define AMDGPU_IB_FLAG_RESET_GDS_MAX_WAVE_ID (1 << 4)
+
+/* Flag the IB as secure (TMZ)
+ */
+#define AMDGPU_IB_FLAGS_SECURE  (1 << 5)
 
 struct drm_amdgpu_cs_chunk_ib {
 	__u32 _pad;

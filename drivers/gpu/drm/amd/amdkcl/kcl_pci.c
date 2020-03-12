@@ -343,42 +343,33 @@ static struct attribute *pcie_dev_attrs[] = {
 	NULL,
 };
 
-static const struct attribute_group pcie_dev_group = {
-	.attrs = pcie_dev_attrs,
-};
-
-const struct attribute_group *pcie_dev_groups[] = {
-	&pcie_dev_group,
-	NULL,
-};
-
 int _kcl_pci_create_measure_file(struct pci_dev *pdev)
 {
 	int ret = 0;
 
 	ret = device_create_file(&pdev->dev, &dev_attr_current_link_speed);
-	if (ret != 0 && ret != -EEXIST) {
+	if (ret) {
 		dev_err(&pdev->dev,
 				"Failed to create current_link_speed sysfs files: %d\n", ret);
 		return ret;
 	}
 
 	ret = device_create_file(&pdev->dev, &dev_attr_current_link_width);
-	if (ret != 0 && ret != -EEXIST) {
+	if (ret) {
 		dev_err(&pdev->dev,
 				"Failed to create current_link_width sysfs files: %d\n", ret);
 		return ret;
 	}
 
 	ret = device_create_file(&pdev->dev, &dev_attr_max_link_width);
-	if (ret != 0 && ret != -EEXIST) {
+	if (ret) {
 		dev_err(&pdev->dev,
 				"Failed to create max_link_width sysfs files: %d\n", ret);
 		return ret;
 	}
 
 	ret = device_create_file(&pdev->dev, &dev_attr_max_link_speed);
-	if (ret != 0 && ret != -EEXIST) {
+	if (ret) {
 		dev_err(&pdev->dev,
 				"Failed to create max_link_speed sysfs files: %d\n", ret);
 		return ret;
@@ -387,4 +378,13 @@ int _kcl_pci_create_measure_file(struct pci_dev *pdev)
 	return ret;
 }
 EXPORT_SYMBOL(_kcl_pci_create_measure_file);
+
+void _kcl_pci_remove_measure_file(struct pci_dev *pdev)
+{
+	device_remove_file(&pdev->dev, &dev_attr_current_link_speed);
+	device_remove_file(&pdev->dev, &dev_attr_current_link_width);
+	device_remove_file(&pdev->dev, &dev_attr_max_link_width);
+	device_remove_file(&pdev->dev, &dev_attr_max_link_speed);
+}
+EXPORT_SYMBOL(_kcl_pci_remove_measure_file);
 #endif /* AMDKCL_CREATE_MEASURE_FILE */

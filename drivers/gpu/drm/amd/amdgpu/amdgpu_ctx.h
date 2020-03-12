@@ -29,12 +29,14 @@ struct drm_device;
 struct drm_file;
 struct amdgpu_fpriv;
 
+#define AMDGPU_MAX_ENTITY_NUM 4
+
 struct amdgpu_ctx_entity {
 	uint64_t		sequence;
-	struct dma_fence	**fences;
 	struct drm_sched_entity	entity;
 	struct list_head	sem_dep_list;
 	struct mutex		sem_lock;
+	struct dma_fence	*fences[];
 };
 
 struct amdgpu_ctx {
@@ -44,7 +46,7 @@ struct amdgpu_ctx {
 	unsigned			reset_counter_query;
 	uint32_t			vram_lost_counter;
 	spinlock_t			ring_lock;
-	struct amdgpu_ctx_entity	*entities[AMDGPU_HW_IP_NUM];
+	struct amdgpu_ctx_entity	*entities[AMDGPU_HW_IP_NUM][AMDGPU_MAX_ENTITY_NUM];
 	bool				preamble_presented;
 	enum drm_sched_priority		init_priority;
 	enum drm_sched_priority		override_priority;

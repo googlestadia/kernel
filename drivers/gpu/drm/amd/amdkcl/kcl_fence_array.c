@@ -22,7 +22,7 @@
 #include <linux/export.h>
 #include <linux/slab.h>
 
-#if !defined(HAVE_DMA_FENCE_DEFINED) && !defined(HAVE_FENCE_ARRAY_H)
+#if !defined(HAVE_LINUX_DMA_FENCE_H) && !defined(HAVE_LINUX_FENCE_ARRAY_H)
 static void fence_array_cb_func(struct fence *f, struct fence_cb *cb);
 
 static const char *fence_array_get_driver_name(struct fence *fence)
@@ -145,4 +145,4 @@ struct fence_array *fence_array_create(int num_fences, struct fence **fences,
 }
 EXPORT_SYMBOL(fence_array_create);
 
-#endif /* !defined(HAVE_DMA_FENCE_DEFINED) && !defined(HAVE_FENCE_ARRAY_H) */
+#endif /* !defined(HAVE_LINUX_DMA_FENCE_H) && !defined(HAVE_LINUX_FENCE_ARRAY_H) */

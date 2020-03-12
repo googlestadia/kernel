@@ -26,6 +26,7 @@
 #ifndef DC_LINK_H_
 #define DC_LINK_H_
 
+#include "dc.h"
 #include "dc_types.h"
 #include "grph_object_defs.h"
 
@@ -336,4 +337,9 @@ bool dc_submit_i2c_oem(
 
 uint32_t dc_bandwidth_in_kbps_from_timing(
 	const struct dc_crtc_timing *timing);
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+bool dc_link_is_fec_supported(const struct dc_link *link);
+#endif
+
 #endif /* DC_LINK_H_ */

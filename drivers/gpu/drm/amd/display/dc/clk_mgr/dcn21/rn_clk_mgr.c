@@ -46,6 +46,7 @@
 /* Constants */
 
 #define LPDDR_MEM_RETRAIN_LATENCY 4.977 /* Number obtained from LPDDR4 Training Counter Requirement doc */
+#define SMU_VER_55_51_0 0x373300 /* SMU Version that is able to set DISPCLK below 100MHz */
 
 /* Macros */
 
@@ -405,7 +406,7 @@ void rn_init_clocks(struct clk_mgr *clk_mgr)
 	clk_mgr->clks.pwr_state = DCN_PWR_STATE_UNKNOWN;
 }
 
-void build_watermark_ranges(struct clk_bw_params *bw_params, struct pp_smu_wm_range_sets *ranges)
+static void build_watermark_ranges(struct clk_bw_params *bw_params, struct pp_smu_wm_range_sets *ranges)
 {
 	int i, num_valid_sets;
 
@@ -503,7 +504,7 @@ static struct clk_mgr_funcs dcn21_funcs = {
 	.notify_wm_ranges = rn_notify_wm_ranges
 };
 
-struct clk_bw_params rn_bw_params = {
+static struct clk_bw_params rn_bw_params = {
 	.vram_type = Ddr4MemType,
 	.num_channels = 1,
 	.clk_table = {
@@ -543,7 +544,7 @@ struct clk_bw_params rn_bw_params = {
 
 };
 
-struct wm_table ddr4_wm_table = {
+static struct wm_table ddr4_wm_table = {
 	.entries = {
 		{
 			.wm_inst = WM_A,
@@ -580,7 +581,7 @@ struct wm_table ddr4_wm_table = {
 	}
 };
 
-struct wm_table lpddr4_wm_table = {
+static struct wm_table lpddr4_wm_table = {
 	.entries = {
 		{
 			.wm_inst = WM_A,
@@ -719,6 +720,13 @@ void rn_clk_mgr_construct(
 		clk_mgr->base.dentist_vco_freq_khz = 3600000;
 	} else {
 		struct clk_log_info log_info = {0};
+
+		clk_mgr->smu_ver = rn_vbios_smu_get_smu_version(clk_mgr);
+
+		/* SMU Version 55.51.0 and up no longer have an issue
+		 * that needs to limit minimum dispclk */
+		if (clk_mgr->smu_ver >= SMU_VER_55_51_0)
+			debug->min_disp_clk_khz = 0;
 
 		/* TODO: Check we get what we expect during bringup */
 		clk_mgr->base.dentist_vco_freq_khz = get_vco_frequency_from_reg(clk_mgr);

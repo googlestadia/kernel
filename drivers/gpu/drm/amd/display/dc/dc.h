@@ -39,7 +39,7 @@
 #include "inc/hw/dmcu.h"
 #include "dml/display_mode_lib.h"
 
-#define DC_VER "3.2.72"
+#define DC_VER "3.2.76"
 
 #define MAX_SURFACES 3
 #define MAX_PLANES 6
@@ -130,6 +130,7 @@ struct dc_bug_wa {
 	bool dedcn20_305_wa;
 #endif
 	bool skip_clock_update;
+	bool lt_early_cr_pattern;
 };
 
 struct dc_dcc_surface_param {
@@ -233,6 +234,7 @@ struct dc_config {
 	bool forced_clocks;
 	bool disable_extended_timeout_support; // Used to disable extended timeout and lttpr feature as well
 	bool multi_mon_pp_mclk_switch;
+	bool psr_on_dmub;
 };
 
 enum visual_confirm {
@@ -394,6 +396,7 @@ struct dc_debug_options {
 	int always_scale;
 	bool disable_pplib_clock_request;
 	bool disable_clock_gate;
+	bool disable_mem_low_power;
 	bool disable_dmcu;
 	bool disable_psr;
 	bool force_abm_enable;
@@ -534,7 +537,8 @@ struct dc {
 	struct dce_hwseq *hwseq;
 
 	/* Require to optimize clocks and bandwidth for added/removed planes */
-	bool optimized_required;
+	bool clk_optimized_required;
+	bool wm_optimized_required;
 
 	/* Require to maintain clocks and bandwidth for UEFI enabled HW */
 	int optimize_seamless_boot_streams;
@@ -1069,6 +1073,11 @@ struct dc_sink_dsc_caps {
 };
 #endif
 
+struct dc_sink_fec_caps {
+	bool is_rx_fec_supported;
+	bool is_topology_fec_supported;
+};
+
 /*
  * The sink structure contains EDID and other display device properties
  */
@@ -1083,7 +1092,8 @@ struct dc_sink {
 	bool converter_disable_audio;
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-	struct dc_sink_dsc_caps sink_dsc_caps;
+	struct dc_sink_dsc_caps dsc_caps;
+	struct dc_sink_fec_caps fec_caps;
 #endif
 
 	/* private to DC core */

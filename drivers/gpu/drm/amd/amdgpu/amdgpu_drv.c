@@ -1067,6 +1067,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 			    const struct pci_device_id *ent)
 {
 	struct drm_device *dev;
+	struct amdgpu_device *adev;
 	unsigned long flags = ent->driver_data;
 	int ret, retry = 0;
 	bool supports_atomic = false;
@@ -1150,6 +1151,8 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 
 	pci_set_drvdata(pdev, dev);
 
+	amdgpu_driver_load_kms(dev, ent->driver_data);
+
 retry_init:
 	ret = drm_dev_register(dev, ent->driver_data);
 	if (ret == -EAGAIN && ++retry <= 3) {
@@ -1159,6 +1162,11 @@ retry_init:
 		goto retry_init;
 	} else if (ret)
 		goto err_pci;
+
+	adev = dev->dev_private;
+	ret = amdgpu_debugfs_init(adev);
+	if (ret)
+		DRM_ERROR("Creating debugfs files failed (%d).\n", ret);
 
 	return 0;
 
@@ -1179,13 +1187,18 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 #endif
 		DRM_ERROR("Hotplug removal is not supported\n");
 #ifdef HAVE_DRM_DEV_UNPLUG
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+	drm_dev_get(dev);
+#endif
 	drm_dev_unplug(dev);
 #else
 	drm_dev_unregister(dev);
 #endif
-	drm_dev_put(dev);
+	amdgpu_driver_unload_kms(dev);
+	kcl_pci_remove_measure_file(pdev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
+	drm_dev_put(dev);
 }
 
 static void
@@ -1360,24 +1373,63 @@ static int amdgpu_pmops_runtime_idle(struct device *dev)
 {
 	struct drm_device *drm_dev = dev_get_drvdata(dev);
 	struct amdgpu_device *adev = drm_dev->dev_private;
-	struct drm_crtc *crtc;
+	/* we don't want the main rpm_idle to call suspend - we want to autosuspend */
+	int ret = 1;
 
 	if (!adev->runpm) {
 		pm_runtime_forbid(dev);
 		return -EBUSY;
 	}
 
-	list_for_each_entry(crtc, &drm_dev->mode_config.crtc_list, head) {
-		if (crtc->enabled) {
-			DRM_DEBUG_DRIVER("failing to power off - crtc active\n");
-			return -EBUSY;
+	if (amdgpu_device_has_dc_support(adev)) {
+		struct drm_crtc *crtc;
+
+		drm_modeset_lock_all(drm_dev);
+
+		drm_for_each_crtc(crtc, drm_dev) {
+			if (crtc->state->active) {
+				ret = -EBUSY;
+				break;
+			}
 		}
+
+		drm_modeset_unlock_all(drm_dev);
+
+	} else {
+		struct drm_connector *list_connector;
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+		struct drm_connector_list_iter iter;
+#endif
+
+		mutex_lock(&drm_dev->mode_config.mutex);
+		drm_modeset_lock(&drm_dev->mode_config.connection_mutex, NULL);
+
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+		drm_connector_list_iter_begin(drm_dev, &iter);
+		drm_for_each_connector_iter(list_connector, &iter) {
+#else
+		drm_for_each_connector(list_connector, drm_dev) {
+#endif
+			if (list_connector->dpms ==  DRM_MODE_DPMS_ON) {
+				ret = -EBUSY;
+				break;
+			}
+		}
+
+#ifdef HAVE_DRM_CONNECTOR_LIST_ITER_BEGIN
+		drm_connector_list_iter_end(&iter);
+#endif
+
+		drm_modeset_unlock(&drm_dev->mode_config.connection_mutex);
+		mutex_unlock(&drm_dev->mode_config.mutex);
 	}
+
+	if (ret == -EBUSY)
+		DRM_DEBUG_DRIVER("failing to power off - crtc active\n");
 
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_autosuspend(dev);
-	/* we don't want the main rpm_idle to call suspend - we want to autosuspend */
-	return 1;
+	return ret;
 }
 
 long amdgpu_drm_ioctl(struct file *filp,
@@ -1454,11 +1506,10 @@ int amdgpu_file_to_fpriv(struct file *filp, struct amdgpu_fpriv **fpriv)
 
 static struct drm_driver kms_driver = {
 	.driver_features =
-	    DRIVER_USE_AGP
+	    DRIVER_HAVE_IRQ
 #ifdef HAVE_DRM_DEVICE_DRIVER_FEATURES
 	    | DRIVER_ATOMIC
 #endif /* HAVE_DRM_DEVICE_DRIVER_FEATURES */
-	    | DRIVER_HAVE_IRQ
 #ifdef HAVE_DRM_DRV_DRIVER_IRQ_SHARED
 	    | DRIVER_IRQ_SHARED
 #endif /* HAVE_DRM_DRV_DRIVER_IRQ_SHARED */
@@ -1474,14 +1525,12 @@ static struct drm_driver kms_driver = {
 	    | DRIVER_SYNCOBJ_TIMELINE
 #endif /* HAVE_DRM_DRV_DRIVER_SYNCOBJ_TIMELINE */
 	    ,
-	.load = amdgpu_driver_load_kms,
 	.open = amdgpu_driver_open_kms,
 	.postclose = amdgpu_driver_postclose_kms,
 	.lastclose = amdgpu_driver_lastclose_kms,
 #if defined(HAVE_SET_BUSID_IN_STRUCT_DRM_DRIVER)
 	.set_busid = drm_pci_set_busid,
 #endif
-	.unload = amdgpu_driver_unload_kms,
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,

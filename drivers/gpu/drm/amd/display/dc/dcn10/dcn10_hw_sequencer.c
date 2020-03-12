@@ -1058,7 +1058,7 @@ void dcn10_plane_atomic_disconnect(struct dc *dc, struct pipe_ctx *pipe_ctx)
 	if (opp != NULL)
 		opp->mpcc_disconnect_pending[pipe_ctx->plane_res.mpcc_inst] = true;
 
-	dc->optimized_required = true;
+	dc->clk_optimized_required = true;
 
 	if (hubp->funcs->hubp_disconnect)
 		hubp->funcs->hubp_disconnect(hubp);
@@ -1109,7 +1109,7 @@ void dcn10_plane_atomic_disable(struct dc *dc, struct pipe_ctx *pipe_ctx)
 				false);
 
 	hubp->power_gated = true;
-	dc->optimized_required = false; /* We're powering off, no need to optimize */
+	dc->clk_optimized_required = false; /* We're powering off, no need to optimize */
 
 	hws->funcs.plane_atomic_power_down(dc,
 			pipe_ctx->plane_res.dpp,
@@ -1278,7 +1278,8 @@ void dcn10_init_hw(struct dc *dc)
 		}
 
 		//Enable ability to power gate / don't force power on permanently
-		hws->funcs.enable_power_gating_plane(hws, true);
+		if (hws->funcs.enable_power_gating_plane)
+			hws->funcs.enable_power_gating_plane(hws, true);
 
 		return;
 	}
@@ -1340,14 +1341,21 @@ void dcn10_init_hw(struct dc *dc)
 		enum dc_status status = DC_ERROR_UNEXPECTED;
 
 		for (i = 0; i < dc->link_count; i++) {
-			if (dc->links[i]->connector_signal != SIGNAL_TYPE_DISPLAY_PORT) {
+			if (dc->links[i]->connector_signal != SIGNAL_TYPE_DISPLAY_PORT)
 				continue;
-			}
-			/* if any of the displays are lit up turn them off */
-			status = core_link_read_dpcd(dc->links[i], DP_SET_POWER,
-						     &dpcd_power_state, sizeof(dpcd_power_state));
-			if (status == DC_OK && dpcd_power_state == DP_POWER_STATE_D0) {
-				dp_receiver_power_ctrl(dc->links[i], false);
+
+			/*
+			 * core_link_read_dpcd() will invoke dm_helpers_dp_read_dpcd(),
+			 * which needs to read dpcd info with the help of aconnector.
+			 * If aconnector (dc->links[i]->prev) is NULL, then dpcd status
+			 * cannot be read.
+			 */
+			if (dc->links[i]->priv) {
+				/* if any of the displays are lit up turn them off */
+				status = core_link_read_dpcd(dc->links[i], DP_SET_POWER,
+								&dpcd_power_state, sizeof(dpcd_power_state));
+				if (status == DC_OK && dpcd_power_state == DP_POWER_STATE_D0)
+					dp_receiver_power_ctrl(dc->links[i], false);
 			}
 		}
 	}
@@ -1390,8 +1398,8 @@ void dcn10_init_hw(struct dc *dc)
 
 		REG_UPDATE(DCFCLK_CNTL, DCFCLK_GATE_DIS, 0);
 	}
-
-	hws->funcs.enable_power_gating_plane(dc->hwseq, true);
+	if (hws->funcs.enable_power_gating_plane)
+		hws->funcs.enable_power_gating_plane(dc->hwseq, true);
 
 	if (dc->clk_mgr->funcs->notify_wm_ranges)
 		dc->clk_mgr->funcs->notify_wm_ranges(dc->clk_mgr);
@@ -2125,6 +2133,10 @@ void dcn10_get_hdr_visual_confirm_color(
 		if (top_pipe_ctx->stream->out_transfer_func->tf == TRANSFER_FUNCTION_PQ) {
 			/* HDR10, ARGB2101010 - set boarder color to red */
 			color->color_r_cr = color_value;
+		} else if (top_pipe_ctx->stream->out_transfer_func->tf == TRANSFER_FUNCTION_GAMMA22) {
+			/* FreeSync 2 ARGB2101010 - set boarder color to pink */
+			color->color_r_cr = color_value;
+			color->color_b_cb = color_value;
 		}
 		break;
 	case PIXEL_FORMAT_FP16:
@@ -2632,7 +2644,7 @@ void dcn10_post_unlock_program_front_end(
 		struct dc *dc,
 		struct dc_state *context)
 {
-	int i, j;
+	int i;
 
 	DC_LOGGER_INIT(dc->ctx->logger);
 
@@ -2642,13 +2654,7 @@ void dcn10_post_unlock_program_front_end(
 		if (!pipe_ctx->top_pipe &&
 			!pipe_ctx->prev_odm_pipe &&
 			pipe_ctx->stream) {
-			struct dc_stream_status *stream_status = NULL;
 			struct timing_generator *tg = pipe_ctx->stream_res.tg;
-
-			for (j = 0; j < context->stream_count; j++) {
-				if (pipe_ctx->stream == context->streams[j])
-					stream_status = &context->stream_status[j];
-			}
 
 			if (context->stream_status[i].plane_count == 0)
 				false_optc_underflow_wa(dc, pipe_ctx->stream, tg);
@@ -2705,7 +2711,7 @@ void dcn10_prepare_bandwidth(
 				false);
 	}
 
-	hubbub->funcs->program_watermarks(hubbub,
+	dc->wm_optimized_required = hubbub->funcs->program_watermarks(hubbub,
 			&context->bw_ctx.bw.dcn.watermarks,
 			dc->res_pool->ref_clocks.dchub_ref_clock_inKhz / 1000,
 			true);
@@ -2742,6 +2748,7 @@ void dcn10_optimize_bandwidth(
 			&context->bw_ctx.bw.dcn.watermarks,
 			dc->res_pool->ref_clocks.dchub_ref_clock_inKhz / 1000,
 			true);
+
 	dcn10_stereo_hw_frame_pack_wa(dc, context);
 
 	if (dc->debug.pplib_wm_report_mode == WM_REPORT_OVERRIDE)
@@ -2933,6 +2940,7 @@ void dcn10_update_pending_status(struct pipe_ctx *pipe_ctx)
 	struct dc_plane_state *plane_state = pipe_ctx->plane_state;
 	struct timing_generator *tg = pipe_ctx->stream_res.tg;
 	bool flip_pending;
+	struct dc *dc = plane_state->ctx->dc;
 
 	if (plane_state == NULL)
 		return;
@@ -2949,6 +2957,19 @@ void dcn10_update_pending_status(struct pipe_ctx *pipe_ctx)
 			tg->funcs->is_stereo_left_eye) {
 		plane_state->status.is_right_eye =
 				!tg->funcs->is_stereo_left_eye(pipe_ctx->stream_res.tg);
+	}
+
+	if (dc->hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied) {
+		struct dce_hwseq *hwseq = dc->hwseq;
+		struct timing_generator *tg = dc->res_pool->timing_generators[0];
+		unsigned int cur_frame = tg->funcs->get_frame_count(tg);
+
+		if (cur_frame != hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied_on_frame) {
+			struct hubbub *hubbub = dc->res_pool->hubbub;
+
+			hubbub->funcs->allow_self_refresh_control(hubbub, !dc->debug.disable_stutter);
+			hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied = false;
+		}
 	}
 }
 

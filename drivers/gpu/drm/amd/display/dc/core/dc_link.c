@@ -45,7 +45,7 @@
 #include "dpcd_defs.h"
 #include "dmcu.h"
 #include "hw/clk_mgr.h"
-#include "../dce/dmub_psr.h"
+#include "dce/dmub_psr.h"
 
 #define DC_LOGGER_INIT(logger)
 
@@ -585,14 +585,14 @@ static void read_current_link_settings_on_detect(struct dc_link *link)
 		LINK_SPREAD_05_DOWNSPREAD_30KHZ : LINK_SPREAD_DISABLED;
 }
 
-static bool detect_dp(
-	struct dc_link *link,
-	struct display_sink_capability *sink_caps,
-	bool *converter_disable_audio,
-	struct audio_support *audio_support,
-	enum dc_detect_reason reason)
+static bool detect_dp(struct dc_link *link,
+		      struct display_sink_capability *sink_caps,
+		      bool *converter_disable_audio,
+		      struct audio_support *audio_support,
+		      enum dc_detect_reason reason)
 {
 	bool boot = false;
+
 	sink_caps->signal = link_detect_sink(link, reason);
 	sink_caps->transaction_type =
 		get_ddc_transaction_type(sink_caps->signal);
@@ -609,9 +609,8 @@ static bool detect_dp(
 			sink_caps->signal = SIGNAL_TYPE_DISPLAY_PORT_MST;
 			link->type = dc_connection_mst_branch;
 
-			dal_ddc_service_set_transaction_type(
-							link->ddc,
-							sink_caps->transaction_type);
+			dal_ddc_service_set_transaction_type(link->ddc,
+							     sink_caps->transaction_type);
 
 			/*
 			 * This call will initiate MST topology discovery. Which
@@ -640,13 +639,10 @@ static bool detect_dp(
 			if (reason == DETECT_REASON_BOOT)
 				boot = true;
 
-			dm_helpers_dp_update_branch_info(
-				link->ctx,
-				link);
+			dm_helpers_dp_update_branch_info(link->ctx, link);
 
-			if (!dm_helpers_dp_mst_start_top_mgr(
-				link->ctx,
-				link, boot)) {
+			if (!dm_helpers_dp_mst_start_top_mgr(link->ctx,
+							     link, boot)) {
 				/* MST not supported */
 				link->type = dc_connection_single;
 				sink_caps->signal = SIGNAL_TYPE_DISPLAY_PORT;
@@ -654,7 +650,7 @@ static bool detect_dp(
 		}
 
 		if (link->type != dc_connection_mst_branch &&
-			is_dp_active_dongle(link)) {
+		    is_dp_active_dongle(link)) {
 			/* DP active dongles */
 			link->type = dc_connection_active_dongle;
 			if (!link->dpcd_caps.sink_count.bits.SINK_COUNT) {
@@ -665,14 +661,15 @@ static bool detect_dp(
 				return true;
 			}
 
-			if (link->dpcd_caps.dongle_type != DISPLAY_DONGLE_DP_HDMI_CONVERTER)
+			if (link->dpcd_caps.dongle_type !=
+			    DISPLAY_DONGLE_DP_HDMI_CONVERTER)
 				*converter_disable_audio = true;
 		}
 	} else {
 		/* DP passive dongles */
 		sink_caps->signal = dp_passive_dongle_detection(link->ddc,
-				sink_caps,
-				audio_support);
+								sink_caps,
+								audio_support);
 	}
 
 	return true;
@@ -973,13 +970,17 @@ static bool dc_link_detect_helper(struct dc_link *link,
 			break;
 		}
 
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+		if (link->local_sink->edid_caps.panel_patch.disable_fec)
+			link->ctx->dc->debug.disable_fec = true;
+#endif
+
 		// Check if edid is the same
 		if ((prev_sink != NULL) && ((edid_status == EDID_THE_SAME) || (edid_status == EDID_OK)))
 			same_edid = is_same_edid(&prev_sink->dc_edid, &sink->dc_edid);
 
-		if (&sink->edid_caps.panel_patch.skip_scdc_overwrite)
+		if (sink->edid_caps.panel_patch.skip_scdc_overwrite)
 			link->ctx->dc->debug.hdmi20_disable = true;
-
 
 		if (link->connector_signal == SIGNAL_TYPE_DISPLAY_PORT &&
 			sink_caps.transaction_type == DDC_TRANSACTION_TYPE_I2C_OVER_AUX) {
@@ -1499,9 +1500,8 @@ static void enable_stream_features(struct pipe_ctx *pipe_ctx)
 	}
 }
 
-static enum dc_status enable_link_dp(
-		struct dc_state *state,
-		struct pipe_ctx *pipe_ctx)
+static enum dc_status enable_link_dp(struct dc_state *state,
+				     struct pipe_ctx *pipe_ctx)
 {
 	struct dc_stream_state *stream = pipe_ctx->stream;
 	enum dc_status status;
@@ -1536,7 +1536,8 @@ static enum dc_status enable_link_dp(
 	pipe_ctx->stream_res.pix_clk_params.requested_sym_clk =
 			link_settings.link_rate * LINK_RATE_REF_FREQ_IN_KHZ;
 	if (state->clk_mgr && !apply_seamless_boot_optimization)
-		state->clk_mgr->funcs->update_clocks(state->clk_mgr, state, false);
+		state->clk_mgr->funcs->update_clocks(state->clk_mgr,
+						     state, false);
 
 	// during mode switch we do DP_SET_POWER off then on, and OUI is lost
 	dpcd_set_source_specific_data(link);
@@ -1544,22 +1545,21 @@ static enum dc_status enable_link_dp(
 	skip_video_pattern = true;
 
 	if (link_settings.link_rate == LINK_RATE_LOW)
-			skip_video_pattern = false;
+		skip_video_pattern = false;
 
-	if (perform_link_training_with_retries(
-			&link_settings,
-			skip_video_pattern,
-			LINK_TRAINING_ATTEMPTS,
-			pipe_ctx,
-			pipe_ctx->stream->signal)) {
+	if (perform_link_training_with_retries(&link_settings,
+					       skip_video_pattern,
+					       LINK_TRAINING_ATTEMPTS,
+					       pipe_ctx,
+					       pipe_ctx->stream->signal)) {
 		link->cur_link_settings = link_settings;
 		status = DC_OK;
-	}
-	else
+	} else {
 		status = DC_FAIL_DP_LINK_TRAINING;
+	}
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-	if (link->preferred_training_settings.fec_enable != NULL)
+	if (link->preferred_training_settings.fec_enable)
 		fec_enable = *link->preferred_training_settings.fec_enable;
 	else
 		fec_enable = true;
@@ -1772,8 +1772,7 @@ static void write_i2c_retimer_setting(
 				slave_address, buffer[0], buffer[1], i2c_success?1:0);
 
 			if (!i2c_success)
-				/* Write failure */
-				ASSERT(i2c_success);
+				goto i2c_write_fail;
 
 			/* Based on DP159 specs, APPLY_RX_TX_CHANGE bit in 0x0A
 			 * needs to be set to 1 on every 0xA-0xC write.
@@ -1791,8 +1790,7 @@ static void write_i2c_retimer_setting(
 						pipe_ctx->stream->link->ddc,
 						slave_address, &offset, 1, &value, 1);
 					if (!i2c_success)
-						/* Write failure */
-						ASSERT(i2c_success);
+						goto i2c_write_fail;
 				}
 
 				buffer[0] = offset;
@@ -1804,8 +1802,7 @@ static void write_i2c_retimer_setting(
 					offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 					slave_address, buffer[0], buffer[1], i2c_success?1:0);
 				if (!i2c_success)
-					/* Write failure */
-					ASSERT(i2c_success);
+					goto i2c_write_fail;
 			}
 		}
 	}
@@ -1825,8 +1822,7 @@ static void write_i2c_retimer_setting(
 					slave_address, buffer[0], buffer[1], i2c_success?1:0);
 
 				if (!i2c_success)
-					/* Write failure */
-					ASSERT(i2c_success);
+					goto i2c_write_fail;
 
 				/* Based on DP159 specs, APPLY_RX_TX_CHANGE bit in 0x0A
 				 * needs to be set to 1 on every 0xA-0xC write.
@@ -1844,8 +1840,7 @@ static void write_i2c_retimer_setting(
 								pipe_ctx->stream->link->ddc,
 								slave_address, &offset, 1, &value, 1);
 						if (!i2c_success)
-							/* Write failure */
-							ASSERT(i2c_success);
+							goto i2c_write_fail;
 					}
 
 					buffer[0] = offset;
@@ -1857,8 +1852,7 @@ static void write_i2c_retimer_setting(
 						offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 						slave_address, buffer[0], buffer[1], i2c_success?1:0);
 					if (!i2c_success)
-						/* Write failure */
-						ASSERT(i2c_success);
+						goto i2c_write_fail;
 				}
 			}
 		}
@@ -1876,8 +1870,7 @@ static void write_i2c_retimer_setting(
 				offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 				slave_address, buffer[0], buffer[1], i2c_success?1:0);
 		if (!i2c_success)
-			/* Write failure */
-			ASSERT(i2c_success);
+			goto i2c_write_fail;
 
 		/* Write offset 0x00 to 0x23 */
 		buffer[0] = 0x00;
@@ -1888,8 +1881,7 @@ static void write_i2c_retimer_setting(
 			offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 			slave_address, buffer[0], buffer[1], i2c_success?1:0);
 		if (!i2c_success)
-			/* Write failure */
-			ASSERT(i2c_success);
+			goto i2c_write_fail;
 
 		/* Write offset 0xff to 0x00 */
 		buffer[0] = 0xff;
@@ -1900,10 +1892,14 @@ static void write_i2c_retimer_setting(
 			offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 			slave_address, buffer[0], buffer[1], i2c_success?1:0);
 		if (!i2c_success)
-			/* Write failure */
-			ASSERT(i2c_success);
+			goto i2c_write_fail;
 
 	}
+
+	return;
+
+i2c_write_fail:
+	DC_LOG_DEBUG("Set retimer failed");
 }
 
 static void write_i2c_default_retimer_setting(
@@ -1928,8 +1924,7 @@ static void write_i2c_default_retimer_setting(
 		offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 		slave_address, buffer[0], buffer[1], i2c_success?1:0);
 	if (!i2c_success)
-		/* Write failure */
-		ASSERT(i2c_success);
+		goto i2c_write_fail;
 
 	/* Write offset 0x0A to 0x17 */
 	buffer[0] = 0x0A;
@@ -1940,8 +1935,7 @@ static void write_i2c_default_retimer_setting(
 		offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 		slave_address, buffer[0], buffer[1], i2c_success?1:0);
 	if (!i2c_success)
-		/* Write failure */
-		ASSERT(i2c_success);
+		goto i2c_write_fail;
 
 	/* Write offset 0x0B to 0xDA or 0xD8 */
 	buffer[0] = 0x0B;
@@ -1952,8 +1946,7 @@ static void write_i2c_default_retimer_setting(
 		offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 		slave_address, buffer[0], buffer[1], i2c_success?1:0);
 	if (!i2c_success)
-		/* Write failure */
-		ASSERT(i2c_success);
+		goto i2c_write_fail;
 
 	/* Write offset 0x0A to 0x17 */
 	buffer[0] = 0x0A;
@@ -1964,8 +1957,7 @@ static void write_i2c_default_retimer_setting(
 		offset = 0x%x, reg_val= 0x%x, i2c_success = %d\n",
 		slave_address, buffer[0], buffer[1], i2c_success?1:0);
 	if (!i2c_success)
-		/* Write failure */
-		ASSERT(i2c_success);
+		goto i2c_write_fail;
 
 	/* Write offset 0x0C to 0x1D or 0x91 */
 	buffer[0] = 0x0C;
@@ -1976,8 +1968,7 @@ static void write_i2c_default_retimer_setting(
 		offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 		slave_address, buffer[0], buffer[1], i2c_success?1:0);
 	if (!i2c_success)
-		/* Write failure */
-		ASSERT(i2c_success);
+		goto i2c_write_fail;
 
 	/* Write offset 0x0A to 0x17 */
 	buffer[0] = 0x0A;
@@ -1988,8 +1979,7 @@ static void write_i2c_default_retimer_setting(
 		offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 		slave_address, buffer[0], buffer[1], i2c_success?1:0);
 	if (!i2c_success)
-		/* Write failure */
-		ASSERT(i2c_success);
+		goto i2c_write_fail;
 
 
 	if (is_vga_mode) {
@@ -2004,8 +1994,7 @@ static void write_i2c_default_retimer_setting(
 			offset = 0x%x, reg_val = 0x%x, i2c_success = %d\n",
 			slave_address, buffer[0], buffer[1], i2c_success?1:0);
 		if (!i2c_success)
-			/* Write failure */
-			ASSERT(i2c_success);
+			goto i2c_write_fail;
 
 		/* Write offset 0x00 to 0x23 */
 		buffer[0] = 0x00;
@@ -2016,8 +2005,7 @@ static void write_i2c_default_retimer_setting(
 			offset = 0x%x, reg_val= 0x%x, i2c_success = %d\n",
 			slave_address, buffer[0], buffer[1], i2c_success?1:0);
 		if (!i2c_success)
-			/* Write failure */
-			ASSERT(i2c_success);
+			goto i2c_write_fail;
 
 		/* Write offset 0xff to 0x00 */
 		buffer[0] = 0xff;
@@ -2028,9 +2016,13 @@ static void write_i2c_default_retimer_setting(
 			offset = 0x%x, reg_val= 0x%x, i2c_success = %d end here\n",
 			slave_address, buffer[0], buffer[1], i2c_success?1:0);
 		if (!i2c_success)
-			/* Write failure */
-			ASSERT(i2c_success);
+			goto i2c_write_fail;
 	}
+
+	return;
+
+i2c_write_fail:
+	DC_LOG_DEBUG("Set default retimer failed");
 }
 
 static void write_i2c_redriver_setting(
@@ -2059,8 +2051,7 @@ static void write_i2c_redriver_setting(
 		slave_address, buffer[3], buffer[4], buffer[5], buffer[6], i2c_success?1:0);
 
 	if (!i2c_success)
-		/* Write failure */
-		ASSERT(i2c_success);
+		DC_LOG_DEBUG("Set redriver failed");
 }
 
 static void disable_link(struct dc_link *link, enum signal_type signal)
@@ -2441,7 +2432,7 @@ bool dc_link_set_psr_allow_active(struct dc_link *link, bool allow_active, bool 
 	struct dmcu *dmcu = dc->res_pool->dmcu;
 	struct dmub_psr *psr = dc->res_pool->psr;
 
-	if ((psr != NULL) && link->psr_feature_enabled)
+	if (psr != NULL && link->psr_feature_enabled)
 		psr->funcs->psr_enable(psr, allow_active);
 	else if ((dmcu != NULL && dmcu->funcs->is_dmcu_initialized(dmcu)) && link->psr_feature_enabled)
 		dmcu->funcs->set_psr_enable(dmcu, allow_active, wait);
@@ -2968,6 +2959,8 @@ static void update_psp_stream_config(struct pipe_ctx *pipe_ctx, bool dpms_off)
 		config.link_enc_inst = pipe_ctx->stream->link->link_enc_hw_inst;
 		config.dpms_off = dpms_off;
 		config.dm_stream_ctx = pipe_ctx->stream->dm_stream_context;
+		config.mst_supported = (pipe_ctx->stream->signal ==
+				SIGNAL_TYPE_DISPLAY_PORT_MST);
 		cp_psp->funcs.update_stream_config(cp_psp->handle, &config);
 	}
 }
@@ -3086,8 +3079,12 @@ void core_link_enable_stream(
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 		if (pipe_ctx->stream->timing.flags.DSC) {
 			if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
-					dc_is_virtual_signal(pipe_ctx->stream->signal))
-				dp_set_dsc_enable(pipe_ctx, true);
+					dc_is_virtual_signal(pipe_ctx->stream->signal)) {
+				/* Here we only need to enable DSC on RX. DSC HW programming
+				 * was done earlier, as part of timing programming.
+				 */
+				dp_set_dsc_on_rx(pipe_ctx, true);
+			}
 		}
 #endif
 		dc->hwss.enable_stream(pipe_ctx);
@@ -3107,6 +3104,9 @@ void core_link_enable_stream(
 		dc->hwss.unblank_stream(pipe_ctx,
 			&pipe_ctx->stream->link->cur_link_settings);
 
+		if (stream->sink_patches.delay_ignore_msa > 0)
+			msleep(stream->sink_patches.delay_ignore_msa);
+
 		if (dc_is_dp_signal(pipe_ctx->stream->signal))
 			enable_stream_features(pipe_ctx);
 #if defined(CONFIG_DRM_AMD_DC_HDCP)
@@ -3117,7 +3117,7 @@ void core_link_enable_stream(
 	else { // if (IS_FPGA_MAXIMUS_DC(dc->ctx->dce_environment))
 		if (dc_is_dp_signal(pipe_ctx->stream->signal) ||
 				dc_is_virtual_signal(pipe_ctx->stream->signal))
-			dp_set_dsc_enable(pipe_ctx, true);
+			dp_set_dsc_on_rx(pipe_ctx, true);
 
 	}
 #endif
@@ -3427,7 +3427,7 @@ uint32_t dc_link_bandwidth_kbps(
 	link_bw_kbps *= link_setting->lane_count;
 
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
-	if (link->dpcd_caps.fec_cap.bits.FEC_CAPABLE) {
+	if (dc_link_is_fec_supported(link) && !link->dc->debug.disable_fec) {
 		/* Account for FEC overhead.
 		 * We have to do it based on caps,
 		 * and not based on FEC being set ready,
@@ -3471,4 +3471,14 @@ void dc_link_overwrite_extended_receiver_cap(
 {
 	dp_overwrite_extended_receiver_cap(link);
 }
+
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+bool dc_link_is_fec_supported(const struct dc_link *link)
+{
+	return (dc_is_dp_signal(link->connector_signal) &&
+			link->link_enc->features.fec_supported &&
+			link->dpcd_caps.fec_cap.bits.FEC_CAPABLE &&
+			!IS_FPGA_MAXIMUS_DC(link->ctx->dce_environment));
+}
+#endif
 

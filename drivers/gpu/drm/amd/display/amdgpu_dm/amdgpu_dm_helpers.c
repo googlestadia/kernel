@@ -463,8 +463,8 @@ bool dm_helpers_dp_mst_start_top_mgr(
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
-			DRM_ERROR("Failed to found connector for link!");
-			return false;
+		DRM_ERROR("Failed to find connector for link!");
+		return false;
 	}
 
 	if (boot) {
@@ -490,8 +490,8 @@ void dm_helpers_dp_mst_stop_top_mgr(
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
-			DRM_ERROR("Failed to found connector for link!");
-			return;
+		DRM_ERROR("Failed to find connector for link!");
+		return;
 	}
 
 	DRM_INFO("DM_MST: stopping TM on aconnector: %p [id: %d]\n",
@@ -513,7 +513,7 @@ bool dm_helpers_dp_read_dpcd(
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
-		DRM_ERROR("Failed to found connector for link!");
+		DRM_ERROR("Failed to find connector for link!");
 		return false;
 	}
 
@@ -531,7 +531,7 @@ bool dm_helpers_dp_write_dpcd(
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
-		DRM_ERROR("Failed to found connector for link!");
+		DRM_ERROR("Failed to find connector for link!");
 		return false;
 	}
 
@@ -551,7 +551,7 @@ bool dm_helpers_submit_i2c(
 	bool result;
 
 	if (!aconnector) {
-		DRM_ERROR("Failed to found connector for link!");
+		DRM_ERROR("Failed to find connector for link!");
 		return false;
 	}
 
@@ -608,7 +608,7 @@ bool dm_helpers_is_dp_sink_present(struct dc_link *link)
 	struct amdgpu_dm_connector *aconnector = link->priv;
 
 	if (!aconnector) {
-		BUG_ON("Failed to found connector for link!");
+		BUG_ON("Failed to find connector for link!");
 		return true;
 	}
 

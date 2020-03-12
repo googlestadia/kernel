@@ -1174,7 +1174,7 @@ static int kfd_ioctl_get_tile_config(struct file *filep,
 	if (!dev)
 		return -EINVAL;
 
-	dev->kfd2kgd->get_tile_config(dev->kgd, &config);
+	amdgpu_amdkfd_get_tile_config(dev->kgd, &config);
 
 	args->gb_addr_config = config.gb_addr_config;
 	args->num_banks = config.num_banks;
@@ -1959,8 +1959,8 @@ static int kfd_create_cma_system_bo(struct kfd_dev *kdev, struct kfd_bo *bo,
 	uint64_t bo_size = 0;
 	struct dma_fence *f;
 
-	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_WRITABLE |
-			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
+	uint32_t flags = KFD_IOC_ALLOC_MEM_FLAGS_GTT | KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE |
+			 KFD_IOC_ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
 
 	*cma_bo = NULL;
 	cbo = kzalloc(sizeof(**cma_bo), GFP_KERNEL);
@@ -2246,8 +2246,8 @@ static int kfd_create_kgd_mem(struct kfd_dev *kdev, uint64_t size,
 {
 	int ret;
 	struct kfd_process_device *pdd = NULL;
-	uint32_t flags = ALLOC_MEM_FLAGS_GTT | ALLOC_MEM_FLAGS_WRITABLE |
-			 ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
+	uint32_t flags = KFD_IOC_ALLOC_MEM_FLAGS_GTT | KFD_IOC_ALLOC_MEM_FLAGS_WRITABLE |
+			 KFD_IOC_ALLOC_MEM_FLAGS_NO_SUBSTITUTE;
 
 	if (!mem || !size || !p || !kdev)
 		return -EINVAL;

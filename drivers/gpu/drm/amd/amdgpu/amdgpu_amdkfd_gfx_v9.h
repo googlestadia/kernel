@@ -58,8 +58,6 @@ uint32_t kgd_gfx_v9_address_watch_get_offset(struct kgd_dev *kgd,
 
 bool kgd_gfx_v9_get_atc_vmid_pasid_mapping_info(struct kgd_dev *kgd,
 					uint8_t vmid, uint16_t *p_pasid);
-int kgd_gfx_v9_get_tile_config(struct kgd_dev *kgd,
-		struct tile_config *config);
 uint32_t kgd_gfx_v9_enable_debug_trap(struct kgd_dev *kgd,
 				      uint32_t trap_debug_wave_launch_mode,
 				      uint32_t vmid);

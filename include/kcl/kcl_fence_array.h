@@ -22,8 +22,8 @@
 #ifndef AMDKCL_FENCE_ARRAY_H
 #define AMDKCL_FENCE_ARRAY_H
 
-#if !defined(HAVE_DMA_FENCE_DEFINED)
-#if defined(HAVE_FENCE_ARRAY_H)
+#if !defined(HAVE_LINUX_DMA_FENCE_H)
+#if defined(HAVE_LINUX_FENCE_ARRAY_H)
 #include <linux/fence-array.h>
 #else
 #include <linux/fence.h>

@@ -1385,7 +1385,7 @@ bool dc_post_update_surfaces_to_stream(struct dc *dc)
 	int i;
 	struct dc_state *context = dc->current_state;
 
-	if (!dc->optimized_required || dc->optimize_seamless_boot_streams > 0)
+	if ((!dc->clk_optimized_required && !dc->wm_optimized_required) || dc->optimize_seamless_boot_streams > 0)
 		return true;
 
 	post_surface_trace(dc);
@@ -1397,9 +1397,11 @@ bool dc_post_update_surfaces_to_stream(struct dc *dc)
 			dc->hwss.disable_plane(dc, &context->res_ctx.pipe_ctx[i]);
 		}
 
-	dc->optimized_required = false;
-
 	dc->hwss.optimize_bandwidth(dc, context);
+
+	dc->clk_optimized_required = false;
+	dc->wm_optimized_required = false;
+
 	return true;
 }
 
@@ -1850,10 +1852,10 @@ enum surface_update_type dc_check_update_surfaces_for_stream(
 		// If there's an available clock comparator, we use that.
 		if (dc->clk_mgr->funcs->are_clock_states_equal) {
 			if (!dc->clk_mgr->funcs->are_clock_states_equal(&dc->clk_mgr->clks, &dc->current_state->bw_ctx.bw.dcn.clk))
-				dc->optimized_required = true;
+				dc->clk_optimized_required = true;
 		// Else we fallback to mem compare.
 		} else if (memcmp(&dc->current_state->bw_ctx.bw.dcn.clk, &dc->clk_mgr->clks, offsetof(struct dc_clocks, prev_p_state_change_support)) != 0) {
-			dc->optimized_required = true;
+			dc->clk_optimized_required = true;
 		}
 	}
 
@@ -2236,7 +2238,7 @@ static void commit_planes_for_stream(struct dc *dc,
 			dc->optimize_seamless_boot_streams--;
 
 			if (dc->optimize_seamless_boot_streams == 0)
-				dc->optimized_required = true;
+				dc->clk_optimized_required = true;
 		}
 	}
 
@@ -2862,21 +2864,3 @@ void dc_get_clock(struct dc *dc, enum dc_clock_type clock_type, struct dc_clock_
 	if (dc->hwss.get_clock)
 		dc->hwss.get_clock(dc, clock_type, clock_cfg);
 }
-
-#if !defined(CONFIG_DRM_AMD_DC_DCN2_0)
-int get_num_odm_splits(struct pipe_ctx *pipe)
-{
-	int odm_split_count = 0;
-	struct pipe_ctx *next_pipe = pipe->next_odm_pipe;
-	while (next_pipe) {
-		odm_split_count++;
-		next_pipe = next_pipe->next_odm_pipe;
-	}
-	pipe = pipe->prev_odm_pipe;
-	while (pipe) {
-		odm_split_count++;
-		pipe = pipe->prev_odm_pipe;
-	}
-	return odm_split_count;
-}
-#endif

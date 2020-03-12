@@ -544,6 +544,22 @@ static inline void get_vp_scan_direction(
 		*flip_horz_scan_dir = !*flip_horz_scan_dir;
 }
 
+int get_num_odm_splits(struct pipe_ctx *pipe)
+{
+	int odm_split_count = 0;
+	struct pipe_ctx *next_pipe = pipe->next_odm_pipe;
+	while (next_pipe) {
+		odm_split_count++;
+		next_pipe = next_pipe->next_odm_pipe;
+	}
+	pipe = pipe->prev_odm_pipe;
+	while (pipe) {
+		odm_split_count++;
+		pipe = pipe->prev_odm_pipe;
+	}
+	return odm_split_count;
+}
+
 static void calculate_split_count_and_index(struct pipe_ctx *pipe_ctx, int *split_count, int *split_idx)
 {
 	*split_count = get_num_odm_splits(pipe_ctx);
@@ -2171,10 +2187,10 @@ enum dc_status dc_validate_global_state(
 			if (pipe_ctx->stream != stream)
 				continue;
 
-			if (dc->res_pool->funcs->get_default_swizzle_mode &&
+			if (dc->res_pool->funcs->patch_unknown_plane_state &&
 					pipe_ctx->plane_state &&
 					pipe_ctx->plane_state->tiling_info.gfx9.swizzle == DC_SW_UNKNOWN) {
-				result = dc->res_pool->funcs->get_default_swizzle_mode(pipe_ctx->plane_state);
+				result = dc->res_pool->funcs->patch_unknown_plane_state(pipe_ctx->plane_state);
 				if (result != DC_OK)
 					return result;
 			}

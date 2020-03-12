@@ -97,6 +97,8 @@ static const struct hwseq_private_funcs dcn20_private_funcs = {
 	.reset_hw_ctx_wrap = dcn20_reset_hw_ctx_wrap,
 	.enable_stream_timing = dcn20_enable_stream_timing,
 	.edp_backlight_control = dce110_edp_backlight_control,
+	.is_panel_backlight_on = dce110_is_panel_backlight_on,
+	.is_panel_powered_on = dce110_is_panel_powered_on,
 	.disable_stream_gating = dcn20_disable_stream_gating,
 	.enable_stream_gating = dcn20_enable_stream_gating,
 	.setup_vupdate_interrupt = dcn20_setup_vupdate_interrupt,
@@ -109,7 +111,6 @@ static const struct hwseq_private_funcs dcn20_private_funcs = {
 	.enable_power_gating_plane = dcn20_enable_power_gating_plane,
 	.dpp_pg_control = dcn20_dpp_pg_control,
 	.hubp_pg_control = dcn20_hubp_pg_control,
-	.dsc_pg_control = NULL,
 	.update_odm = dcn20_update_odm,
 #ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
 	.dsc_pg_control = dcn20_dsc_pg_control,

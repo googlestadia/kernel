@@ -84,6 +84,24 @@ int drm_sched_entity_init(struct drm_sched_entity *entity,
 EXPORT_SYMBOL(drm_sched_entity_init);
 
 /**
+ * drm_sched_entity_modify_sched - Modify sched of an entity
+ * @entity: scheduler entity to init
+ * @sched_list: the list of new drm scheds which will replace
+ *		 existing entity->sched_list
+ * @num_sched_list: number of drm sched in sched_list
+ */
+void drm_sched_entity_modify_sched(struct drm_sched_entity *entity,
+				    struct drm_gpu_scheduler **sched_list,
+				    unsigned int num_sched_list)
+{
+	WARN_ON(!num_sched_list || !sched_list);
+
+	entity->sched_list = sched_list;
+	entity->num_sched_list = num_sched_list;
+}
+EXPORT_SYMBOL(drm_sched_entity_modify_sched);
+
+/**
  * drm_sched_entity_is_idle - Check if entity is idle
  *
  * @entity: scheduler entity
@@ -130,7 +148,7 @@ static struct drm_sched_rq *
 drm_sched_entity_get_free_sched(struct drm_sched_entity *entity)
 {
 	struct drm_sched_rq *rq = NULL;
-	unsigned int min_score = UINT_MAX, num_score;
+	unsigned int min_jobs = UINT_MAX, num_jobs;
 	int i;
 
 	for (i = 0; i < entity->num_sched_list; ++i) {
@@ -141,9 +159,9 @@ drm_sched_entity_get_free_sched(struct drm_sched_entity *entity)
 			continue;
 		}
 
-		num_score = atomic_read(&sched->score);
-		if (num_score < min_score) {
-			min_score = num_score;
+		num_jobs = atomic_read(&sched->num_jobs);
+		if (num_jobs < min_jobs) {
+			min_jobs = num_jobs;
 			rq = &entity->sched_list[i]->sched_rq[entity->priority];
 		}
 	}
@@ -498,7 +516,7 @@ void drm_sched_entity_push_job(struct drm_sched_job *sched_job,
 	bool first;
 
 	trace_drm_sched_job(sched_job, entity);
-	atomic_inc(&entity->rq->sched->score);
+	atomic_inc(&entity->rq->sched->num_jobs);
 	WRITE_ONCE(entity->last_user, current->group_leader);
 	first = spsc_queue_push(&entity->job_queue, &sched_job->queue_node);
 

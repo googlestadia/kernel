@@ -311,7 +311,8 @@ void dcn20_init_blank(
 			COLOR_DEPTH_UNDEFINED,
 			&black_color,
 			otg_active_width,
-			otg_active_height);
+			otg_active_height,
+			0);
 
 	if (num_opps == 2) {
 		bottom_opp->funcs->opp_set_disp_pattern_generator(
@@ -321,7 +322,8 @@ void dcn20_init_blank(
 				COLOR_DEPTH_UNDEFINED,
 				&black_color,
 				otg_active_width,
-				otg_active_height);
+				otg_active_height,
+				0);
 	}
 
 	hws->funcs.wait_for_blank_complete(opp);
@@ -626,6 +628,15 @@ enum dc_status dcn20_enable_stream_timing(
 		return DC_OK;
 
 	/* TODO check if timing_changed, disable stream if timing changed */
+
+	/* Have to setup DSC here to make sure the bandwidth sent to DIG BE won't be bigger than
+	 * what the link and/or DIG BE can handle. VBID[6]/CompressedStream_flag will be automatically
+	 * set at a later time when the video is enabled (DP_VID_STREAM_EN = 1).
+	 */
+#ifdef CONFIG_DRM_AMD_DC_DSC_SUPPORT
+	if (pipe_ctx->stream->timing.flags.DSC)
+		dp_set_dsc_on_stream(pipe_ctx, true);
+#endif
 
 	for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
 		opp_inst[opp_cnt] = odm_pipe->stream_res.opp->inst;
@@ -980,7 +991,8 @@ void dcn20_blank_pixel_data(
 			stream->timing.display_color_depth,
 			&black_color,
 			width,
-			height);
+			height,
+			0);
 
 	for (odm_pipe = pipe_ctx->next_odm_pipe; odm_pipe; odm_pipe = odm_pipe->next_odm_pipe) {
 		odm_pipe->stream_res.opp->funcs->opp_set_disp_pattern_generator(
@@ -991,7 +1003,8 @@ void dcn20_blank_pixel_data(
 				stream->timing.display_color_depth,
 				&black_color,
 				width,
-				height);
+				height,
+				0);
 	}
 
 	if (!blank)
@@ -1590,6 +1603,7 @@ void dcn20_post_unlock_program_front_end(
 {
 	int i;
 	const unsigned int TIMEOUT_FOR_PIPE_ENABLE_MS = 100;
+	struct dce_hwseq *hwseq = dc->hwseq;
 
 	DC_LOGGER_INIT(dc->ctx->logger);
 
@@ -1617,8 +1631,24 @@ void dcn20_post_unlock_program_front_end(
 	}
 
 	/* WA to apply WM setting*/
-	if (dc->hwseq->wa.DEGVIDCN21)
+	if (hwseq->wa.DEGVIDCN21)
 		dc->res_pool->hubbub->funcs->apply_DEDCN21_147_wa(dc->res_pool->hubbub);
+
+
+	/* WA for stutter underflow during MPO transitions when adding 2nd plane */
+	if (hwseq->wa.disallow_self_refresh_during_multi_plane_transition) {
+
+		if (dc->current_state->stream_status[0].plane_count == 1 &&
+				context->stream_status[0].plane_count > 1) {
+
+			struct timing_generator *tg = dc->res_pool->timing_generators[0];
+
+			dc->res_pool->hubbub->funcs->allow_self_refresh_control(dc->res_pool->hubbub, false);
+
+			hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied = true;
+			hwseq->wa_state.disallow_self_refresh_during_multi_plane_transition_applied_on_frame = tg->funcs->get_frame_count(tg);
+		}
+	}
 }
 
 void dcn20_prepare_bandwidth(
@@ -1633,7 +1663,7 @@ void dcn20_prepare_bandwidth(
 			false);
 
 	/* program dchubbub watermarks */
-	hubbub->funcs->program_watermarks(hubbub,
+	dc->wm_optimized_required = hubbub->funcs->program_watermarks(hubbub,
 					&context->bw_ctx.bw.dcn.watermarks,
 					dc->res_pool->ref_clocks.dchub_ref_clock_inKhz / 1000,
 					false);

@@ -49,7 +49,6 @@ struct amdgpu_job {
 	uint32_t		preamble_status;
 	uint32_t                preemption_status;
 	uint32_t		num_ibs;
-	void			*owner;
 	bool                    vm_needs_flush;
 	uint64_t		vm_pd_addr;
 	unsigned		vmid;
@@ -62,9 +61,6 @@ struct amdgpu_job {
 	/* user fence handling */
 	uint64_t		uf_addr;
 	uint64_t		uf_sequence;
-
-	/* the job is due to a secure command submission */
-	bool			secure;
 };
 
 int amdgpu_job_alloc(struct amdgpu_device *adev, unsigned num_ibs,
