@@ -1120,7 +1120,7 @@ void amdgpu_ras_debugfs_create(struct amdgpu_device *adev,
 void amdgpu_ras_debugfs_create_all(struct amdgpu_device *adev)
 {
 	struct amdgpu_ras *con = amdgpu_ras_get_context(adev);
-	struct ras_manager *obj;
+	struct ras_manager *obj, *tmp;
 	struct ras_fs_if fs_info;
 
 	/*
@@ -1132,7 +1132,10 @@ void amdgpu_ras_debugfs_create_all(struct amdgpu_device *adev)
 
 	amdgpu_ras_debugfs_create_ctrl_node(adev);
 
-	list_for_each_entry(obj, &con->head, node) {
+	list_for_each_entry_safe(obj, tmp, &con->head, node) {
+		if (!obj)
+			continue;
+
 		if (amdgpu_ras_is_supported(adev, obj->head.block) &&
 			(obj->attr_inuse == 1)) {
 			sprintf(fs_info.debugfs_name, "%s_err_inject",
