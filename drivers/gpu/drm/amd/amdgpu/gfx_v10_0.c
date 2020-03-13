@@ -441,6 +441,8 @@ static void gfx_v10_0_init_golden_registers(struct amdgpu_device *adev)
 						(const u32)ARRAY_SIZE(golden_settings_gc_10_1_nv14));
 		break;
 	case CHIP_NAVI12:
+		if (amdgpu_sriov_vf(adev))
+			break;
 		soc15_program_register_sequence(adev,
 						golden_settings_gc_10_1_2,
 						(const u32)ARRAY_SIZE(golden_settings_gc_10_1_2));
@@ -1709,6 +1711,10 @@ static void gfx_v10_0_tcp_harvest(struct amdgpu_device *adev)
 	u32 tmp, wgp_active_bitmap = 0;
 	u32 gcrd_targets_disable_tcp = 0;
 	u32 utcl_invreq_disable = 0;
+
+	if (amdgpu_sriov_vf(adev))
+		return;
+
 	/*
 	 * GCRD_TARGETS_DISABLE field contains
 	 * for Navi10/Navi12: GL1C=[18:15], SQC=[14:10], TCP=[9:0]
@@ -1787,8 +1793,8 @@ static void gfx_v10_0_constants_init(struct amdgpu_device *adev)
 {
 	u32 tmp;
 	int i;
-
-	WREG32_FIELD15(GC, 0, GRBM_CNTL, READ_TIMEOUT, 0xff);
+	if (!amdgpu_sriov_vf(adev))
+		WREG32_FIELD15(GC, 0, GRBM_CNTL, READ_TIMEOUT, 0xff);
 
 	gfx_v10_0_tiling_mode_table_init(adev);
 
@@ -1905,7 +1911,8 @@ static void gfx_v10_0_rlc_start(struct amdgpu_device *adev)
 static void gfx_v10_0_rlc_enable_srm(struct amdgpu_device *adev)
 {
 	uint32_t tmp;
-
+	if (amdgpu_sriov_vf(adev))
+		return;
 	/* enable Save Restore Machine */
 	tmp = RREG32(SOC15_REG_OFFSET(GC, 0, mmRLC_SRM_CNTL));
 	tmp |= RLC_SRM_CNTL__AUTO_INCR_ADDR_MASK;
@@ -3721,6 +3728,9 @@ static void gfx_v10_0_cp_enable(struct amdgpu_device *adev, bool enable)
 static bool gfx_v10_0_check_grbm_cam_remapping(struct amdgpu_device *adev)
 {
 	uint32_t data, pattern = 0xDEADBEEF;
+
+	if (amdgpu_sriov_vf(adev))
+		return false;
 
 	/* check if mmVGT_ESGS_RING_SIZE_UMD
 	 * has been remapped to mmVGT_ESGS_RING_SIZE */
