@@ -267,11 +267,7 @@ static struct atom_display_object_path_v2 *get_bios_object(
 					&& id.enum_id == obj_id.enum_id)
 				return &bp->object_info_tbl.v1_4->display_path[i];
 		}
-#ifdef HAVE_FALLTHROUGH_SUPPORT
 		fallthrough;
-#else
-		/* fall through */
-#endif
 	case OBJECT_TYPE_CONNECTOR:
 	case OBJECT_TYPE_GENERIC:
 		/* Both Generic and Connector Object ID
@@ -284,11 +280,7 @@ static struct atom_display_object_path_v2 *get_bios_object(
 					&& id.enum_id == obj_id.enum_id)
 				return &bp->object_info_tbl.v1_4->display_path[i];
 		}
-#ifdef HAVE_FALLTHROUGH_SUPPORT
 		fallthrough;
-#else
-		/* fall through */
-#endif
 	default:
 		return NULL;
 	}
