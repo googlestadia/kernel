@@ -79,7 +79,11 @@ static uint32_t get_sdma_rlc_reg_offset(struct amdgpu_device *adev,
 		dev_warn(adev->dev,
 			 "Invalid sdma engine id (%d), using engine id 0\n",
 			 engine_id);
+#ifdef HAVE_FALLTHROUGH_SUPPORT
+		fallthrough;
+#else
 		/* fall through */
+#endif
 	case 0:
 		sdma_engine_reg_base = SOC15_REG_OFFSET(SDMA0, 0,
 				mmSDMA0_RLC0_RB_CNTL) - mmSDMA0_RLC0_RB_CNTL;
