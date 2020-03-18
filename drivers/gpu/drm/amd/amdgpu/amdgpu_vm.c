@@ -1446,7 +1446,7 @@ static int amdgpu_vm_update_ptes(struct amdgpu_vm_update_params *params,
 		uint64_t incr, entry_end, pe_start;
 		struct amdgpu_bo *pt;
 
-		if (flags & AMDGPU_PTE_VALID) {
+		if (flags & (AMDGPU_PTE_VALID | AMDGPU_PTE_PRT)) {
 			/* make sure that the page tables covering the
 			 * address range are actually allocated
 			 */
@@ -1603,7 +1603,7 @@ static int amdgpu_vm_bo_update_mapping(struct amdgpu_device *adev,
 		goto error_unlock;
 	}
 
-	if (flags & AMDGPU_PTE_VALID) {
+	if (flags & (AMDGPU_PTE_VALID | AMDGPU_PTE_PRT)) {
 		struct amdgpu_bo *root = vm->root.base.bo;
 
 		if (!dma_fence_is_signaled(vm->last_direct))
@@ -1722,7 +1722,7 @@ static int amdgpu_vm_bo_split_mapping(struct amdgpu_device *adev,
 						addr = pages_addr[pfn];
 						max_entries = count;
 					}
-				} else if (flags & AMDGPU_PTE_VALID) {
+				} else if (flags & (AMDGPU_PTE_VALID | AMDGPU_PTE_PRT)) {
 					addr += vram_base_offset;
 					addr += pfn << PAGE_SHIFT;
 				}
