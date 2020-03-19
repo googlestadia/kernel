@@ -65,7 +65,6 @@ def main():
       "BUILD_USER": "",
       "STABLE_BUILD_SCM_BRANCH": "",
       "STABLE_BUILD_SCM_REVISION": "",
-      "STABLE_BUILD_SCM_STATUS": "",
       "STABLE_KOKORO_BUILD_ID": "",
       "STABLE_KOKORO_BUILD_NUMBER": "0",
       "STABLE_KOKORO_JOB_NAME": "",
@@ -84,7 +83,7 @@ def main():
       vars_dict["STABLE_RELEASE_TRAIN"] = m.group(1)
   # Extract information from STABLE_RAPID_CANDIDATE_NAME.
   if vars_dict["STABLE_RAPID_CANDIDATE_NAME"]:
-    m = RAPID_RC_NUMBER_RE.search(vars["STABLE_RAPID_CANDIDATE_NAME"])
+    m = RAPID_RC_NUMBER_RE.search(vars_dict["STABLE_RAPID_CANDIDATE_NAME"])
     if m:
       vars_dict["STABLE_RELEASE_CANDIDATE_NUMBER"] = m.group(1)
     m = RAPID_RELEASE_TRAIN_RE.search(vars_dict["STABLE_RAPID_CANDIDATE_NAME"])
