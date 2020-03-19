@@ -15,15 +15,6 @@ if [[ $? != 0 ]]; then
 fi
 echo "STABLE_BUILD_SCM_BRANCH ${git_branch:-unknown}"
 
-# Check whether there are any uncommited changes
-git diff-index --quiet HEAD --
-if [[ $? == 0 ]]; then
-  tree_status="Clean"
-else
-  tree_status="Modified"
-fi
-echo "STABLE_BUILD_SCM_STATUS ${tree_status:-unknown}"
-
 # Include kokoro information if available.
 if [[ -n "${KOKORO_BUILD_ID}" ]]; then
   echo "STABLE_KOKORO_BUILD_ID ${KOKORO_BUILD_ID}"
