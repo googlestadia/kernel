@@ -86,7 +86,7 @@
 #define HAVE_DMA_RESV_SEQ 1
 
 /* down_write_killable() is available */
-/* #undef HAVE_DOWN_WRITE_KILLABLE */
+#define HAVE_DOWN_WRITE_KILLABLE 1
 
 /* drm_dp_mst_connector_early_unregister() is available */
 #define HAVE_DP_MST_CONNECTOR_EARLY_UNREGISTER 1
@@ -256,13 +256,13 @@
 #define HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP 1
 
 /* drm_dp_mst_add_affected_dsc_crtcs() is available */
-/* #undef HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS */
+#define HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS 1
 
 /* drm_dp_mst_allocate_vcpi() has p,p,i,i interface */
 #define HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I 1
 
 /* drm_dp_mst_atomic_check() is available */
-/* #undef HAVE_DRM_DP_MST_ATOMIC_CHECK */
+#define HAVE_DRM_DP_MST_ATOMIC_CHECK 1
 
 /* drm_dp_mst_atomic_enable_dsc() is available */
 #define HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC 1
@@ -455,6 +455,9 @@
 
 /* drm_vma_node_verify_access() 2nd argument is drm_file */
 #define HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE 1
+
+/* fallthrough is supported */
+#define HAVE_FALLTHROUGH_SUPPORT 1
 
 /* fb_info_apertures() is available */
 #define HAVE_FB_INFO_APERTURES 1
