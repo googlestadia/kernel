@@ -33,5 +33,9 @@ $(SCHED_NAME)-y := sched_main.o sched_fence.o sched_entity.o
 obj-$(CONFIG_DRM_SCHED) += $(SCHED_NAME).o
 gpu-sched-y := sched_main.o sched_fence.o sched_entity.o
 
-SCHED_FULL_PATH := $(realpath $(src))
+ifeq ($(KBUILD_EXTMOD),)
+SCHED_FULL_PATH := $(srctree)/$(src)
+else
+SCHED_FULL_PATH := $(src)
+endif
 include $(SCHED_FULL_PATH)/backport/Makefile

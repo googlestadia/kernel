@@ -23,7 +23,11 @@
 # Makefile for the drm device driver.  This driver provides support for the
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 
-FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(realpath $(src)))
+ifeq ($(KBUILD_EXTMOD),)
+FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(srctree)/$(src))
+else
+FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(src))
+endif
 ifeq (,$(BUILD_AS_DKMS))
 AMDKCL_KBUILD_TAKE_PATH=1
 else
