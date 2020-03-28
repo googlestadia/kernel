@@ -74,7 +74,7 @@ for file in $FILES; do
 done
 
 export KERNELVER
-(cd $SRC && CPPFLAGS="-I$SRCTREE/arch/$SRCARCH/include \
+(cd $SRC && ./autogen.sh && CPPFLAGS="-I$SRCTREE/arch/$SRCARCH/include \
 	-I$BLDTREE/arch/$SRCARCH/include/generated \
 	-I$SRCTREE/include \
 	-I$BLDTREE/include \
