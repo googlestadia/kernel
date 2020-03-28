@@ -1187,7 +1187,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 #endif
 		DRM_ERROR("Hotplug removal is not supported\n");
 #ifdef HAVE_DRM_DEV_UNPLUG
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0)
 	drm_dev_get(dev);
 #endif
 	drm_dev_unplug(dev);
