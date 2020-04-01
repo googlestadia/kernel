@@ -326,7 +326,6 @@ int amdgpu_virt_fw_reserve_get_checksum(void *obj, unsigned long obj_size,
 void amdgpu_virt_init_data_exchange(struct amdgpu_device *adev);
 void amdgpu_detect_virtualization(struct amdgpu_device *adev);
 int amdgpu_virt_create_debugs(struct amdgpu_device *);
-void amdgpu_virt_remove_debugfs(struct amdgpu_device *);
 int amdgpu_virt_notify_booked(struct amdgpu_device *, struct amdgpu_job *);
 int amdgpu_virt_wait_dump(struct amdgpu_device *, unsigned long tmo);
 #endif

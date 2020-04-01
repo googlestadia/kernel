@@ -203,15 +203,6 @@ err:
        return -EFAULT;
 }
 
-void amdgpu_virt_remove_debugfs(struct amdgpu_device *adev)
-{
-       struct amdgpu_virt *virt = &adev->virt;
-       int idx;
-
-       for (idx = 0; idx < MAX_AUTODUMP_NODE; idx++)
-               debugfs_remove(virt->dump_dentries[idx]);
-}
-
 int amdgpu_virt_notify_booked(struct amdgpu_device *adev, struct amdgpu_job *job)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)

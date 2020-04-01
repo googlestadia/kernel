@@ -3403,7 +3403,6 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 		amdgpu_pmu_fini(adev);
 	if (amdgpu_discovery && adev->asic_type >= CHIP_NAVI10)
 		amdgpu_discovery_fini(adev);
-	amdgpu_virt_remove_debugfs(adev);
 }
 
 
