@@ -2537,15 +2537,22 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
  */
 int amdgpu_device_ip_suspend(struct amdgpu_device *adev)
 {
-	int r;
+	int r = 0;
+	int skip_hw = 0;
 
 	if (amdgpu_sriov_vf(adev))
-		amdgpu_virt_request_full_gpu(adev, false);
+		skip_hw = amdgpu_virt_request_full_gpu(adev, false);
 
-	r = amdgpu_device_ip_suspend_phase1(adev);
-	if (r)
-		return r;
-	r = amdgpu_device_ip_suspend_phase2(adev);
+	/* In case amdgpu_virt_request_full_gpu failed and vm cannot get
+	 * full access, we should skip touching hw and let poweroff continue
+	 */
+
+	if (!skip_hw) {
+		r = amdgpu_device_ip_suspend_phase1(adev);
+		if (r)
+			return r;
+		r = amdgpu_device_ip_suspend_phase2(adev);
+	}
 
 	if (amdgpu_sriov_vf(adev))
 		amdgpu_virt_release_full_gpu(adev, false);
