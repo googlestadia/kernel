@@ -2318,7 +2318,7 @@ static int amdgpu_device_ip_late_init(struct amdgpu_device *adev)
  * and sw_fini tears down any software state associated with each IP.
  * Returns 0 on success, negative error code on failure.
  */
-static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
+static int amdgpu_device_ip_fini(struct amdgpu_device *adev, int skip_hw)
 {
 	int i, r;
 
@@ -2330,41 +2330,43 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 	if (adev->gmc.xgmi.num_physical_nodes > 1)
 		amdgpu_xgmi_remove_device(adev);
 
-	amdgpu_amdkfd_device_fini(adev);
+	if (!skip_hw)
+		amdgpu_amdkfd_device_fini(adev);
 
 	amdgpu_device_set_pg_state(adev, AMD_PG_STATE_UNGATE);
 	amdgpu_device_set_cg_state(adev, AMD_CG_STATE_UNGATE);
 
-	/* need to disable SMC first */
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.hw)
-			continue;
-		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_SMC) {
+	if (!skip_hw) {
+		/* need to disable SMC first */
+		for (i = 0; i < adev->num_ip_blocks; i++) {
+			if (!adev->ip_blocks[i].status.hw)
+				continue;
+			if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_SMC) {
+				r = adev->ip_blocks[i].version->funcs->hw_fini((void *)adev);
+				/* XXX handle errors */
+				if (r) {
+					DRM_DEBUG("hw_fini of IP block <%s> failed %d\n",
+							adev->ip_blocks[i].version->funcs->name, r);
+				}
+				adev->ip_blocks[i].status.hw = false;
+				break;
+			}
+		}
+
+		for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
+			if (!adev->ip_blocks[i].status.hw)
+				continue;
+
 			r = adev->ip_blocks[i].version->funcs->hw_fini((void *)adev);
 			/* XXX handle errors */
 			if (r) {
 				DRM_DEBUG("hw_fini of IP block <%s> failed %d\n",
-					  adev->ip_blocks[i].version->funcs->name, r);
+						adev->ip_blocks[i].version->funcs->name, r);
 			}
+
 			adev->ip_blocks[i].status.hw = false;
-			break;
 		}
 	}
-
-	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
-		if (!adev->ip_blocks[i].status.hw)
-			continue;
-
-		r = adev->ip_blocks[i].version->funcs->hw_fini((void *)adev);
-		/* XXX handle errors */
-		if (r) {
-			DRM_DEBUG("hw_fini of IP block <%s> failed %d\n",
-				  adev->ip_blocks[i].version->funcs->name, r);
-		}
-
-		adev->ip_blocks[i].status.hw = false;
-	}
-
 
 	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
 		if (!adev->ip_blocks[i].status.sw)
@@ -3355,7 +3357,11 @@ failed:
  */
 void amdgpu_device_fini(struct amdgpu_device *adev)
 {
-	int r;
+	int r = 0;
+	/* In case amdgpu_virt_request_full_gpu failed and vm cannot get
+	* full access, we should skip touching hw and let unload continue
+	*/
+	int skip_hw = 0;
 
 	DRM_INFO("amdgpu: finishing device.\n");
 	if (!amdgpu_sriov_vf(adev))
@@ -3366,10 +3372,11 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	 * to avoid preemption on IB test
 	 * */
 	if (amdgpu_sriov_vf(adev))
-		amdgpu_virt_request_full_gpu(adev, false);
+		skip_hw = amdgpu_virt_request_full_gpu(adev, false);
 
 	/* disable all interrupts */
-	amdgpu_irq_disable_all(adev);
+	if (!skip_hw)
+		amdgpu_irq_disable_all(adev);
 	if (adev->mode_info.mode_config_initialized){
 		if (!amdgpu_device_has_dc_support(adev))
 			drm_helper_force_disable_all(adev->ddev);
@@ -3378,11 +3385,11 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 			drm_atomic_helper_shutdown(adev->ddev);
 #endif
 	}
-	amdgpu_fence_driver_fini(adev);
+	amdgpu_fence_driver_fini(adev, skip_hw);
 	if (adev->pm_sysfs_en)
 		amdgpu_pm_sysfs_fini(adev);
 	amdgpu_fbdev_fini(adev);
-	r = amdgpu_device_ip_fini(adev);
+	r = amdgpu_device_ip_fini(adev, skip_hw);
 	if (adev->firmware.gpu_info_fw) {
 		release_firmware(adev->firmware.gpu_info_fw);
 		adev->firmware.gpu_info_fw = NULL;
