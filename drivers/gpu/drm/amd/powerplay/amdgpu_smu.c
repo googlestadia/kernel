@@ -327,13 +327,13 @@ int smu_get_dpm_freq_by_index(struct smu_context *smu, enum smu_clk_type clk_typ
 	param = (uint32_t)(((clk_id & 0xffff) << 16) | (level & 0xffff));
 
 	ret = smu_send_smc_msg_with_param(smu, SMU_MSG_GetDpmFreqByIndex,
-					  param, &param);
+					  param, value);
 	if (ret)
 		return ret;
 
 	/* BIT31:  0 - Fine grained DPM, 1 - Dicrete DPM
 	 * now, we un-support it */
-	*value = param & 0x7fffffff;
+	*value = *value & 0x7fffffff;
 
 	return ret;
 }
@@ -511,7 +511,6 @@ int smu_update_table(struct smu_context *smu, enum smu_table_id table_index, int
 	int table_id = smu_table_get_index(smu, table_index);
 	uint32_t table_size;
 	int ret = 0;
-
 	if (!table_data || table_id >= SMU_TABLE_COUNT || table_id < 0)
 		return -EINVAL;
 
@@ -665,7 +664,6 @@ int smu_feature_is_enabled(struct smu_context *smu, enum smu_feature_mask mask)
 
 	if (smu->is_apu)
 		return 1;
-
 	feature_id = smu_feature_get_index(smu, mask);
 	if (feature_id < 0)
 		return 0;
@@ -1169,7 +1167,15 @@ static int smu_smc_table_hw_init(struct smu_context *smu,
 				return ret;
 			}
 		}
+	} else {
+		/* we need to enable some SMU features for one vf mode */
+		if (amdgpu_sriov_is_pp_one_vf(adev)) {
+			ret = smu_system_features_control(smu, true);
+			if (ret)
+				return ret;
+		}
 	}
+
 	if (adev->asic_type != CHIP_ARCTURUS) {
 		ret = smu_notify_display_change(smu);
 		if (ret)
@@ -1323,6 +1329,9 @@ static int smu_hw_init(void *handle)
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
 
+	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev))
+		return 0;
+
 	ret = smu_start_smc_engine(smu);
 	if (ret) {
 		pr_err("SMU is not ready yet!\n");
@@ -1335,9 +1344,6 @@ static int smu_hw_init(void *handle)
 		smu_powergate_jpeg(&adev->smu, false);
 		smu_set_gfx_cgpg(&adev->smu, true);
 	}
-
-	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev))
-		return 0;
 
 	if (!smu->pm_enabled)
 		return 0;
@@ -1381,6 +1387,9 @@ failed:
 
 static int smu_stop_dpms(struct smu_context *smu)
 {
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
+
 	return smu_system_features_control(smu, false);
 }
 
