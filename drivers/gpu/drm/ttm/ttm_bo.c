@@ -543,7 +543,7 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 		if (!ttm_bo_get_unless_zero(bo))
 			continue;
 
-		if (remove_all || amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo)) {
+		if (remove_all) {
 			spin_unlock(&glob->lru_lock);
 			dma_resv_lock(amdkcl_ttm_resvp(bo), NULL);
 
