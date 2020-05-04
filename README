@@ -1,5 +1,5 @@
 Stadia kernel
-============
+=============
 
 This repo contains the Stadia instance kernel and build system.
 
@@ -30,6 +30,23 @@ Before building, ensure that submodules have been updated with
 
 To build, run `sudo ./kokoro/docker/glinux_launcher.sh`. You can optionally pass
 a build directory as an argument.
+
+### amdgpu firmware
+
+The Stadia boot image includes a custom initramfs which includes a squashfs
+filesystem (the "kernel root filesystem" or "krootfs") which includes the set of
+amdgpu firmware files required on Stadia. The build script downloads a set of
+firmware files from
+https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git by
+default. To override the default firmware bundle, set the environment variables
+`AMDGPU_FIRMWARE_URL` to the download URL and `AMDGPU_FIRMWARE_SHA256` to the
+sha256 checksum of a gzipped tar archive containing the firmware files. When
+using `sudo`, the environment variables have to be set as part of the command,
+otherwise they get filtered out.
+
+```shell
+sudo AMDGPU_FIRMWARE_URL=... AMDGPU_FIRMWARE_SHA256=... ./kokoro/docker/glinux_launcher.sh
+```
 
 ## Contributing
 
