@@ -28,7 +28,7 @@ Prior to building for the first time, you will need to
 Before building, ensure that submodules have been updated with
 `git submodule update --init --depth=1` or a similar command.
 
-To build, run `sudo ./kororo/docker/glinux_launcher.sh`. You can optionally pass
+To build, run `sudo ./kokoro/docker/glinux_launcher.sh`. You can optionally pass
 a build directory as an argument.
 
 ## Contributing
