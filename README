@@ -1,3 +1,42 @@
+Stadia kernel
+============
+
+This repo contains the Stadia instance kernel and build system.
+
+## External modules
+
+The Stadia kernel integrates an external version of the `amdgpu` kernel module.
+The module is imported as a submodule in `external/amd-cloudgpu`. The built-in
+`amdgpu` module is not compiled.
+
+## Configuring
+
+Stadia uses a [custom kernel configuration](kokoro/config). To modify it, copy
+it to the repo root as `.config` and run `make menuconfig`. Once edits and
+testing are done, copy `.config` back to the `kokoro` directory and send a merge
+request with the changes.
+
+## Building
+
+Stadia uses a build script that invokes the kernel's build system and performs
+additional post-build processing to yield a bootable VM disk image. The build
+is performed in a Docker container maintained on Google Cloud.
+
+Prior to building for the first time, you will need to
+[install Docker](https://docs.docker.com/engine/install/).
+
+Before building, ensure that submodules have been updated with
+`git submodule update --init --depth=1` or a similar command.
+
+To build, run `sudo ./kororo/docker/glinux_launcher.sh`. You can optionally pass
+a build directory as an argument.
+
+## Contributing
+
+Direct contributions to this kernel are welcome in the form of Merge Requests.
+Alternatively, submit your patch to upstream Linux and then open an issue for
+the patch to be merged.
+
 Linux kernel
 ============
 
