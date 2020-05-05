@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
   build-essential \
   cpio \
   dpkg-dev \
+  e2fsprogs \
   extlinux \
   fakeroot \
   flex \
