@@ -5,9 +5,8 @@
 #   1. Build directory. If omitted, will create and build in a temp directory.
 #      Provide this arg to reuse existing artifacts for an incremental build.
 #
-# In order to run this successfully, you must:
-# * Install and configure docker.
-# * Install the Google Cloud SDK.
+# In order to run this successfully, you must install a container engine
+# (either Docker or podman).
 
 set -ex
 
@@ -59,7 +58,7 @@ ${ENGINE_BIN} run \
   --env "DOCKER_SRC_DIR=/workspace/src/kernel" \
   --net=host \
   --privileged=true \
-  -t gcr.io/stadia-open-source/build/kernel@sha256:476f6e5d2c4f4ef4ec25773d1b1a9bb48cf9d65a1275adad39611f8ed0185e8f \
+  -t $(cat "${SCRIPT_DIR}/image.sh") \
   /container_tools/fix_permissions.sh --user "$(id -u):$(id -g)" \
   -- \
   /workspace/src/kernel/kokoro/build.sh

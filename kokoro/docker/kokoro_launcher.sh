@@ -1,15 +1,13 @@
 #!/bin/bash
 
-# Move all non-build artifacts out of $KOKORO_ARTIFACTS_DIR
+set -ex
 
+# Move all non-build artifacts out of $KOKORO_ARTIFACTS_DIR
 readonly KOKORO_NONBUILD_ARTIFACTS="${KOKORO_ROOT}/nonbuild"
 mkdir "${KOKORO_NONBUILD_ARTIFACTS}"
-mkdir -p "${KOKORO_NONBUILD_ARTIFACTS}/git"
-
-mv "${KOKORO_ARTIFACTS_DIR}/git/gamelet_kernel" \
-  "${KOKORO_NONBUILD_ARTIFACTS}/git"
-mv "${KOKORO_KEYSTORE_DIR}" "${KOKORO_NONBUILD_ARTIFACTS}"
-mv "${KOKORO_GFILE_DIR}" "${KOKORO_NONBUILD_ARTIFACTS}"
+mv "${KOKORO_ARTIFACTS_DIR}/git" "${KOKORO_NONBUILD_ARTIFACTS}/"
+mv "${KOKORO_KEYSTORE_DIR}" "${KOKORO_NONBUILD_ARTIFACTS}/"
+mv "${KOKORO_GFILE_DIR}" "${KOKORO_NONBUILD_ARTIFACTS}/"
 
 rm -rf "${KOKORO_ARTIFACTS_DIR}"/*
 
@@ -23,12 +21,12 @@ gcloud auth activate-service-account --key-file \
 gcloud auth configure-docker
 
 docker run \
-  --volume ${TMPDIR}:/workspace/tmp \
-  --volume ${KOKORO_ARTIFACTS_DIR}:/workspace/artifacts \
-  --volume ${KOKORO_NONBUILD_ARTIFACTS}/git/gamelet_kernel:/workspace/src/kernel \
-  --volume ${KOKORO_NONBUILD_ARTIFACTS}/keystore:/workspace/keystore \
-  --volume ${KOKORO_NONBUILD_ARTIFACTS}/gfile:/workspace/gfile \
-  --volume ${HOME}:/workspace/home \
+  --volume "${TMPDIR}":/workspace/tmp \
+  --volume "${KOKORO_ARTIFACTS_DIR}":/workspace/artifacts \
+  --volume "${KOKORO_NONBUILD_ARTIFACTS}"/git/gamelet_kernel:/workspace/src/kernel \
+  --volume "${KOKORO_NONBUILD_ARTIFACTS}"/keystore:/workspace/keystore \
+  --volume "${KOKORO_NONBUILD_ARTIFACTS}"/gfile:/workspace/gfile \
+  --volume "${HOME}":/workspace/home \
   --volume /dev:/dev \
   --env "HOME=/workspace/home" \
   --env "USER=dockerbuilder" \
@@ -45,7 +43,7 @@ docker run \
   --env "TMP=/workspace/tmp" \
   --net=host \
   --privileged=true \
-  -t gcr.io/stadia-open-source/build/kernel@sha256:476f6e5d2c4f4ef4ec25773d1b1a9bb48cf9d65a1275adad39611f8ed0185e8f \
+  -t $(cat "${KOKORO_NONBUILD_ARTIFACTS}/git/gamelet_kernel/kokoro/docker/image.sh") \
   /container_tools/fix_permissions.sh --user "$(id -u):$(id -g)" \
   -- \
   /workspace/src/kernel/kokoro/build.sh
