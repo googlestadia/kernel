@@ -79,8 +79,8 @@ config DRM_DEBUG_SELFTEST
 
 	  If in doubt, say "N".
 
-config DRM_KMS_HELPER
-	tristate
+menuconfig DRM_KMS_HELPER
+	tristate "Direct Rendering Manager KMS helper"
 	depends on DRM
 	help
 	  CRTC helpers for KMS drivers.

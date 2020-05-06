@@ -448,7 +448,7 @@ config BTREE
 	bool
 
 config INTERVAL_TREE
-	bool
+	bool "Interval tree support functions"
 	help
 	  Simple, embeddable, interval-tree. Can find the start of an
 	  overlapping range in log(n) time and then iterate over all
