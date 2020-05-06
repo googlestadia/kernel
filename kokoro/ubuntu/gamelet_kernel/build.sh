@@ -6,8 +6,8 @@ readonly SRC_DIR=$(readlink -f "${SCRIPT_DIR}/../../..")
 readonly GCLOUD_KEY_FILE="${KOKORO_KEYSTORE_DIR}/71274_kokoro_service_key_json"
 readonly INITRAMFS_BIN_URL="gs://stadia_kernels/initramfs/initramfs-20190312.tar.gz"
 readonly INITRAMFS_BIN_SHA256="9790f1a9a859eca95c8ca036416f0ca7d76fdd0bc41c273fcad4636caf4681d3"
-readonly AMDGPU_FIRMWARE_URL="gs://stadia_kernels/amdgpu-firmware/amdgpu-firmware-2019.1.tar.gz"
-readonly AMDGPU_FIRMWARE_SHA256="6405e394f6efa2f824c4ba8d4cc29e8bcce28333cfb00955a86ed7eef5db8032"
+readonly AMDGPU_FIRMWARE_URL="gs://stadia_kernels/amdgpu-firmware/amdgpu-firmware-2019.3.tar.gz"
+readonly AMDGPU_FIRMWARE_SHA256="cc904ee1a9c89c2b0f80800dc43f26cf92b5fb8afc354514e85593026e12072a"
 
 # Downloads a file from GCS and verifies its authenticity using a checksum.
 function download_gcs() {
@@ -135,7 +135,6 @@ function finalize_config() {
   if ! make syncconfig "${MAKE_ARGS[@]}"; then
     exit 1
   fi
-
   if ! KERNELRELEASE="$(make -s kernelrelease "${MAKE_ARGS[@]}")"; then
     exit 1
   fi
@@ -179,8 +178,7 @@ function build_kernel_rootfs() {
   #     stadia/initramfs/root-image/init,
   #     stadia/initramfs/root-image/scripts/overlay.sh,
   # )
-  rm -f "${KROOTFS}"
-  # mksquashfs does not support merging, so do it with rsync.
+  readonly KROOTFS_ASSETS="${SRC_DIR}/stadia/krootfs"
   local -r krootfs_install_dir="${KBUILD_OUTPUT}/krootfs-install"
   rm -rf "${KROOTFS}" "${krootfs_install_dir}"
   mkdir "${krootfs_install_dir}"
@@ -189,9 +187,10 @@ function build_kernel_rootfs() {
     "${MOD_INSTALL_DIR}"/ \
     "${FIRMWARE_INSTALL_DIR}"/ \
     "${PERF_INSTALL_DIR}"/ \
+    "${KROOTFS_ASSETS}"/ \
     "${krootfs_install_dir}"/
   find "${krootfs_install_dir}" -type d -exec chmod 00755 {} \;
-  find "${krootfs_install_dir}/usr/local/bin" -type f -exec chmod 00755 {} \;
+  find "${krootfs_install_dir}/usr/bin" -type f -exec chmod 00755 {} \;
   mksquashfs "${krootfs_install_dir}" "${KROOTFS}" \
     -comp xz -no-exports -all-root -no-progress -no-recovery -Xbcj x86
 }
@@ -244,7 +243,7 @@ function build_boot_disk() {
   local -r boot_disk_mount_dir="${KBUILD_OUTPUT}/boot-mount"
   rm -f "${BOOT_DISK}"
   touch "${BOOT_DISK}"
-  fallocate --zero-range --length 28M "${BOOT_DISK}"
+  fallocate --zero-range --length 32M "${BOOT_DISK}"
   /sbin/parted --script "${BOOT_DISK}" -- mklabel msdos mkpart primary ext2 \
     2048s -1s set 1 boot on
   /sbin/mkfs.ext2 -F -L GGPBOOTFS -Eoffset=1048576 "${BOOT_DISK}"
