@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - stadia/*
+      - experimental/*
+  pull_request:
+    branches:
+      - stadia/*
+      - experimental/*
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: glinux_launcher
+      run: ./kokoro/docker/glinux_launcher.sh
