@@ -37,7 +37,7 @@ mkdir -p "${BUILD_DIR}/tmp" "${BUILD_DIR}/artifacts" "${BUILD_DIR}/gfile"
 
 # Detect the container engine to use. Prefer podman.
 if hash podman 2>/dev/null; then
-  ENGINE_BIN=podman
+  ENGINE_BIN="sudo podman"
 elif hash docker 2>/dev/null; then
   ENGINE_BIN=docker
 else
