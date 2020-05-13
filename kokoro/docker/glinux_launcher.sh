@@ -35,13 +35,13 @@ fi
 
 mkdir -p "${BUILD_DIR}/tmp" "${BUILD_DIR}/artifacts" "${BUILD_DIR}/gfile"
 
-# Detect the container engine to use.
+# Detect the container engine to use. Prefer podman.
 if hash podman 2>/dev/null; then
-  ENGINE_BIN="podman --runtime /usr/local/bin/crun"
+  ENGINE_BIN=podman
 elif hash docker 2>/dev/null; then
   ENGINE_BIN=docker
 else
-  echo "No available container engine. Install docker or podman with crun."
+  echo "No available container engine. Install docker or podman."
   exit 1
 fi
 
