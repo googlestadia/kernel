@@ -136,6 +136,73 @@ function build_modules() {
   popd
 }
 
+function build_amdgpu_external_module() {
+  local -r ext_kbuild="${KBUILD_OUTPUT}"/external/amd-cloudgpu
+  rm -rf "${ext_kbuild}"
+  mkdir -p "${ext_kbuild}"
+
+  # Copy DKMS sources. Based on dkms/sources and dkms/headers.
+  pushd "${SRC_DIR}"/external/amd-cloudgpu
+  rsync -a \
+    drivers/gpu/drm/amd \
+    drivers/gpu/drm/ttm \
+    drivers/gpu/drm/scheduler \
+    drivers/gpu/drm/amd/dkms/ \
+    "${ext_kbuild}"/
+
+  mkdir -p "${ext_kbuild}"/include/drm/
+  rsync -a \
+    include/drm/ttm \
+    include/drm/gpu_scheduler.h \
+    drivers/gpu/drm/scheduler/gpu_scheduler_trace.h \
+    include/drm/amd_asic_type.h \
+    include/drm/spsc_queue.h \
+    include/drm/amd_rdma.h \
+    "${ext_kbuild}"/include/drm/
+
+  mkdir -p "${ext_kbuild}"/include/
+  rsync -a \
+    include/kcl \
+    "${ext_kbuild}"/include/
+
+  mkdir -p "${ext_kbuild}"/include/uapi/drm/
+  rsync -a \
+    include/uapi/drm/amdgpu_drm.h \
+    "${ext_kbuild}"/include/uapi/drm/
+
+  mkdir -p "${ext_kbuild}"/include/uapi/linux/
+  rsync -a \
+    include/uapi/linux/kfd_ioctl.h \
+    "${ext_kbuild}"/include/uapi/linux/
+
+  mkdir -p "${ext_kbuild}"/amd/amdkcl/
+  rsync -a \
+    drivers/dma-buf/dma-resv.c \
+    "${ext_kbuild}"/amd/amdkcl/
+
+  mkdir -p "${ext_kbuild}"/include/linux/
+  rsync -a \
+    include/linux/dma-resv.h \
+    include/kcl/reservation.h \
+    "${ext_kbuild}"/include/linux/
+  popd
+
+  pushd "${ext_kbuild}"
+  ./pre-build.sh 5.4
+  popd
+
+  pushd "${SRC_DIR}"
+  make -j "$(nproc)" \
+    M="${ext_kbuild}" "${MAKE_ARGS[@]}"
+  local -r mod_install_usr_dir="${MOD_INSTALL_DIR}/usr"
+  make -j "$(nproc)" \
+    M="${ext_kbuild}" \
+    modules_install "${MAKE_ARGS[@]}" \
+    INSTALL_MOD_PATH="${mod_install_usr_dir}" \
+    INSTALL_MOD_STRIP=1
+  popd
+}
+
 function build_kernel_rootfs() {
   # LINT.IfChange
   readonly KROOTFS="${INITRAMFS_INSTALL_DIR}/krootfs.squashfs"
@@ -304,6 +371,7 @@ function build() {
   finalize_config
   build_bzimage_and_headers
   build_modules
+  build_amdgpu_external_module
   build_perf
   build_kernel_rootfs
   build_initramfs
