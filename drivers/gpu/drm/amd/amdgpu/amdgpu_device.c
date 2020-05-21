@@ -3285,8 +3285,16 @@ fence_driver_init:
 	/* must succeed. */
 	amdgpu_ras_resume(adev);
 
-	queue_delayed_work(system_wq, &adev->delayed_init_work,
+	if (amdgpu_sriov_vf(adev)) {
+		r = amdgpu_ib_ring_tests(adev);
+		if (r) {
+			DRM_ERROR("ib ring test failed (%d).\n", r);
+			return r;
+		}
+	} else {
+		queue_delayed_work(system_wq, &adev->delayed_init_work,
 			   msecs_to_jiffies(AMDGPU_RESUME_MS));
+	}
 
 	r = device_create_file(adev->dev, &dev_attr_pcie_replay_count);
 	if (r) {
@@ -3340,7 +3348,8 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	int r;
 
 	DRM_INFO("amdgpu: finishing device.\n");
-	flush_delayed_work(&adev->delayed_init_work);
+	if (!amdgpu_sriov_vf(adev))
+		flush_delayed_work(&adev->delayed_init_work);
 	adev->shutdown = true;
 
 	/* make sure IB test finished before entering exclusive mode
@@ -3445,7 +3454,8 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 	if (fbcon)
 		amdgpu_fbdev_set_suspend(adev, 1);
 
-	cancel_delayed_work_sync(&adev->delayed_init_work);
+	if (!amdgpu_sriov_vf(adev))
+		cancel_delayed_work_sync(&adev->delayed_init_work);
 
 	if (!amdgpu_device_has_dc_support(adev)) {
 		/* turn off display hw */
@@ -3557,8 +3567,16 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon)
 	if (r)
 		return r;
 
-	queue_delayed_work(system_wq, &adev->delayed_init_work,
+	if (amdgpu_sriov_vf(adev)) {
+		r = amdgpu_ib_ring_tests(adev);
+		if (r) {
+			DRM_ERROR("ib ring test failed (%d).\n", r);
+			return r;
+		}
+	} else {
+		queue_delayed_work(system_wq, &adev->delayed_init_work,
 			   msecs_to_jiffies(AMDGPU_RESUME_MS));
+	}
 
 	if (!amdgpu_device_has_dc_support(adev)) {
 		/* pin cursors */
@@ -3583,7 +3601,8 @@ int amdgpu_device_resume(struct drm_device *dev, bool fbcon)
 		return r;
 
 	/* Make sure IB tests flushed */
-	flush_delayed_work(&adev->delayed_init_work);
+	if (!amdgpu_sriov_vf(adev))
+		flush_delayed_work(&adev->delayed_init_work);
 
 	/* blat the mode back in */
 	if (fbcon) {
@@ -4230,7 +4249,8 @@ int amdgpu_device_gpu_recover(struct amdgpu_device *adev,
 	dev_info(adev->dev, "GPU %s begin!\n",
 		(in_ras_intr && !use_baco) ? "jobs stop":"reset");
 
-	cancel_delayed_work_sync(&adev->delayed_init_work);
+	if (!amdgpu_sriov_vf(adev))
+		cancel_delayed_work_sync(&adev->delayed_init_work);
 
 	hive = amdgpu_get_xgmi_hive(adev, false);
 
