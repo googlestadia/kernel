@@ -2,12 +2,12 @@
 set -xe
 
 readonly SCRIPT_DIR=$(dirname "$(readlink -f "${0}")")
-readonly SRC_DIR=$(readlink -f "${SCRIPT_DIR}/../../..")
+readonly SRC_DIR=$(readlink -f "${SCRIPT_DIR}/..")
 readonly GCLOUD_KEY_FILE="${KOKORO_KEYSTORE_DIR}/71274_kokoro_service_key_json"
-readonly INITRAMFS_BIN_URL="gs://yeti_kernels/initramfs/initramfs-20190312.tar.gz"
+readonly INITRAMFS_BIN_URL="gs://stadia_kernel_public/initramfs/initramfs-20190312.tar.gz"
 readonly INITRAMFS_BIN_SHA256="9790f1a9a859eca95c8ca036416f0ca7d76fdd0bc41c273fcad4636caf4681d3"
-readonly AMDGPU_FIRMWARE_URL="gs://yeti_kernels/amdgpu-firmware/amdgpu-firmware-2019.3.tar.gz"
-readonly AMDGPU_FIRMWARE_SHA256="cc904ee1a9c89c2b0f80800dc43f26cf92b5fb8afc354514e85593026e12072a"
+readonly AMDGPU_FIRMWARE_URL="gs://stadia_kernel/amdgpu-firmware/amdgpu-firmware-2019.3.tar.gz"
+readonly AMDGPU_FIRMWARE_SHA256="9e30cd60622f219dedb46428ba82bb0fdd8e17cd9624f249e4a9c5bb148c7645"
 
 # Downloads a file from GCS and verifies its authenticity using a checksum.
 function download_gcs() {
