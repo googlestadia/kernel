@@ -456,6 +456,9 @@
 /* drm_vma_node_verify_access() 2nd argument is drm_file */
 #define HAVE_DRM_VMA_NODE_VERIFY_ACCESS_HAS_DRM_FILE 1
 
+/* fallthrough is supported */
+#define HAVE_FALLTHROUGH_SUPPORT 1
+
 /* fb_info_apertures() is available */
 #define HAVE_FB_INFO_APERTURES 1
 

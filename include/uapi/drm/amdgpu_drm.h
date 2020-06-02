@@ -115,6 +115,7 @@ extern "C" {
 #define AMDGPU_GEM_DOMAIN_OA		0x20
 #define AMDGPU_GEM_DOMAIN_DGMA		0x40
 #define AMDGPU_GEM_DOMAIN_DGMA_IMPORT	0x80
+#define AMDGPU_GEM_DOMAIN_DGMA_PEER 0x100 /* verylike DGMA_IMPORT but it doesn't consume domain0 GART space */
 #define AMDGPU_GEM_DOMAIN_MASK		(AMDGPU_GEM_DOMAIN_CPU | \
 					 AMDGPU_GEM_DOMAIN_GTT | \
 					 AMDGPU_GEM_DOMAIN_VRAM | \
@@ -122,7 +123,8 @@ extern "C" {
 					 AMDGPU_GEM_DOMAIN_GWS | \
 					 AMDGPU_GEM_DOMAIN_OA |\
 					 AMDGPU_GEM_DOMAIN_DGMA |\
-					 AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
+					 AMDGPU_GEM_DOMAIN_DGMA_IMPORT |\
+					 AMDGPU_GEM_DOMAIN_DGMA_PEER)
 
 /* Flag that CPU access will be required for the case of VRAM domain */
 #define AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED	(1 << 0)
@@ -366,6 +368,7 @@ union drm_amdgpu_sched {
 #define AMDGPU_GEM_USERPTR_ANONONLY	(1 << 1)
 #define AMDGPU_GEM_USERPTR_VALIDATE	(1 << 2)
 #define AMDGPU_GEM_USERPTR_REGISTER	(1 << 3)
+#define AMDGPU_GEM_USERPTR_PEERMEM  (1 << 4)
 
 struct drm_amdgpu_gem_userptr {
 	__u64		addr;

@@ -4,14 +4,13 @@ subdir-ccflags-y += \
 	-DDRM_SUB="0"
 
 subdir-ccflags-y += -include $(src)/config/config.h
-DKMS_INCLUDE_PREFIX = \
+LINUXINCLUDE := \
 	-I$(src)/include \
 	-I$(src)/include/drm \
 	-I$(src)/include/uapi \
 	-include $(src)/include/kcl/kcl_version.h \
-	-include $(src)/include/rename_symbol.h
-
-export DKMS_INCLUDE_PREFIX
+	-include $(src)/include/rename_symbol.h \
+	$(LINUXINCLUDE)
 
 export CONFIG_HSA_AMD=y
 export CONFIG_DRM_TTM=m

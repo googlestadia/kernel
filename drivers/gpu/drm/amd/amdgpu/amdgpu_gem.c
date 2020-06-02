@@ -84,6 +84,8 @@ int amdgpu_gem_object_create(struct amdgpu_device *adev, unsigned long size,
 			return -ENOMEM;
 		}
 	}
+	else if (initial_domain == AMDGPU_GEM_DOMAIN_DGMA_PEER)
+		flags |= AMDGPU_GEM_CREATE_NO_EVICT;
 
 	bp.size = size;
 	bp.byte_align = alignment;
@@ -329,6 +331,113 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 	return 0;
 }
 
+static inline dma_addr_t *amdgpu_gem_peer_dma_addr(struct device *dev, struct mm_struct *mm, struct vm_area_struct *vma)
+{
+	unsigned long address = vma->vm_start;
+	dma_addr_t *dma_addr;
+	int idx = 0;
+	pgd_t *pgd;
+	p4d_t *p4d;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+
+	dma_addr = kmalloc_array((vma->vm_end - vma->vm_start) >> PAGE_SHIFT, sizeof(dma_addr_t), GFP_KERNEL);
+	if (!dma_addr)
+		return NULL;
+
+	/* walk through page tables */
+	while (address < vma->vm_end) {
+		pgd = pgd_offset_gate(mm, address);
+		if (!pgd || pgd_none(*pgd))
+			break;
+		p4d = p4d_offset(pgd, address);
+		if (!p4d || p4d_none(*p4d))
+			break;
+		pud = pud_offset(p4d, address);
+		if (!pud || pud_none(*pud))
+			break;
+		pmd = pmd_offset(pud, address);
+		if (!pmd || pmd_none(*pmd))
+			break;
+		if (pmd_trans_huge(*pmd))
+			break;
+		pte = pte_offset_map(pmd, address);
+		if (pte_none(*pte))
+			break;
+
+		if (pfn_valid(pte_pfn(*pte))) {
+			/* for system ram we return error, user should call regular USRPTR to handle that case */
+			while (--idx > -1)
+				dma_unmap_resource(dev, dma_addr[idx], PAGE_SIZE, DMA_BIDIRECTIONAL, 0);
+
+			kfree(dma_addr);
+			return NULL;
+		} else {
+			/* it is valid to dma_map on a non-ram physical address */
+			dma_addr[idx++] = dma_map_resource(dev, pte_pfn(*pte) << PAGE_SHIFT, PAGE_SIZE, DMA_BIDIRECTIONAL, 0);
+		}
+		address += PAGE_SIZE;
+	}
+
+	if (address != vma->vm_end) {
+		kfree(dma_addr);
+		return NULL;
+	}
+
+	return dma_addr;
+}
+
+static int amdgpu_gem_userptr_peermem(struct amdgpu_device *adev,
+				 struct drm_amdgpu_gem_userptr *args, struct drm_file *filp)
+{
+	unsigned long end = args->addr + args->size;
+	struct mm_struct *mm = current->mm;
+	struct drm_gem_object *gobj;
+	struct vm_area_struct *vma;
+	struct amdgpu_bo *abo;
+	dma_addr_t *dma_addr;
+	u32 handle;
+	int r;
+
+	/* get VMA first */
+	down_read(&mm->mmap_sem);
+	vma = find_vma(mm, args->addr);
+	/* we only support user virual mapped with a vm_file backing */
+	if (!vma || !vma->vm_file || vma->vm_end < end) {
+		up_read(&mm->mmap_sem);
+		return -EINVAL;
+	}
+
+	dma_addr = amdgpu_gem_peer_dma_addr(adev->dev, mm, vma);
+	up_read(&mm->mmap_sem);
+
+	if (!dma_addr)
+		return -EINVAL;
+
+	r = amdgpu_gem_object_create(adev, args->size, 0,
+		AMDGPU_GEM_DOMAIN_DGMA_PEER, 0,
+		0, NULL, &gobj);
+	if (r)
+		goto release_dma_addr;
+
+	abo = gem_to_amdgpu_bo(gobj);
+	abo->tbo.mem.bus.base = dma_addr[0];
+	abo->tbo.mem.bus.offset = 0;
+	abo->tbo.mem.bus.addr = (void *)dma_addr;
+
+	r = drm_gem_handle_create(filp, gobj, &handle);
+	drm_gem_object_put_unlocked(gobj);
+	if (r)
+		goto release_dma_addr;
+
+	args->handle = handle;
+	return 0;
+release_dma_addr:
+	kfree(dma_addr);
+	return r;
+}
+
 int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 			     struct drm_file *filp)
 {
@@ -344,6 +453,9 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 
 	if (offset_in_page(args->addr | args->size))
 		return -EINVAL;
+
+	if (args->flags & AMDGPU_GEM_USERPTR_PEERMEM)
+		return amdgpu_gem_userptr_peermem(adev, args, filp);
 
 	/* reject unknown flag values */
 	if (args->flags & ~(AMDGPU_GEM_USERPTR_READONLY |
@@ -949,6 +1061,9 @@ static int amdgpu_debugfs_gem_bo_info(int id, void *ptr, void *data)
 		break;
 	case AMDGPU_GEM_DOMAIN_DGMA_IMPORT:
 		placement = "DGMA_IMPORT";
+		break;
+	case AMDGPU_GEM_DOMAIN_DGMA_PEER:
+		placement = "DGMA_PEER";
 		break;
 	case AMDGPU_GEM_DOMAIN_GTT:
 		placement = " GTT";

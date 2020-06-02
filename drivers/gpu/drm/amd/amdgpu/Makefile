@@ -23,15 +23,19 @@
 # Makefile for the drm device driver.  This driver provides support for the
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 
+ifeq ($(KBUILD_EXTMOD),)
+FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(srctree)/$(src))
+else
+FULL_AMD_PATH := $(patsubst %/amdgpu,%,$(src))
+endif
 ifeq (,$(BUILD_AS_DKMS))
-FULL_AMD_PATH=$(srctree)/$(src)/..
 AMDKCL_KBUILD_TAKE_PATH=1
 else
 FULL_AMD_PATH=$(src)/..
 AMDKCL_KBUILD_TAKE_PATH=1
 endif
-DISPLAY_FOLDER_NAME=display
-FULL_AMD_DISPLAY_PATH = $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
+DISPLAY_FOLDER_NAME := display
+FULL_AMD_DISPLAY_PATH := $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
 
 ccflags-y := -I$(FULL_AMD_PATH)/include/asic_reg \
 	-I$(FULL_AMD_PATH)/include \
@@ -61,7 +65,7 @@ amdgpu-y += amdgpu_device.o amdgpu_kms.o \
 	amdgpu_vf_error.o amdgpu_sched.o amdgpu_debugfs.o amdgpu_ids.o \
 	amdgpu_gmc.o amdgpu_mmhub.o amdgpu_xgmi.o amdgpu_csa.o amdgpu_ras.o amdgpu_vm_cpu.o \
 	amdgpu_vm_sdma.o amdgpu_discovery.o amdgpu_ras_eeprom.o amdgpu_nbio.o \
-	amdgpu_umc.o smu_v11_0_i2c.o amdgpu_sem.o
+	amdgpu_umc.o smu_v11_0_i2c.o amdgpu_sem.o amdgpu_fru_eeprom.o
 
 amdgpu-$(CONFIG_PERF_EVENTS) += amdgpu_pmu.o
 
@@ -218,7 +222,7 @@ amdgpu-y += $(AMD_POWERPLAY_FILES)
 
 ifneq ($(CONFIG_DRM_AMD_DC),)
 
-RELATIVE_AMD_DISPLAY_PATH = ../$(DISPLAY_FOLDER_NAME)
+RELATIVE_AMD_DISPLAY_PATH := ../$(DISPLAY_FOLDER_NAME)
 include $(FULL_AMD_DISPLAY_PATH)/Makefile
 
 amdgpu-y += $(AMD_DISPLAY_FILES)
@@ -232,8 +236,3 @@ obj-$(CONFIG_DRM_AMDGPU)+= amdgpu.o
 #if defined(BUILD_AS_DKMS)
 CFLAGS_amdgpu_trace_points.o := -I$(src)
 #endif
-
-ifeq (,$(BUILD_AS_DKMS))
-FOR_MODULE := amdgpu
-include $(FULL_AMD_PATH)/dkms/Makefile.intree
-endif

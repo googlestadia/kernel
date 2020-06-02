@@ -26,7 +26,6 @@
 
 #define SMU_11_0_PARTIAL_PPTABLE
 
-#include "pp_debug.h"
 #include "amdgpu.h"
 #include "amdgpu_smu.h"
 #include "smu_internal.h"
@@ -60,7 +59,7 @@ static int smu_v11_0_send_msg_without_waiting(struct smu_context *smu,
 					      uint16_t msg)
 {
 	struct amdgpu_device *adev = smu->adev;
-	WREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_66, msg);
+	WREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_66, msg);
 	return 0;
 }
 
@@ -68,7 +67,7 @@ static int smu_v11_0_read_arg(struct smu_context *smu, uint32_t *arg)
 {
 	struct amdgpu_device *adev = smu->adev;
 
-	*arg = RREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_82);
+	*arg = RREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_82);
 	return 0;
 }
 
@@ -78,7 +77,7 @@ static int smu_v11_0_wait_for_response(struct smu_context *smu)
 	uint32_t cur_value, i, timeout = adev->usec_timeout * 10;
 
 	for (i = 0; i < timeout; i++) {
-		cur_value = RREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_90);
+		cur_value = RREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90);
 		if ((cur_value & MP1_C2PMSG_90__CONTENT_MASK) != 0)
 			return cur_value == 0x1 ? 0 : -EIO;
 
@@ -86,7 +85,10 @@ static int smu_v11_0_wait_for_response(struct smu_context *smu)
 	}
 
 	/* timeout means wrong logic */
-	return -ETIME;
+	if (i == timeout)
+		return -ETIME;
+
+	return RREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90) == 0x1 ? 0 : -EIO;
 }
 
 int
@@ -110,9 +112,9 @@ smu_v11_0_send_msg_with_param(struct smu_context *smu,
 		goto out;
 	}
 
-	WREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_90, 0);
+	WREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90, 0);
 
-	WREG32_SOC15(MP1, 0, mmMP1_SMN_C2PMSG_82, param);
+	WREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_82, param);
 
 	smu_v11_0_send_msg_without_waiting(smu, (uint16_t)index);
 
@@ -122,6 +124,7 @@ smu_v11_0_send_msg_with_param(struct smu_context *smu,
 		       smu_get_message_name(smu, msg), index, param, ret);
 		goto out;
 	}
+
 	if (read_arg) {
 		ret = smu_v11_0_read_arg(smu, read_arg);
 		if (ret) {
@@ -733,8 +736,9 @@ int smu_v11_0_parse_pptable(struct smu_context *smu)
 	struct smu_table_context *table_context = &smu->smu_table;
 	struct smu_table *table = &table_context->tables[SMU_TABLE_PPTABLE];
 
+	/* during TDR we need to free and alloc the pptable */
 	if (table_context->driver_pptable)
-		return -EINVAL;
+		kfree(table_context->driver_pptable);
 
 	table_context->driver_pptable = kzalloc(table->size, GFP_KERNEL);
 
@@ -764,6 +768,9 @@ int smu_v11_0_write_pptable(struct smu_context *smu)
 	struct smu_table_context *table_context = &smu->smu_table;
 	int ret = 0;
 
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
+
 	ret = smu_update_table(smu, SMU_TABLE_PPTABLE, 0,
 			       table_context->driver_pptable, true);
 
@@ -773,6 +780,9 @@ int smu_v11_0_write_pptable(struct smu_context *smu)
 int smu_v11_0_set_deep_sleep_dcefclk(struct smu_context *smu, uint32_t clk)
 {
 	int ret;
+
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
 
 	ret = smu_send_smc_msg_with_param(smu,
 					  SMU_MSG_SetMinDeepSleepDcefclk, clk, NULL);
@@ -819,6 +829,9 @@ int smu_v11_0_set_tool_table_location(struct smu_context *smu)
 	int ret = 0;
 	struct smu_table *tool_table = &smu->smu_table.tables[SMU_TABLE_PMSTATUSLOG];
 
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
+
 	if (tool_table->mc_address) {
 		ret = smu_send_smc_msg_with_param(smu,
 				SMU_MSG_SetToolsDramAddrHigh,
@@ -838,6 +851,9 @@ int smu_v11_0_init_display_count(struct smu_context *smu, uint32_t count)
 {
 	int ret = 0;
 
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
+
 	if (!smu->pm_enabled)
 		return ret;
 
@@ -851,6 +867,9 @@ int smu_v11_0_set_allowed_mask(struct smu_context *smu)
 	struct smu_feature *feature = &smu->smu_feature;
 	int ret = 0;
 	uint32_t feature_mask[2];
+
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
 
 	mutex_lock(&feature->mutex);
 	if (bitmap_empty(feature->allowed, SMU_FEATURE_MAX) || feature->feature_num < 64)
@@ -879,6 +898,9 @@ int smu_v11_0_get_enabled_mask(struct smu_context *smu,
 	uint32_t feature_mask_high = 0, feature_mask_low = 0;
 	struct smu_feature *feature = &smu->smu_feature;
 	int ret = 0;
+
+	if (amdgpu_sriov_vf(smu->adev) && !amdgpu_sriov_is_pp_one_vf(smu->adev))
+		return 0;
 
 	if (!feature_mask || num < 2)
 		return -EINVAL;
@@ -909,10 +931,12 @@ int smu_v11_0_system_features_control(struct smu_context *smu,
 	uint32_t feature_mask[2];
 	int ret = 0;
 
-	ret = smu_send_smc_msg(smu, (en ? SMU_MSG_EnableAllSmuFeatures :
-				     SMU_MSG_DisableAllSmuFeatures), NULL);
-	if (ret)
-		return ret;
+	if (!amdgpu_sriov_vf(smu->adev)) {
+		ret = smu_send_smc_msg(smu, (en ? SMU_MSG_EnableAllSmuFeatures :
+									 SMU_MSG_DisableAllSmuFeatures), NULL);
+		if (ret)
+			return ret;
+	}
 
 	bitmap_zero(feature->enabled, feature->feature_num);
 	bitmap_zero(feature->supported, feature->feature_num);
@@ -934,6 +958,9 @@ int smu_v11_0_system_features_control(struct smu_context *smu,
 int smu_v11_0_notify_display_change(struct smu_context *smu)
 {
 	int ret = 0;
+
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
 
 	if (!smu->pm_enabled)
 		return ret;
@@ -1098,6 +1125,9 @@ int smu_v11_0_set_power_limit(struct smu_context *smu, uint32_t n)
 {
 	int ret = 0;
 	uint32_t max_power_limit;
+
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
 
 	max_power_limit = smu_v11_0_get_max_power_limit(smu);
 
@@ -1526,6 +1556,13 @@ int smu_v11_0_set_xgmi_pstate(struct smu_context *smu,
 	return ret;
 }
 
+static int smu_v11_0_ack_ac_dc_interrupt(struct smu_context *smu)
+{
+	return smu_send_smc_msg(smu,
+				SMU_MSG_ReenableAcDcInterrupt,
+				NULL);
+}
+
 #define THM_11_0__SRCID__THM_DIG_THERM_L2H		0		/* ASIC_TEMP > CG_THERMAL_INT.DIG_THERM_INTH  */
 #define THM_11_0__SRCID__THM_DIG_THERM_H2L		1		/* ASIC_TEMP < CG_THERMAL_INT.DIG_THERM_INTL  */
 
@@ -1559,6 +1596,9 @@ static int smu_v11_0_irq_process(struct amdgpu_device *adev,
 		break;
 
 		}
+	} else if (client_id == SOC15_IH_CLIENTID_MP1) {
+		if (src_id == 0xfe)
+			smu_v11_0_ack_ac_dc_interrupt(&adev->smu);
 	}
 
 	return 0;
@@ -1594,6 +1634,12 @@ int smu_v11_0_register_irq_handler(struct smu_context *smu)
 
 	ret = amdgpu_irq_add_id(adev, SOC15_IH_CLIENTID_THM,
 				THM_11_0__SRCID__THM_DIG_THERM_H2L,
+				irq_src);
+	if (ret)
+		return ret;
+
+	ret = amdgpu_irq_add_id(adev, SOC15_IH_CLIENTID_MP1,
+				0xfe,
 				irq_src);
 	if (ret)
 		return ret;
@@ -1834,6 +1880,9 @@ int smu_v11_0_override_pcie_parameters(struct smu_context *smu)
 	uint32_t pcie_gen = 0, pcie_width = 0;
 	int ret;
 
+	if (amdgpu_sriov_vf(smu->adev))
+		return 0;
+
 	if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN4)
 		pcie_gen = 3;
 	else if (adev->pm.pcie_gen_mask & CAIL_PCIE_LINK_SPEED_SUPPORT_GEN3)
@@ -1938,5 +1987,20 @@ int smu_v11_0_set_performance_level(struct smu_context *smu,
 		break;
 	}
 	return ret;
+}
+
+int smu_v11_0_set_power_source(struct smu_context *smu,
+			       enum smu_power_src_type power_src)
+{
+	int pwr_source;
+
+	pwr_source = smu_power_get_index(smu, (uint32_t)power_src);
+	if (pwr_source < 0)
+		return -EINVAL;
+
+	return smu_send_smc_msg_with_param(smu,
+					SMU_MSG_NotifyPowerSource,
+					pwr_source,
+					NULL);
 }
 

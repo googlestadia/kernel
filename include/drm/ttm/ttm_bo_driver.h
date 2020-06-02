@@ -447,7 +447,7 @@ extern struct ttm_bo_global {
 } ttm_bo_glob;
 
 
-#define TTM_NUM_MEM_TYPES 8
+#define TTM_NUM_MEM_TYPES 16
 
 /**
  * struct ttm_bo_device - Buffer object driver device-specific data.

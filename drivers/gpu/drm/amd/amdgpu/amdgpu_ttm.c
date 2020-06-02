@@ -140,6 +140,7 @@ static int amdgpu_init_mem_type(struct ttm_bo_device *bdev, uint32_t type,
 		man->default_caching = TTM_PL_FLAG_UNCACHED;
 		break;
 	case AMDGPU_PL_DGMA_IMPORT:
+	case AMDGPU_PL_DGMA_PEER:
 		/* reserved GTT space for direct GMA */
 		man->func = &ttm_bo_manager_func;
 		/* meaningless for this domain */
@@ -226,6 +227,7 @@ static void amdgpu_evict_flags(struct ttm_buffer_object *bo,
 		break;
 	case TTM_PL_TT:
 	case AMDGPU_PL_DGMA_IMPORT:
+	case AMDGPU_PL_DGMA_PEER:
 	default:
 		amdgpu_bo_placement_from_domain(abo, AMDGPU_GEM_DOMAIN_CPU);
 		break;
@@ -657,7 +659,8 @@ static int amdgpu_bo_move(struct ttm_buffer_object *bo, bool evict,
 		return -EINVAL;
 
 	if (old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA ||
-	    old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA_IMPORT)
+	    old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA_IMPORT ||
+		old_mem->mem_type == AMDGPU_GEM_DOMAIN_DGMA_PEER)
 		return -EINVAL;
 
 	adev = amdgpu_ttm_adev(bo->bdev);
@@ -775,6 +778,7 @@ static int amdgpu_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_
 		mem->bus.is_iomem = true;
 		break;
 	case AMDGPU_PL_DGMA_IMPORT:
+	case AMDGPU_PL_DGMA_PEER:
 		mem->bus.addr = backup.bus.addr;
 		mem->bus.offset = backup.bus.offset;
 		mem->bus.base = backup.bus.base;
@@ -797,7 +801,8 @@ static unsigned long amdgpu_ttm_io_mem_pfn(struct ttm_buffer_object *bo,
 	unsigned long offset = (page_offset << PAGE_SHIFT);
 
 	if (bo->mem.mem_type == AMDGPU_PL_DGMA ||
-			bo->mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
+			bo->mem.mem_type == AMDGPU_PL_DGMA_IMPORT ||
+			bo->mem.mem_type == AMDGPU_PL_DGMA_PEER)
 		return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT)
 			+ page_offset;
 
@@ -1529,7 +1534,7 @@ uint64_t amdgpu_ttm_tt_pte_flags(struct amdgpu_device *adev, struct ttm_tt *ttm,
 {
 	uint64_t flags = amdgpu_ttm_tt_pde_flags(ttm, mem);
 
-	if (mem && mem->mem_type == AMDGPU_PL_DGMA_IMPORT)
+	if (mem && (mem->mem_type == AMDGPU_PL_DGMA_IMPORT || mem->mem_type == AMDGPU_PL_DGMA_PEER))
 		flags |= AMDGPU_PTE_SYSTEM;
 
 	flags |= adev->gart.gart_pte_flags;
@@ -1742,6 +1747,26 @@ static int amdgpu_ttm_fw_reserve_vram_init(struct amdgpu_device *adev)
 					  &adev->fw_vram_usage.reserved_bo,
 					  &adev->fw_vram_usage.va);
 }
+
+static int amdgpu_direct_gma_peer_init(struct amdgpu_device *adev)
+{
+       unsigned long psize;
+
+       if (!amdgpu_peermem_size)
+               return 0;
+
+       psize = amdgpu_peermem_size * 256;
+       return ttm_bo_init_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_PEER, psize);
+}
+
+static int amdgpu_direct_gma_peer_fini(struct amdgpu_device *adev)
+{
+       if (!amdgpu_peermem_size)
+               return 0;
+
+       return ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_DGMA_PEER);
+}
+
 
 /*
  * Memoy training reservation functions
@@ -2065,9 +2090,11 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	 *The reserved vram for memory training must be pinned to the specified
 	 *place on the VRAM, so reserve it early.
 	 */
-	r = amdgpu_ttm_training_reserve_vram_init(adev);
-	if (r)
-		return r;
+	if (!amdgpu_sriov_vf(adev)) {
+		r = amdgpu_ttm_training_reserve_vram_init(adev);
+		if (r)
+			return r;
+	}
 
 	/* allocate memory as required for VGA
 	 * This is used for VGA emulation and pre-OS scanout buffers to
@@ -2120,6 +2147,7 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	DRM_INFO("amdgpu: %uM of GTT memory ready.\n",
 		 (unsigned)(gtt_size / (1024 * 1024)));
 
+	amdgpu_direct_gma_peer_init(adev);
 	amdgpu_direct_gma_init(adev);
 	amdgpu_ssg_init(adev);
 
@@ -2177,6 +2205,7 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 
 	amdgpu_ssg_fini(adev);
 	amdgpu_direct_gma_fini(adev);
+	amdgpu_direct_gma_peer_fini(adev);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_VRAM);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_TT);
 	ttm_bo_clean_mm(&adev->mman.bdev, AMDGPU_PL_GDS);

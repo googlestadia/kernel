@@ -508,7 +508,6 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 	fbo->base.moving = NULL;
 	drm_vma_node_reset(&fbo->base.base.vma_node);
 
-	kref_init(&fbo->base.list_kref);
 	kref_init(&fbo->base.kref);
 	fbo->base.destroy = &ttm_transfered_destroy;
 	fbo->base.acc_size = 0;
@@ -516,6 +515,7 @@ static int ttm_buffer_object_transfer(struct ttm_buffer_object *bo,
 		amdkcl_ttm_resvp(&fbo->base) = &amdkcl_ttm_resv(&fbo->base);
 
 	dma_resv_init(&amdkcl_ttm_resv(&fbo->base));
+	fbo->base.base.dev = NULL;
 	ret = dma_resv_trylock(&amdkcl_ttm_resv(&fbo->base));
 	WARN_ON(!ret);
 

@@ -618,7 +618,13 @@ static int gmc_v9_0_flush_gpu_tlb_pasid(struct amdgpu_device *adev,
 						      pasid, 2, all_hub);
 		kiq->pmf->kiq_invalidate_tlbs(ring,
 					pasid, flush_type, all_hub);
-		amdgpu_fence_emit_polling(ring, &seq);
+		r = amdgpu_fence_emit_polling(ring, &seq, MAX_KIQ_REG_WAIT);
+		if (r) {
+			amdgpu_ring_undo(ring);
+			spin_unlock(&kiq->ring_lock);
+			return -ETIME;
+		}
+
 		amdgpu_ring_commit(ring);
 		spin_unlock(&adev->gfx.kiq.ring_lock);
 		r = amdgpu_fence_wait_polling(ring, seq, adev->usec_timeout);
@@ -922,30 +928,20 @@ static int gmc_v9_0_late_init(void *handle)
 	if (r)
 		return r;
 	/* Check if ecc is available */
-	if (!amdgpu_sriov_vf(adev)) {
-		switch (adev->asic_type) {
-		case CHIP_VEGA10:
-		case CHIP_VEGA20:
-		case CHIP_ARCTURUS:
-			r = amdgpu_atomfirmware_mem_ecc_supported(adev);
-			if (!r) {
-				DRM_INFO("ECC is not present.\n");
-				if (adev->df.funcs->enable_ecc_force_par_wr_rmw)
-					adev->df.funcs->enable_ecc_force_par_wr_rmw(adev, false);
-			} else {
-				DRM_INFO("ECC is active.\n");
-			}
+	if (!amdgpu_sriov_vf(adev) && (adev->asic_type == CHIP_VEGA10)) {
+		r = amdgpu_atomfirmware_mem_ecc_supported(adev);
+		if (!r) {
+			DRM_INFO("ECC is not present.\n");
+			if (adev->df.funcs->enable_ecc_force_par_wr_rmw)
+				adev->df.funcs->enable_ecc_force_par_wr_rmw(adev, false);
+		} else
+			DRM_INFO("ECC is active.\n");
 
-			r = amdgpu_atomfirmware_sram_ecc_supported(adev);
-			if (!r) {
-				DRM_INFO("SRAM ECC is not present.\n");
-			} else {
-				DRM_INFO("SRAM ECC is active.\n");
-			}
-			break;
-		default:
-			break;
-		}
+		r = amdgpu_atomfirmware_sram_ecc_supported(adev);
+		if (!r)
+			DRM_INFO("SRAM ECC is not present.\n");
+		else
+			DRM_INFO("SRAM ECC is active.\n");
 	}
 
 	if (adev->mmhub.funcs && adev->mmhub.funcs->reset_ras_error_count)

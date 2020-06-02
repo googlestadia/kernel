@@ -4188,6 +4188,18 @@ static int vega10_force_clock_level(struct pp_hwmgr *hwmgr,
 		break;
 	}
 
+	/* just one workaround for RGP test app problem.
+	 * RGP will directly query clock after setting it in 1ms
+	 * which is not correct because when SMU response register is 1
+	 * it only means SMU has done the setting which not indicate the
+	 * actual clock archieve the target. Especially for mem clock,
+	 * it archieve the target will be later than gfx clock which may
+	 * cost 5ms therefore just wait for a while to make clk archieve
+	 * the target
+	 */
+	if (hwmgr->pp_one_vf)
+		mdelay(10);
+
 	return 0;
 }
 

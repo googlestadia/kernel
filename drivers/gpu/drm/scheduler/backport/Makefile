@@ -1,10 +1,4 @@
-
-LINUXINCLUDE := $(DKMS_INCLUDE_PREFIX) $(LINUXINCLUDE)
-
-ifndef BUILD_AS_DKMS
-ccflags-y += -include $(objtree)/$(obj)/dkms/config/config.h
-endif
-
 ccflags-y += \
 	-I$(SCHED_FULL_PATH) \
+	-include $(SCHED_FULL_PATH)/../amd/dkms/config/config.h \
 	-include backport/backport.h

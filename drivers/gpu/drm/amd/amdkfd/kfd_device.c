@@ -1136,7 +1136,7 @@ kfd_gtt_out:
 kfd_gtt_no_free_chunk:
 	pr_debug("Allocation failed with mem_obj = %p\n", mem_obj);
 	mutex_unlock(&kfd->gtt_sa_lock);
-	kfree(mem_obj);
+	kfree(*mem_obj);
 	return -ENOMEM;
 }
 

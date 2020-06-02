@@ -16,18 +16,13 @@ $(TTM_NAME)-$(CONFIG_DRM_TTM_DMA_PAGE_POOL) += ttm_page_alloc_dma.o
 
 obj-$(CONFIG_DRM_TTM) += $(TTM_NAME).o
 
-ifeq (,$(BUILD_AS_DKMS))
-TTM_FULL_PATH = $(srctree)/$(src)
+ifeq ($(KBUILD_EXTMOD),)
+TTM_FULL_PATH := $(srctree)/$(src)
 else
-TTM_FULL_PATH = $(src)
+TTM_FULL_PATH := $(src)
 endif
 include $(TTM_FULL_PATH)/backport/Makefile
 
 #if defined(BUILD_AS_DKMS)
 CFLAGS_ttm_tracepoints.o := -I$(src)
 #endif
-
-ifeq (,$(BUILD_AS_DKMS))
-FOR_MODULE := $(TTM_NAME)
-include $(TTM_FULL_PATH)/../amd/dkms/Makefile.intree
-endif

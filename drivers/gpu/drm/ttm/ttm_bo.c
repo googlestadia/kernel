@@ -152,30 +152,6 @@ static inline uint32_t ttm_bo_type_flags(unsigned type)
 	return 1 << (type);
 }
 
-static void ttm_bo_release_list(struct kref *list_kref)
-{
-	struct ttm_buffer_object *bo =
-	    container_of(list_kref, struct ttm_buffer_object, list_kref);
-	size_t acc_size = bo->acc_size;
-
-	BUG_ON(kref_read(&bo->list_kref));
-	BUG_ON(kref_read(&bo->kref));
-	BUG_ON(bo->mem.mm_node != NULL);
-	BUG_ON(!list_empty(&bo->lru));
-	BUG_ON(!list_empty(&bo->ddestroy));
-	ttm_tt_destroy(bo->ttm);
-	atomic_dec(&ttm_bo_glob.bo_count);
-	dma_fence_put(bo->moving);
-	if (!ttm_bo_uses_embedded_gem_object(bo))
-		dma_resv_fini(&amdkcl_ttm_resv(bo));
-#ifndef HAVE_DRM_GEM_OBJECT_RESV
-	dma_resv_fini(&amdkcl_ttm_resv(bo));
-#endif
-	mutex_destroy(&bo->wu_mutex);
-	bo->destroy(bo);
-	ttm_mem_global_free(&ttm_mem_glob, acc_size);
-}
-
 static void ttm_bo_add_mem_to_lru(struct ttm_buffer_object *bo,
 				  struct ttm_mem_reg *mem)
 {
@@ -192,19 +168,12 @@ static void ttm_bo_add_mem_to_lru(struct ttm_buffer_object *bo,
 
 	man = &bdev->man[mem->mem_type];
 	list_add_tail(&bo->lru, &man->lru[bo->priority]);
-	kref_get(&bo->list_kref);
 
 	if (!(man->flags & TTM_MEMTYPE_FLAG_FIXED) && bo->ttm &&
 	    !(bo->ttm->page_flags & (TTM_PAGE_FLAG_SG |
 				     TTM_PAGE_FLAG_SWAPPED))) {
 		list_add_tail(&bo->swap, &ttm_bo_glob.swap_lru[bo->priority]);
-		kref_get(&bo->list_kref);
 	}
-}
-
-static void ttm_bo_ref_bug(struct kref *list_kref)
-{
-	BUG();
 }
 
 static void ttm_bo_del_from_lru(struct ttm_buffer_object *bo)
@@ -214,12 +183,10 @@ static void ttm_bo_del_from_lru(struct ttm_buffer_object *bo)
 
 	if (!list_empty(&bo->swap)) {
 		list_del_init(&bo->swap);
-		kref_put(&bo->list_kref, ttm_bo_ref_bug);
 		notify = true;
 	}
 	if (!list_empty(&bo->lru)) {
 		list_del_init(&bo->lru);
-		kref_put(&bo->list_kref, ttm_bo_ref_bug);
 		notify = true;
 	}
 
@@ -439,8 +406,19 @@ static int ttm_bo_individualize_resv(struct ttm_buffer_object *bo)
 	BUG_ON(!dma_resv_trylock(&amdkcl_ttm_resv(bo)));
 
 	r = dma_resv_copy_fences(&amdkcl_ttm_resv(bo), amdkcl_ttm_resvp(bo));
+	dma_resv_unlock(&amdkcl_ttm_resv(bo));
 	if (r)
-		dma_resv_unlock(&amdkcl_ttm_resv(bo));
+		return r;
+
+	if (bo->type != ttm_bo_type_sg) {
+		/* This works because the BO is about to be destroyed and nobody
+		 * reference it any more. The only tricky case is the trylock on
+		 * the resv object while holding the lru_lock.
+		 */
+		spin_lock(&ttm_bo_glob.lru_lock);
+		amdkcl_ttm_resvp(bo) = &amdkcl_ttm_resv(bo);
+		spin_unlock(&ttm_bo_glob.lru_lock);
+	}
 
 	return r;
 }
@@ -467,66 +445,10 @@ static void ttm_bo_flush_all_fences(struct ttm_buffer_object *bo)
 	rcu_read_unlock();
 }
 
-static void ttm_bo_cleanup_refs_or_queue(struct ttm_buffer_object *bo)
-{
-	struct ttm_bo_device *bdev = bo->bdev;
-	int ret;
-
-	ret = ttm_bo_individualize_resv(bo);
-	if (ret) {
-		/* Last resort, if we fail to allocate memory for the
-		 * fences block for the BO to become idle
-		 */
-		dma_resv_wait_timeout_rcu(amdkcl_ttm_resvp(bo), true, false,
-						    30 * HZ);
-		spin_lock(&ttm_bo_glob.lru_lock);
-		goto error;
-	}
-
-	spin_lock(&ttm_bo_glob.lru_lock);
-	ret = dma_resv_trylock(amdkcl_ttm_resvp(bo)) ? 0 : -EBUSY;
-	if (!ret) {
-		if (dma_resv_test_signaled_rcu(&amdkcl_ttm_resv(bo), true)) {
-			ttm_bo_del_from_lru(bo);
-			spin_unlock(&ttm_bo_glob.lru_lock);
-			if (amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo))
-				dma_resv_unlock(&amdkcl_ttm_resv(bo));
-
-			ttm_bo_cleanup_memtype_use(bo);
-			dma_resv_unlock(amdkcl_ttm_resvp(bo));
-			return;
-		}
-
-		ttm_bo_flush_all_fences(bo);
-
-		/*
-		 * Make NO_EVICT bos immediately available to
-		 * shrinkers, now that they are queued for
-		 * destruction.
-		 */
-		if (bo->mem.placement & TTM_PL_FLAG_NO_EVICT) {
-			bo->mem.placement &= ~TTM_PL_FLAG_NO_EVICT;
-			ttm_bo_move_to_lru_tail(bo, NULL);
-		}
-
-		dma_resv_unlock(amdkcl_ttm_resvp(bo));
-	}
-	if (amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo))
-		dma_resv_unlock(&amdkcl_ttm_resv(bo));
-
-error:
-	kref_get(&bo->list_kref);
-	list_add_tail(&bo->ddestroy, &bdev->ddestroy);
-	spin_unlock(&ttm_bo_glob.lru_lock);
-
-	schedule_delayed_work(&bdev->wq,
-			      ((HZ / 100) < 1) ? 1 : HZ / 100);
-}
-
 /**
  * function ttm_bo_cleanup_refs
- * If bo idle, remove from delayed- and lru lists, and unref.
- * If not idle, do nothing.
+ * If bo idle, remove from lru lists, and unref.
+ * If not idle, block if possible.
  *
  * Must be called with lru_lock and reservation held, this function
  * will drop the lru lock and optionally the reservation lock before returning.
@@ -588,13 +510,13 @@ static int ttm_bo_cleanup_refs(struct ttm_buffer_object *bo,
 
 	ttm_bo_del_from_lru(bo);
 	list_del_init(&bo->ddestroy);
-	kref_put(&bo->list_kref, ttm_bo_ref_bug);
-
 	spin_unlock(&ttm_bo_glob.lru_lock);
 	ttm_bo_cleanup_memtype_use(bo);
 
 	if (unlock_resv)
 		dma_resv_unlock(amdkcl_ttm_resvp(bo));
+
+	ttm_bo_put(bo);
 
 	return 0;
 }
@@ -617,8 +539,9 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 
 		bo = list_first_entry(&bdev->ddestroy, struct ttm_buffer_object,
 				      ddestroy);
-		kref_get(&bo->list_kref);
 		list_move_tail(&bo->ddestroy, &removed);
+		if (!ttm_bo_get_unless_zero(bo))
+			continue;
 
 		if (remove_all || amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo)) {
 			spin_unlock(&glob->lru_lock);
@@ -633,7 +556,7 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 			spin_unlock(&glob->lru_lock);
 		}
 
-		kref_put(&bo->list_kref, ttm_bo_release_list);
+		ttm_bo_put(bo);
 		spin_lock(&glob->lru_lock);
 	}
 	list_splice_tail(&removed, &bdev->ddestroy);
@@ -659,16 +582,68 @@ static void ttm_bo_release(struct kref *kref)
 	    container_of(kref, struct ttm_buffer_object, kref);
 	struct ttm_bo_device *bdev = bo->bdev;
 	struct ttm_mem_type_manager *man = &bdev->man[bo->mem.mem_type];
+	size_t acc_size = bo->acc_size;
+	int ret;
 
-	if (bo->bdev->driver->release_notify)
-		bo->bdev->driver->release_notify(bo);
+	if (!bo->deleted) {
+		ret = ttm_bo_individualize_resv(bo);
+		if (ret) {
+			/* Last resort, if we fail to allocate memory for the
+			 * fences block for the BO to become idle
+			 */
+			dma_resv_wait_timeout_rcu(amdkcl_ttm_resvp(bo), true, false,
+						  30 * HZ);
+		}
 
-	drm_vma_offset_remove(bdev->vma_manager, &bo->base.vma_node);
-	ttm_mem_io_lock(man, false);
-	ttm_mem_io_free_vm(bo);
-	ttm_mem_io_unlock(man);
-	ttm_bo_cleanup_refs_or_queue(bo);
-	kref_put(&bo->list_kref, ttm_bo_release_list);
+		if (bo->bdev->driver->release_notify)
+			bo->bdev->driver->release_notify(bo);
+
+		drm_vma_offset_remove(bdev->vma_manager, &bo->base.vma_node);
+		ttm_mem_io_lock(man, false);
+		ttm_mem_io_free_vm(bo);
+		ttm_mem_io_unlock(man);
+	}
+
+	if (!dma_resv_test_signaled_rcu(amdkcl_ttm_resvp(bo), true)) {
+		/* The BO is not idle, resurrect it for delayed destroy */
+		ttm_bo_flush_all_fences(bo);
+		bo->deleted = true;
+
+		spin_lock(&ttm_bo_glob.lru_lock);
+
+		/*
+		 * Make NO_EVICT bos immediately available to
+		 * shrinkers, now that they are queued for
+		 * destruction.
+		 */
+		if (bo->mem.placement & TTM_PL_FLAG_NO_EVICT) {
+			bo->mem.placement &= ~TTM_PL_FLAG_NO_EVICT;
+			ttm_bo_move_to_lru_tail(bo, NULL);
+		}
+
+		kref_init(&bo->kref);
+		list_add_tail(&bo->ddestroy, &bdev->ddestroy);
+		spin_unlock(&ttm_bo_glob.lru_lock);
+
+		schedule_delayed_work(&bdev->wq,
+				      ((HZ / 100) < 1) ? 1 : HZ / 100);
+		return;
+	}
+
+	spin_lock(&ttm_bo_glob.lru_lock);
+	ttm_bo_del_from_lru(bo);
+	list_del(&bo->ddestroy);
+	spin_unlock(&ttm_bo_glob.lru_lock);
+
+	ttm_bo_cleanup_memtype_use(bo);
+
+	BUG_ON(bo->mem.mm_node != NULL);
+	atomic_dec(&ttm_bo_glob.bo_count);
+	dma_fence_put(bo->moving);
+	if (!ttm_bo_uses_embedded_gem_object(bo))
+		dma_resv_fini(&amdkcl_ttm_resv(bo));
+	bo->destroy(bo);
+	ttm_mem_global_free(&ttm_mem_glob, acc_size);
 }
 
 void ttm_bo_put(struct ttm_buffer_object *bo)
@@ -771,8 +746,7 @@ static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
 
 	if (amdkcl_ttm_resvp(bo) == ctx->resv) {
 		dma_resv_assert_held(amdkcl_ttm_resvp(bo));
-		if (ctx->flags & TTM_OPT_FLAG_ALLOW_RES_EVICT
-		    || !list_empty(&bo->ddestroy))
+		if (ctx->flags & TTM_OPT_FLAG_ALLOW_RES_EVICT)
 			ret = true;
 		*locked = false;
 		if (busy)
@@ -853,6 +827,11 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 					dma_resv_unlock(amdkcl_ttm_resvp(bo));
 				continue;
 			}
+			if (!ttm_bo_get_unless_zero(bo)) {
+				if (locked)
+					dma_resv_unlock(amdkcl_ttm_resvp(bo));
+				continue;
+			}
 			break;
 		}
 
@@ -864,21 +843,19 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 	}
 
 	if (!bo) {
-		if (busy_bo)
-			kref_get(&busy_bo->list_kref);
+		if (busy_bo && !ttm_bo_get_unless_zero(busy_bo))
+			busy_bo = NULL;
 		spin_unlock(&ttm_bo_glob.lru_lock);
 		ret = ttm_mem_evict_wait_busy(busy_bo, ctx, ticket);
 		if (busy_bo)
-			kref_put(&busy_bo->list_kref, ttm_bo_release_list);
+			ttm_bo_put(busy_bo);
 		return ret;
 	}
 
-	kref_get(&bo->list_kref);
-
-	if (!list_empty(&bo->ddestroy)) {
+	if (bo->deleted) {
 		ret = ttm_bo_cleanup_refs(bo, ctx->interruptible,
 					  ctx->no_wait_gpu, locked);
-		kref_put(&bo->list_kref, ttm_bo_release_list);
+		ttm_bo_put(bo);
 		return ret;
 	}
 
@@ -888,7 +865,7 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 	if (locked)
 		ttm_bo_unreserve(bo);
 
-	kref_put(&bo->list_kref, ttm_bo_release_list);
+	ttm_bo_put(bo);
 	return ret;
 }
 
@@ -1300,7 +1277,6 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 	bo->destroy = destroy ? destroy : ttm_bo_default_destroy;
 
 	kref_init(&bo->kref);
-	kref_init(&bo->list_kref);
 	INIT_LIST_HEAD(&bo->lru);
 	INIT_LIST_HEAD(&bo->ddestroy);
 	INIT_LIST_HEAD(&bo->swap);
@@ -1825,11 +1801,18 @@ int ttm_bo_swapout(struct ttm_bo_global *glob, struct ttm_operation_ctx *ctx)
 	spin_lock(&glob->lru_lock);
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
 		list_for_each_entry(bo, &glob->swap_lru[i], swap) {
-			if (ttm_bo_evict_swapout_allowable(bo, ctx, &locked,
-							   NULL)) {
-				ret = 0;
-				break;
+			if (!ttm_bo_evict_swapout_allowable(bo, ctx, &locked,
+							    NULL))
+				continue;
+
+			if (!ttm_bo_get_unless_zero(bo)) {
+				if (locked)
+					dma_resv_unlock(amdkcl_ttm_resvp(bo));
+				continue;
 			}
+
+			ret = 0;
+			break;
 		}
 		if (!ret)
 			break;
@@ -1840,11 +1823,9 @@ int ttm_bo_swapout(struct ttm_bo_global *glob, struct ttm_operation_ctx *ctx)
 		return ret;
 	}
 
-	kref_get(&bo->list_kref);
-
-	if (!list_empty(&bo->ddestroy)) {
+	if (bo->deleted) {
 		ret = ttm_bo_cleanup_refs(bo, false, false, locked);
-		kref_put(&bo->list_kref, ttm_bo_release_list);
+		ttm_bo_put(bo);
 		return ret;
 	}
 
@@ -1898,7 +1879,7 @@ out:
 	 */
 	if (locked)
 		dma_resv_unlock(amdkcl_ttm_resvp(bo));
-	kref_put(&bo->list_kref, ttm_bo_release_list);
+	ttm_bo_put(bo);
 	return ret;
 }
 EXPORT_SYMBOL(ttm_bo_swapout);

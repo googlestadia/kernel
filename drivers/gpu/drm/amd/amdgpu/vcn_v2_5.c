@@ -308,25 +308,16 @@ done:
 static int vcn_v2_5_hw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct amdgpu_ring *ring;
-	int i, j;
+	int i;
 
 	for (i = 0; i < adev->vcn.num_vcn_inst; ++i) {
 		if (adev->vcn.harvest_config & (1 << i))
 			continue;
-		ring = &adev->vcn.inst[i].ring_dec;
 
 		if ((adev->pg_flags & AMD_PG_SUPPORT_VCN_DPG) ||
 		    (adev->vcn.cur_state != AMD_PG_STATE_GATE &&
 		     RREG32_SOC15(VCN, i, mmUVD_STATUS)))
 			vcn_v2_5_set_powergating_state(adev, AMD_PG_STATE_GATE);
-
-		ring->sched.ready = false;
-
-		for (j = 0; j < adev->vcn.num_enc_rings; ++j) {
-			ring = &adev->vcn.inst[i].ring_enc[j];
-			ring->sched.ready = false;
-		}
 	}
 
 	return 0;
@@ -1673,7 +1664,7 @@ static int vcn_v2_5_set_clockgating_state(void *handle,
 		return 0;
 
 	if (enable) {
-		if (vcn_v2_5_is_idle(handle))
+		if (!vcn_v2_5_is_idle(handle))
 			return -EBUSY;
 		vcn_v2_5_enable_clock_gating(adev);
 	} else {

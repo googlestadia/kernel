@@ -92,6 +92,9 @@ void amdgpu_pm_acpi_event_handler(struct amdgpu_device *adev)
 		if (adev->powerplay.pp_funcs->enable_bapm)
 			amdgpu_dpm_enable_bapm(adev, adev->pm.ac_power);
 		mutex_unlock(&adev->pm.mutex);
+
+		if (is_support_sw_smu(adev))
+			smu_set_ac_dc(&adev->smu);
 	}
 }
 
@@ -3264,26 +3267,27 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 		return ret;
 	}
 
-
-	ret = device_create_file(adev->dev, &dev_attr_pp_num_states);
-	if (ret) {
-		DRM_ERROR("failed to create device file pp_num_states\n");
-		return ret;
-	}
-	ret = device_create_file(adev->dev, &dev_attr_pp_cur_state);
-	if (ret) {
-		DRM_ERROR("failed to create device file pp_cur_state\n");
-		return ret;
-	}
-	ret = device_create_file(adev->dev, &dev_attr_pp_force_state);
-	if (ret) {
-		DRM_ERROR("failed to create device file pp_force_state\n");
-		return ret;
-	}
-	ret = device_create_file(adev->dev, &dev_attr_pp_table);
-	if (ret) {
-		DRM_ERROR("failed to create device file pp_table\n");
-		return ret;
+	if (!amdgpu_sriov_vf(adev)) {
+		ret = device_create_file(adev->dev, &dev_attr_pp_num_states);
+		if (ret) {
+			DRM_ERROR("failed to create device file pp_num_states\n");
+			return ret;
+		}
+		ret = device_create_file(adev->dev, &dev_attr_pp_cur_state);
+		if (ret) {
+			DRM_ERROR("failed to create device file pp_cur_state\n");
+			return ret;
+		}
+		ret = device_create_file(adev->dev, &dev_attr_pp_force_state);
+		if (ret) {
+			DRM_ERROR("failed to create device file pp_force_state\n");
+			return ret;
+		}
+		ret = device_create_file(adev->dev, &dev_attr_pp_table);
+		if (ret) {
+			DRM_ERROR("failed to create device file pp_table\n");
+			return ret;
+		}
 	}
 
 	ret = device_create_file(adev->dev, &dev_attr_pp_dpm_sclk);
@@ -3330,6 +3334,13 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 			return ret;
 		}
 	}
+
+	/* the reset are not needed for SRIOV one vf mode */
+	if (amdgpu_sriov_vf(adev)) {
+		adev->pm.sysfs_initialized = true;
+		return ret;
+	}
+
 	if (adev->asic_type != CHIP_ARCTURUS) {
 		ret = device_create_file(adev->dev, &dev_attr_pp_dpm_pcie);
 		if (ret) {

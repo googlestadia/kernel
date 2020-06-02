@@ -223,6 +223,10 @@ static int vcn_v2_0_hw_init(void *handle)
 	if (r)
 		goto done;
 
+	//Disable vcn decode for sriov
+	if (amdgpu_sriov_vf(adev))
+		ring->sched.ready = false;
+
 	for (i = 0; i < adev->vcn.num_enc_rings; ++i) {
 		ring = &adev->vcn.inst->ring_enc[i];
 		r = amdgpu_ring_test_helper(ring);
@@ -248,20 +252,11 @@ done:
 static int vcn_v2_0_hw_fini(void *handle)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
-	struct amdgpu_ring *ring = &adev->vcn.inst->ring_dec;
-	int i;
 
 	if ((adev->pg_flags & AMD_PG_SUPPORT_VCN_DPG) ||
 	    (adev->vcn.cur_state != AMD_PG_STATE_GATE &&
 	      RREG32_SOC15(VCN, 0, mmUVD_STATUS)))
 		vcn_v2_0_set_powergating_state(adev, AMD_PG_STATE_GATE);
-
-	ring->sched.ready = false;
-
-	for (i = 0; i < adev->vcn.num_enc_rings; ++i) {
-		ring = &adev->vcn.inst->ring_enc[i];
-		ring->sched.ready = false;
-	}
 
 	return 0;
 }
@@ -1251,7 +1246,7 @@ static int vcn_v2_0_set_clockgating_state(void *handle,
 
 	if (enable) {
 		/* wait for STATUS to clear */
-		if (vcn_v2_0_is_idle(handle))
+		if (!vcn_v2_0_is_idle(handle))
 			return -EBUSY;
 		vcn_v2_0_enable_clock_gating(adev);
 	} else {

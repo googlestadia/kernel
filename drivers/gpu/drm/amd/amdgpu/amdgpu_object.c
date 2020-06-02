@@ -77,7 +77,8 @@ static void amdgpu_bo_destroy(struct ttm_buffer_object *tbo)
 	struct amdgpu_device *adev = amdgpu_ttm_adev(tbo->bdev);
 	struct amdgpu_bo *bo = ttm_to_amdgpu_bo(tbo);
 
-	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT)
+	if (bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_IMPORT ||
+		bo->tbo.mem.mem_type == AMDGPU_PL_DGMA_PEER)
 		kfree(tbo->mem.bus.addr);
 	if (bo->pin_count > 0)
 		amdgpu_bo_subtract_pin_size(bo);
@@ -145,6 +146,14 @@ void amdgpu_bo_placement_from_domain(struct amdgpu_bo *abo, u32 domain)
 		places[c].lpfn = 0;
 		places[c].flags = TTM_PL_FLAG_WC | TTM_PL_FLAG_UNCACHED |
 			AMDGPU_PL_FLAG_DGMA_IMPORT | TTM_PL_FLAG_NO_EVICT;
+		c++;
+	}
+
+	if (domain & AMDGPU_GEM_DOMAIN_DGMA_PEER) {
+		places[c].fpfn = 0;
+		places[c].lpfn = 0;
+		places[c].flags = TTM_PL_FLAG_WC | TTM_PL_FLAG_UNCACHED |
+			AMDGPU_PL_FLAG_DGMA_PEER | TTM_PL_FLAG_NO_EVICT;
 		c++;
 	}
 
@@ -637,12 +646,17 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 		bo->flags &= ~AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 
 	if (((bp->flags & AMDGPU_GEM_CREATE_NO_EVICT) && amdgpu_no_evict) ||
-	    bp->domain & (AMDGPU_GEM_DOMAIN_DGMA | AMDGPU_GEM_DOMAIN_DGMA_IMPORT)) {
-		r = amdgpu_bo_reserve(bo, false);
-		if (unlikely(r != 0))
-			return r;
+	    bp->domain & (AMDGPU_GEM_DOMAIN_DGMA | AMDGPU_GEM_DOMAIN_DGMA_IMPORT |
+						AMDGPU_GEM_DOMAIN_DGMA_PEER)) {
+
+		if (!bp->resv) {
+			r = amdgpu_bo_reserve(bo, false);
+			if (unlikely(r != 0))
+				return r;
+		}
 		r = amdgpu_bo_pin(bo, bp->domain);
-		amdgpu_bo_unreserve(bo);
+		if (!bp->resv)
+			amdgpu_bo_unreserve(bo);
 	}
 
 	return 0;
@@ -1339,6 +1353,12 @@ void amdgpu_bo_release_notify(struct ttm_buffer_object *bo)
 
 	if (abo->kfd_bo)
 		amdgpu_amdkfd_unreserve_memory_limit(abo);
+
+	/* We only remove the fence if the resv has individualized. */
+	WARN_ON_ONCE(bo->type == ttm_bo_type_kernel
+			&& amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo));
+	if (amdkcl_ttm_resvp(bo) == &amdkcl_ttm_resv(bo))
+		amdgpu_amdkfd_remove_fence_on_pt_pd_bos(abo);
 
 	if (bo->mem.mem_type != TTM_PL_VRAM || !bo->mem.mm_node ||
 	    !(abo->flags & AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE))

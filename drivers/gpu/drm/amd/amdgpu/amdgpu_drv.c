@@ -90,7 +90,7 @@
 #define KMS_DRIVER_MINOR	36
 #define KMS_DRIVER_PATCHLEVEL	0
 
-#define AMDGPU_VERSION		"5.4.9"
+#define AMDGPU_VERSION		"5.4.10"
 
 int amdgpu_vram_limit = 0;
 int amdgpu_vis_vram_limit = 0;
@@ -127,8 +127,8 @@ int amdgpu_direct_gma_size = 0;
 int amdgpu_ssg_enabled = 0;
 uint amdgpu_pcie_gen_cap = 0;
 uint amdgpu_pcie_lane_cap = 0;
-uint amdgpu_cg_mask = 0xffffffff;
-uint amdgpu_pg_mask = 0xffffffff;
+uint amdgpu_cg_mask;
+uint amdgpu_pg_mask;
 uint amdgpu_sdma_phase_quantum = 32;
 char *amdgpu_disable_cu = NULL;
 char *amdgpu_virtual_display = NULL;
@@ -139,6 +139,7 @@ int amdgpu_job_hang_limit = 0;
 int amdgpu_lbpw = -1;
 int amdgpu_compute_multipipe = -1;
 int amdgpu_gpu_recovery = -1; /* auto */
+int amdgpu_peermem_size = 32;
 int amdgpu_emu_mode = 0;
 uint amdgpu_smu_memory_pool_size = 0;
 /* FBC (bit 0) disabled by default*/
@@ -436,17 +437,17 @@ module_param_named(pcie_lane_cap, amdgpu_pcie_lane_cap, uint, 0444);
 /**
  * DOC: cg_mask (uint)
  * Override Clockgating features enabled on GPU (0 = disable clock gating). See the AMD_CG_SUPPORT flags in
- * drivers/gpu/drm/amd/include/amd_shared.h. The default is 0xffffffff (all enabled).
+ * drivers/gpu/drm/amd/include/amd_shared.h. The default is 0x00000000 (all disabled).
  */
-MODULE_PARM_DESC(cg_mask, "Clockgating flags mask (0 = disable clock gating)");
+MODULE_PARM_DESC(cg_mask, "Clockgating flags mask (0 = disable clock gating(default))");
 module_param_named(cg_mask, amdgpu_cg_mask, uint, 0444);
 
 /**
  * DOC: pg_mask (uint)
  * Override Powergating features enabled on GPU (0 = disable power gating). See the AMD_PG_SUPPORT flags in
- * drivers/gpu/drm/amd/include/amd_shared.h. The default is 0xffffffff (all enabled).
+ * drivers/gpu/drm/amd/include/amd_shared.h. The default is 0x00000000 (all disabled).
  */
-MODULE_PARM_DESC(pg_mask, "Powergating flags mask (0 = disable power gating)");
+MODULE_PARM_DESC(pg_mask, "Powergating flags mask (0 = disable power gating(default))");
 module_param_named(pg_mask, amdgpu_pg_mask, uint, 0444);
 
 /**
@@ -519,6 +520,9 @@ module_param_named(ras_enable, amdgpu_ras_enable, int, 0444);
  */
 MODULE_PARM_DESC(ras_mask, "Mask of RAS features to enable (default 0xffffffff), only valid when ras_enable == 1");
 module_param_named(ras_mask, amdgpu_ras_mask, uint, 0444);
+
+MODULE_PARM_DESC(peermem_size, "Peer device mem access size in megabytes (default 32MB)");
+module_param_named(peermem_size, amdgpu_peermem_size, int, 0444);
 
 /**
  * DOC: si_support (int)
@@ -1151,7 +1155,9 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
 
 	pci_set_drvdata(pdev, dev);
 
-	amdgpu_driver_load_kms(dev, ent->driver_data);
+	ret = amdgpu_driver_load_kms(dev, ent->driver_data);
+	if (ret)
+		goto err_pci;
 
 retry_init:
 	ret = drm_dev_register(dev, ent->driver_data);
@@ -1187,7 +1193,7 @@ amdgpu_pci_remove(struct pci_dev *pdev)
 #endif
 		DRM_ERROR("Hotplug removal is not supported\n");
 #ifdef HAVE_DRM_DEV_UNPLUG
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0)
 	drm_dev_get(dev);
 #endif
 	drm_dev_unplug(dev);
