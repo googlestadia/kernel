@@ -258,9 +258,10 @@ static void xgpu_ai_mailbox_flr_work(struct work_struct *work)
 	 * which means host side had finished this VF's FLR.
 	 */
 	locked = mutex_trylock(&adev->lock_reset);
-	if (locked)
-		adev->in_gpu_reset = true;
+	if (!locked)
+		return;
 
+	adev->in_gpu_reset = true;
 	do {
 		if (xgpu_ai_mailbox_peek_msg(adev) == IDH_FLR_NOTIFICATION_CMPL)
 			goto flr_done;
@@ -270,14 +271,11 @@ static void xgpu_ai_mailbox_flr_work(struct work_struct *work)
 	} while (timeout > 1);
 
 flr_done:
-	if (locked) {
-		adev->in_gpu_reset = false;
-		mutex_unlock(&adev->lock_reset);
-	}
+	adev->in_gpu_reset = false;
+	mutex_unlock(&adev->lock_reset);
 
 	/* Trigger recovery for world switch failure if no TDR */
-	if (amdgpu_device_should_recover_gpu(adev)
-		&& adev->sdma_timeout == MAX_SCHEDULE_TIMEOUT)
+	if (amdgpu_device_should_recover_gpu(adev))
 		amdgpu_device_gpu_recover(adev, NULL);
 }
 
