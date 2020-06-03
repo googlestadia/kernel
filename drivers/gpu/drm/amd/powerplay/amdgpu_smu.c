@@ -1325,12 +1325,15 @@ static int smu_start_smc_engine(struct smu_context *smu)
 
 static int smu_hw_init(void *handle)
 {
-	int ret;
+	int ret = 0;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
 
-	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev))
-		return 0;
+	/* SMU is supported only in 1 VF mode on SRIOV */
+	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev)) {
+		smu->pm_enabled = false;
+		return ret;
+	}
 
 	ret = smu_start_smc_engine(smu);
 	if (ret) {
