@@ -1,1 +1,0 @@
-gcr.io/stadia-open-source/build/kernel@sha256:476f6e5d2c4f4ef4ec25773d1b1a9bb48cf9d65a1275adad39611f8ed0185e8f
