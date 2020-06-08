@@ -71,7 +71,7 @@ ${ENGINE_BIN} run \
   --env "DOCKER_SRC_DIR=/workspace/src/kernel" \
   --net=host \
   --privileged=true \
-  -t $(cat "${SCRIPT_DIR}/image.sh") \
+  -t gcr.io/stadia-open-source/kernel/debian9:latest \
   /container_tools/fix_permissions.sh --user "$(id -u):$(id -g)" \
   -- \
   /workspace/src/kernel/kokoro/build.sh
