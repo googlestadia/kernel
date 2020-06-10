@@ -38,7 +38,11 @@ static int prepend(char **buffer, int buflen, const char *str, int namelen)
 
 #define CHROOT_NSCONNECT (PATH_CHROOT_REL | PATH_CHROOT_NSCONNECT)
 
-/* If the path is not connected to the expected root,
+/* Try finding the real vfsmount from the path first. If such is
+ * found, it means that the mount was privately cloned. In this
+ * case, we can get the path through the real vfsmount.
+ * 
+ * Otherwise, if the path is not connected to the expected root,
  * check if it is a sysctl and handle specially else remove any
  * leading / that __d_path may have returned.
  * Unless
@@ -53,6 +57,22 @@ static int disconnect(const struct path *path, char *buf, char **name,
 		      int flags, const char *disconnected)
 {
 	int error = 0;
+	int isdir = (flags & PATH_IS_DIR) ? 1 : 0;
+	int buflen = aa_g_path_max - isdir;
+
+	// Get the path through the real vfsmount if such is found.
+	struct path real_path = *path;
+	real_path.mnt = real_vfsmount(path);
+	if (real_path.mnt != path->mnt) {
+		char *res = d_absolute_path(&real_path, buf, buflen);
+		if (IS_ERR(res)) {
+			error = PTR_ERR(res);
+			*name = buf;
+		} else {
+			*name = res;
+		}
+		return error;
+	}
 
 	if (!(flags & PATH_CONNECT_PATH) &&
 	    !(((flags & CHROOT_NSCONNECT) == CHROOT_NSCONNECT) &&

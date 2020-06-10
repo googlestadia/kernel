@@ -115,4 +115,6 @@ retry_estale(const long error, const unsigned int flags)
 	return error == -ESTALE && !(flags & LOOKUP_REVAL);
 }
 
+extern struct vfsmount *real_vfsmount(struct path *path);
+
 #endif /* _LINUX_NAMEI_H */

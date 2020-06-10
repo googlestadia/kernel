@@ -4863,3 +4863,27 @@ const struct inode_operations page_symlink_inode_operations = {
 	.get_link	= page_get_link,
 };
 EXPORT_SYMBOL(page_symlink_inode_operations);
+
+/**
+ * real_vfsmount - returns the real vfsmount of the provided path
+ * @path: path that contains the dentry and vfsmount to query
+ *
+ * Finds and returns the first vfsmount that links to the dentry in the path
+ * and has the same device name as the vfsmount in the path. The returned
+ * vfsmount will be different from the one in the path if the mount is cloned
+ * at some point, e.g. bind mount or OverlayFS mount.
+ *
+ * Returns the vfsmount in the path if none other is found.
+ */
+struct vfsmount *real_vfsmount(struct path *path)
+{
+	struct mount *mnt;
+	char *dev_name = real_mount(path->mnt)->mnt_devname;
+	list_for_each_entry (mnt, &path->dentry->d_sb->s_mounts, mnt_instance) {
+		if (strcmp(mnt->mnt_devname, dev_name) == 0) {
+			return &mnt->mnt;
+		}
+	}
+	return path->mnt;
+}
+EXPORT_SYMBOL(real_vfsmount);
