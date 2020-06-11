@@ -243,6 +243,11 @@ psp_cmd_submit_buf(struct psp_context *psp,
 	 * during psp initialization to avoid breaking hw_init and it doesn't
 	 * return -EINVAL.
 	 */
+
+	/* We allow TEE_ERROR_NOT_SUPPORTED for VMR command in SRIOV */
+	skip_unsupport = (psp->cmd_buf_mem->resp.status == TEE_ERROR_NOT_SUPPORTED ||
+			psp->cmd_buf_mem->resp.status == PSP_ERR_UNKNOWN_COMMAND) && amdgpu_sriov_vf(psp->adev);
+
 	if (!skip_unsupport && (psp->cmd_buf_mem->resp.status || !timeout) && !ras_intr) {
 		if (ucode)
 			DRM_WARN("failed to load ucode id (%d) ",
@@ -348,6 +353,26 @@ static int psp_tmr_init(struct psp_context *psp)
 	ret = amdgpu_bo_create_kernel(psp->adev, tmr_size, PSP_TMR_SIZE,
 				      AMDGPU_GEM_DOMAIN_VRAM,
 				      &psp->tmr_bo, &psp->tmr_mc_addr, pptr);
+
+	return ret;
+}
+
+static int psp_clear_vf_fw(struct psp_context *psp)
+{
+	int ret;
+	struct psp_gfx_cmd_resp *cmd;
+
+	if (!amdgpu_sriov_vf(psp->adev) || psp->adev->asic_type != CHIP_NAVI12)
+		return 0;
+
+	cmd = kzalloc(sizeof(struct psp_gfx_cmd_resp), GFP_KERNEL);
+	if (!cmd)
+		return -ENOMEM;
+
+	cmd->cmd_id = GFX_CMD_ID_CLEAR_VF_FW;
+
+	ret = psp_cmd_submit_buf(psp, NULL, cmd, psp->fence_buf_mc_addr);
+	kfree(cmd);
 
 	return ret;
 }
@@ -1166,6 +1191,12 @@ static int psp_hw_start(struct psp_context *psp)
 		return ret;
 	}
 
+	ret = psp_clear_vf_fw(psp);
+	if (ret) {
+		DRM_ERROR("PSP clear vf fw!\n");
+		return ret;
+	}
+
 	ret = psp_tmr_init(psp);
 	if (ret) {
 		DRM_ERROR("PSP tmr init failed!\n");
@@ -1581,6 +1612,7 @@ static int psp_hw_fini(void *handle)
 	struct psp_context *psp = &adev->psp;
 	void *tmr_buf;
 	void **pptr;
+	int ret;
 
 	if (psp->adev->psp.ta_fw) {
 		psp_ras_terminate(psp);
@@ -1589,6 +1621,11 @@ static int psp_hw_fini(void *handle)
 	}
 
 	psp_asd_unload(psp);
+	ret = psp_clear_vf_fw(psp);
+	if (ret) {
+		DRM_ERROR("PSP clear vf fw!\n");
+		return ret;
+	}
 
 	psp_ring_destroy(psp, PSP_RING_TYPE__KM);
 
