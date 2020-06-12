@@ -1,8 +1,9 @@
 /*
- * Copyright (C) 2019 Google LLC.
+ * Copyright (C) 2020 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_device.c"
 #include <linux/fs.h>
+#include <linux/google/argos.h>
 #include <linux/list.h>
 #include <linux/uaccess.h>
 
@@ -14,7 +15,11 @@
 #include "argos_overseer.h"
 #include "argos_queue.h"
 #include "argos_types.h"
+#include "chip_global_accessors.h"
+#include "kernel_chip_global_accessors.h"
+#include "kernel_queue_accessors.h"
 #include "rid_filter.h"
+#include "sticky_register_accessors.h"
 #include "tgid_hash.h"
 
 
@@ -22,14 +27,30 @@
 #define FAKE_HARDWARE_TIMEOUT_SCALING 1000ul
 
 
+#define RESET_TIMEOUT_SEC 60ul
+
+
 #define DDR_CHUNK_ACK_TIMEOUT_SEC 4ul
 
 
 #define DDR_CHUNK_CONFIG_TIMEOUT_SEC 2ul
 
-int argos_wait_for_value(
+
+
+
+
+#define DEFAULT_MAX_DDR_CHUNKS_PER_CTX 1024ul
+
+
+ARGOS_FIELD_DECODER_WRAPPER(kernel_queue_ddr_control_change_requested)
+ARGOS_FIELD_DECODER_WRAPPER(kernel_queue_ddr_status_pending_config)
+ARGOS_FIELD_DECODER_WRAPPER(chip_global_state_value)
+ARGOS_FIELD_DECODER_WRAPPER(kernel_chip_global_chip_reset_value)
+
+int argos_wait_for_expected_value(
  struct argos_common_device_data *device_data, int bar,
- ulong offset, ulong timeout, ulong mask, ulong expected_value)
+ ulong offset, ulong timeout, ulong (*get_decoded_value)(uint64),
+ ulong expected_value)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  ulong value, deadline;
@@ -43,19 +64,19 @@ int argos_wait_for_value(
   }
 
   value = gasket_dev_read_64(gasket_dev, bar, offset);
-  if ((value & mask) == expected_value)
+  if (get_decoded_value(value) == expected_value)
    return 0;
   schedule_timeout_interruptible(msecs_to_jiffies(1));
  } while (time_before(jiffies, deadline));
 
 
  value = gasket_dev_read_64(gasket_dev, bar, offset);
- if ((value & mask) == expected_value)
+ if (get_decoded_value(value) == expected_value)
   return 0;
 
  return -ETIMEDOUT;
 }
-EXPORT_SYMBOL(argos_wait_for_value);
+EXPORT_SYMBOL(argos_wait_for_expected_value);
 
 int argos_sysfs_setup_cb(struct gasket_dev *gasket_dev)
 {
@@ -78,6 +99,15 @@ int argos_sysfs_setup_cb(struct gasket_dev *gasket_dev)
 }
 EXPORT_SYMBOL(argos_sysfs_setup_cb);
 
+void argos_initialize_gasket_mappable_region(
+ struct gasket_mappable_region *region, uint64 start, uint64 end)
+{
+ region->start = start;
+ region->length_bytes = end - start + sizeof(ulong);
+ region->flags = VM_READ | VM_WRITE;
+}
+EXPORT_SYMBOL(argos_initialize_gasket_mappable_region);
+
 
 
 
@@ -85,20 +115,25 @@ EXPORT_SYMBOL(argos_sysfs_setup_cb);
 int argos_device_enable_dev(struct gasket_dev *gasket_dev)
 {
  struct argos_common_device_data *device_data;
+ const struct argos_device_desc *device_desc;
  struct queue_ctx *queue_ctxs;
  int i;
  ulong fw_api_version;
- int ret;
+ int ret, fw_bar;
+ u64 value;
+ bool valid;
 
  if (gasket_dev->cb_data == NULL) {
   gasket_log_error(gasket_dev, "Callback data is NULL!");
   return -EINVAL;
  }
  device_data = gasket_dev->cb_data;
+ device_desc = device_data->device_desc;
+ fw_bar = device_desc->firmware_register_bar;
 
- fw_api_version = argos_asic_read_64(
-  device_data,
-  &device_data->device_desc->firmware_api_version_register);
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->firmware_api_version_location);
+ fw_api_version = chip_global_api_version_version(value);
  if (fw_api_version != ARGOS_DEVICE_DRIVER_FIRMWARE_API_VERSION) {
   gasket_log_error(gasket_dev,
    "Firmware API version mismatch! Driver: %lu, firmware: %lu",
@@ -107,7 +142,15 @@ int argos_device_enable_dev(struct gasket_dev *gasket_dev)
   return -EINVAL;
  }
 
- if (device_data->device_desc->rid_filter.count) {
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->max_ddr_chunks_per_ctx_location);
+ valid = kernel_chip_global_max_ddr_chunks_per_ctx_valid(value) ==
+   kKernelChipGlobalMaxDdrChunksPerCtxValidValueValid;
+ device_data->max_chunks_per_queue_ctx = valid ?
+  kernel_chip_global_max_ddr_chunks_per_ctx_chunks(value) :
+  DEFAULT_MAX_DDR_CHUNKS_PER_CTX;
+
+ if (device_desc->rid_filter.count) {
   ret = rid_filter_setup(device_data);
   if (ret)
    return ret;
@@ -115,13 +158,15 @@ int argos_device_enable_dev(struct gasket_dev *gasket_dev)
   device_data->rid_filter_assignments = NULL;
 
  queue_ctxs = device_data->queue_ctxs;
- for (i = 0; i < device_data->device_desc->queue_ctx_count; i++) {
+ for (i = 0; i < device_desc->queue_ctx_count; i++) {
   queue_ctxs[i].pg_tbl = gasket_dev->page_table[i];
   INIT_LIST_HEAD(&queue_ctxs[i].direct_mappings);
  }
 
- device_data->is_real_hardware = argos_asic_read_64(device_data,
-  &device_data->device_desc->is_fake_hardware_register) == 0;
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->firmware_control_enable_location);
+ device_data->is_real_hardware =
+  sticky_registers_firmware_control_enable_cl(value) == 0;
  if (device_data->is_real_hardware)
   device_data->timeout_scaling = DEFAULT_TIMEOUT_SCALING;
  else
@@ -206,15 +251,16 @@ static int ioctl_set_priority_algorithm(
  struct argos_common_device_data *device_data, ulong arg)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
+ const struct argos_device_desc *device_desc = device_data->device_desc;
  struct argos_priority_algorithm_config config;
- ulong value;
- ulong shift;
+ u64 tmp;
+ const int fw_bar = device_desc->firmware_register_bar;
 
  gasket_log_debug(gasket_dev,
     "Recvd ioctl ARGOS_IOCTL_SET_PRIORITY_ALGORITHM");
 
 
- if (!device_data->device_desc->priority_algorithm_config.location)
+ if (!device_desc->priority_algorithm_config_supported)
   return -ENOTTY;
 
  if (!argos_check_ownership(gasket_dev)) {
@@ -232,25 +278,26 @@ static int ioctl_set_priority_algorithm(
  if (copy_from_user(&config, (void __user *)arg, sizeof(config)))
   return -EFAULT;
 
- if (config.priority < 0 || config.priority > 7) {
+ if (config.priority < 0 || config.priority >
+  kernel_chip_global_priority_algorithm_priority_size() - 1) {
   gasket_log_error(gasket_dev, "invalid priority specified: %d",
    config.priority);
   return -EINVAL;
  }
 
- if (config.algorithm < ARGOS_PRIORITY_ALGORITHM_ROUND_ROBIN ||
-     config.algorithm > ARGOS_PRIORITY_ALGORITHM_WATERFALL) {
+ if (!kernel_chip_global_priority_algorithm_priority_value_is_valid(
+  config.algorithm)) {
   gasket_log_error(gasket_dev, "invalid algorithm specified: %d",
    config.algorithm);
   return -EINVAL;
  }
 
- shift = config.priority * 8;
- value = (ulong) config.algorithm;
- gasket_read_modify_write_64(gasket_dev,
-  device_data->device_desc->firmware_register_bar,
-  device_data->device_desc->priority_algorithm_config.location,
-  value, __builtin_popcountl(0xFF), shift);
+ tmp = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->priority_algorithm_config_location);
+ set_kernel_chip_global_priority_algorithm_priority(
+  &tmp, config.priority, config.algorithm);
+ gasket_dev_write_64(gasket_dev, tmp, fw_bar,
+  device_desc->priority_algorithm_config_location);
 
  return 0;
 }
@@ -304,20 +351,83 @@ long argos_device_ioctl(struct file *filp, uint cmd, ulong arg)
  }
 }
 EXPORT_SYMBOL(argos_device_ioctl);
-# 313 "./drivers/char/argos/argos_device.c"
+
+int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
+{
+ struct argos_common_device_data *device_data;
+ const struct argos_device_desc *device_desc;
+ int i, fw_bar;
+ u64 value;
+
+ if (gasket_dev->cb_data == NULL) {
+  gasket_log_error(gasket_dev, "Callback data is NULL!");
+  return -EINVAL;
+ }
+ device_data = gasket_dev->cb_data;
+ device_desc = device_data->device_desc;
+ fw_bar = device_desc->firmware_register_bar;
+
+ if (reset_type != ARGOS_RESET_REINIT) {
+  gasket_log_error(gasket_dev,
+   "Invalid reset type specified: %u; only reinit reset is supported in the kernel.",
+   reset_type);
+  return -EINVAL;
+ }
+
+
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->chip_reset_location);
+ set_kernel_chip_global_chip_reset_value(&value,
+  kKernelChipGlobalChipResetValueValueFunctionalReset);
+ gasket_dev_write_64(gasket_dev, value, fw_bar,
+  device_desc->chip_reset_location);
+
+
+ if (argos_wait_for_expected_value(device_data, fw_bar,
+   device_desc->chip_reset_location,
+   RESET_TIMEOUT_SEC,
+   ARGOS_NAME_FIELD_DECODER_WRAPPER(
+    kernel_chip_global_chip_reset_value),
+   kKernelChipGlobalChipResetValueValueResetAccepted))
+  return -ETIMEDOUT;
+
+
+ if (argos_wait_for_expected_value(device_data, fw_bar,
+   device_desc->global_chip_state_location,
+   RESET_TIMEOUT_SEC,
+   ARGOS_NAME_FIELD_DECODER_WRAPPER(
+    chip_global_state_value),
+   kChipGlobalStateValueValueInitialized))
+  return -ETIMEDOUT;
+
+
+ for (i = 0; i < device_desc->queue_ctx_count; i++) {
+  device_data->queue_ctxs[i].index = i;
+  device_data->queue_ctxs[i].id[0] = '\0';
+  device_data->queue_ctxs[i].owner = 0;
+ }
+ return 0;
+}
+EXPORT_SYMBOL(argos_device_reset);
+# 418 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_count_based(
   struct argos_common_device_data *device_data,
-  struct queue_ctx *queue_ctx,
+  const struct queue_ctx *queue_ctx,
   int original_chunks, int *chunk_delta)
 {
  int available_chunks;
- ulong value;
+ u64 value;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  const struct argos_device_desc *device_desc = device_data->device_desc;
+ const int fw_bar = device_desc->firmware_register_bar;
+ const int ddr_control_location =
+  device_desc->kernel_queue_ddr_control_location(
+   queue_ctx->index);
 
 
- available_chunks = argos_asic_read_64(device_data,
-  &device_desc->global_ddr_state_available_chunks);
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->global_chip_ddr_state_location);
+ available_chunks = chip_global_ddr_state_available_chunks(value);
  *chunk_delta = queue_ctx->dram_chunks - original_chunks;
  if (available_chunks < *chunk_delta) {
   gasket_log_error(gasket_dev,
@@ -326,24 +436,30 @@ static int argos_dram_request_send_count_based(
  }
 
 
-
- value = device_desc->count_based_request | queue_ctx->dram_chunks;
- gasket_dev_write_64(
-  gasket_dev, value, device_desc->firmware_register_bar,
-  device_desc->queue_ddr_control.get_location(queue_ctx->index));
+ value = gasket_dev_read_64(gasket_dev, fw_bar, ddr_control_location);
+ set_kernel_queue_ddr_control_change_requested(
+  &value,
+  kKernelQueueDdrControlChangeRequestedValueCountBasedRequest);
+ set_kernel_queue_ddr_control_requested_chunks(
+  &value, queue_ctx->dram_chunks);
+ gasket_dev_write_64(gasket_dev, value, fw_bar, ddr_control_location);
 
  return 0;
 }
-# 352 "./drivers/char/argos/argos_device.c"
+# 464 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_bitmap_based(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx, int original_chunks,
   uint *bitmap, int bitmap_elems, int *chunk_delta)
 {
  int i;
- ulong value;
+ u64 value;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  const struct argos_device_desc *device_desc = device_data->device_desc;
+ const int fw_bar = device_desc->firmware_register_bar;
+ const int ddr_control_location =
+  device_desc->kernel_queue_ddr_control_location(
+   queue_ctx->index);
 
 
 
@@ -352,9 +468,8 @@ static int argos_dram_request_send_bitmap_based(
 
  *chunk_delta = -original_chunks;
  for (i = 0; i < bitmap_elems; i++) {
-  gasket_dev_write_32(gasket_dev, bitmap[i],
-        device_desc->firmware_register_bar,
-        device_desc->dram_chunk_bitmap.location +
+  gasket_dev_write_32(gasket_dev, bitmap[i], fw_bar,
+        device_desc->dram_chunk_bitmap_location +
         i * sizeof(uint));
   *chunk_delta += hweight_long(bitmap[i]);
  }
@@ -373,14 +488,15 @@ static int argos_dram_request_send_bitmap_based(
 
 
 
- value = device_desc->bitmap_based_request;
- gasket_dev_write_64(
-  gasket_dev, value, device_desc->firmware_register_bar,
-  device_desc->queue_ddr_control.get_location(queue_ctx->index));
+ value = gasket_dev_read_64(gasket_dev, fw_bar, ddr_control_location);
+ set_kernel_queue_ddr_control_change_requested(
+  &value,
+  kKernelQueueDdrControlChangeRequestedValueBitmapBasedRequest);
+ gasket_dev_write_64(gasket_dev, value, fw_bar, ddr_control_location);
 
  return 0;
 }
-# 405 "./drivers/char/argos/argos_device.c"
+# 521 "./drivers/char/argos/argos_device.c"
 static int get_dram_configuration_response(
  struct argos_common_device_data *device_data,
  int queue_index)
@@ -388,14 +504,14 @@ static int get_dram_configuration_response(
  int ret;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  const struct argos_device_desc *device_desc = device_data->device_desc;
+ const int fw_bar = device_desc->firmware_register_bar;
 
- ret = argos_wait_for_value(device_data,
-   device_desc->firmware_register_bar,
-   device_desc->queue_ddr_control_change_requested.
-    get_location(queue_index),
+ ret = argos_wait_for_expected_value(device_data, fw_bar,
+   device_desc->kernel_queue_ddr_control_location(
+    queue_index),
    DDR_CHUNK_ACK_TIMEOUT_SEC,
-   device_desc->queue_ddr_control_change_requested.mask,
-   0);
+   ARGOS_NAME_FIELD_DECODER_WRAPPER(
+    kernel_queue_ddr_control_change_requested), 0);
  if (ret == -ECANCELED)
   return ret;
  else if (ret == -ETIMEDOUT) {
@@ -406,13 +522,13 @@ static int get_dram_configuration_response(
  }
 
 
- ret = argos_wait_for_value(device_data,
-   device_desc->firmware_register_bar,
-   device_desc->queue_ddr_status_pending.get_location(
+ ret = argos_wait_for_expected_value(device_data, fw_bar,
+   device_desc->kernel_queue_ddr_status_location(
     queue_index),
    device_data->max_chunks_per_queue_ctx *
    DDR_CHUNK_ACK_TIMEOUT_SEC,
-   device_desc->queue_ddr_status_pending.mask, 0);
+   ARGOS_NAME_FIELD_DECODER_WRAPPER(
+    kernel_queue_ddr_status_pending_config), 0);
  if (ret == -ECANCELED)
   return ret;
  else if (ret == -ETIMEDOUT) {
@@ -434,7 +550,10 @@ int argos_configure_queue_ctx_dram(
  struct argos_common_device_data *parent_device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  const struct argos_device_desc *device_desc = device_data->device_desc;
- int ret = 0, status, pending_config, original_chunks, chunk_delta;
+ const int fw_bar = device_desc->firmware_register_bar;
+ int ret = 0, pending_config, original_chunks, chunk_delta;
+ u64 value;
+ kernel_queue_ddr_status_value_value status;
 
  if (gasket_dev->parent) {
   parent_device_data = gasket_dev->parent->cb_data;
@@ -449,11 +568,16 @@ int argos_configure_queue_ctx_dram(
  mutex_lock(mutex);
 
 
- pending_config = argos_asic_read_64_indexed(device_data,
-  &device_desc->queue_ddr_status_pending, queue_ctx->index);
- status = argos_asic_read_64_indexed(device_data,
-  &device_desc->queue_ddr_status_value, queue_ctx->index);
- if (pending_config || status == DDR_STATUS_VALUE_IN_PROGRESS) {
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->kernel_queue_ddr_status_location(
+   queue_ctx->index));
+ pending_config = kernel_queue_ddr_status_pending_config(value);
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->kernel_queue_ddr_status_location(
+   queue_ctx->index));
+ status = kernel_queue_ddr_status_value(value);
+ if (pending_config || status ==
+  kKernelQueueDdrStatusValueValuePendingConfigInProgress) {
   if (gasket_dev->status != GASKET_STATUS_DRIVER_EXIT) {
    gasket_log_error(gasket_dev,
     "Pending DDR config in progress. This should not be possible! Marking device unhealthy.");
@@ -465,9 +589,10 @@ int argos_configure_queue_ctx_dram(
   goto out;
  }
 
- original_chunks = argos_asic_read_64_indexed(
-  device_data, &device_desc->queue_ddr_status_current_chunks,
-  queue_ctx->index);
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->kernel_queue_ddr_status_location(
+   queue_ctx->index));
+ original_chunks = kernel_queue_ddr_status_current_chunks(value);
 
  if (bitmap == NULL) {
   ret = argos_dram_request_send_count_based(device_data,
@@ -515,7 +640,7 @@ void argos_populate_queue_mappable_region(
  mappable_region->flags = VM_READ | VM_WRITE;
 }
 EXPORT_SYMBOL(argos_populate_queue_mappable_region);
-# 547 "./drivers/char/argos/argos_device.c"
+# 672 "./drivers/char/argos/argos_device.c"
 int argos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,

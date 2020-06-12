@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Google LLC.
+ * Copyright (C) 2020 Google LLC.
  */
 # 2 "./drivers/char/argos/argos_types.h"
 #ifndef __ARGOS_TYPES_H__
@@ -12,10 +12,11 @@
 
 #include "../../gasket/gasket_core.h"
 #include "../../gasket/gasket_page_table.h"
+#include "../../gasket/gasket_types.h"
 
 struct argos_common_device_data;
 struct argos_subcontainer_queue_ctx_config;
-# 26 "./drivers/char/argos/argos_types.h"
+# 27 "./drivers/char/argos/argos_types.h"
 struct direct_mapping {
 
 
@@ -83,7 +84,7 @@ struct queue_ctx {
 
 
  bool reserved;
-# 103 "./drivers/char/argos/argos_types.h"
+# 104 "./drivers/char/argos/argos_types.h"
  struct mutex direct_mappings_mutex;
 
 
@@ -98,45 +99,18 @@ struct argos_overseer_subcontainer {
 
  bool registered;
 };
-# 127 "./drivers/char/argos/argos_types.h"
-struct argos_register_field_desc {
-
-
-
- ulong location;
-
-
-
-
-
-
-
- ulong (*get_location)(int reg_index);
-
-
-
-
-
- int shift;
-
-
-
-
-
- u64 mask;
-};
 
 
 struct argos_mappable_regions {
 
 
 
- const struct gasket_mappable_region global_region;
+ struct gasket_mappable_region global_region;
 
 
 
 
- const struct gasket_mappable_region master_region;
+ struct gasket_mappable_region master_region;
 
 
 
@@ -189,97 +163,92 @@ struct argos_device_desc {
 
 
 
- struct argos_register_field_desc firmware_api_version_register;
+ ulong firmware_api_version_location;
 
 
 
 
 
- struct argos_register_field_desc is_fake_hardware_register;
+ ulong firmware_control_enable_location;
 
 
 
 
 
- struct argos_register_field_desc queue_ddr_status_value;
 
 
+ ulong (*kernel_queue_ddr_status_location)(int reg_index);
 
 
 
- struct argos_register_field_desc queue_ddr_status_pending;
 
 
+ ulong (*kernel_queue_ddr_control_location)(int reg_index);
 
 
 
- struct argos_register_field_desc queue_ddr_status_current_chunks;
 
+ ulong (*kernel_queue_control_location)(int reg_index);
 
 
 
- struct argos_register_field_desc queue_ddr_control;
 
 
+ ulong (*queue_control_control_location)(int reg_index);
 
 
 
 
- ulong bitmap_based_request;
- ulong count_based_request;
 
+ ulong (*queue_control_status_location)(int reg_index);
 
 
 
 
- struct argos_register_field_desc queue_ddr_control_change_requested;
+ ulong (*interrupt_control_control_location)(int reg_index);
 
 
 
 
- struct argos_register_field_desc queue_control_priority_value;
 
+ ulong (*interrupt_control_status_location)(int reg_index);
 
 
 
 
- struct argos_register_field_desc control_control;
 
 
+ bool priority_algorithm_config_supported;
+ ulong priority_algorithm_config_location;
 
 
 
- struct argos_register_field_desc control_status_enabled;
 
 
+ ulong chip_reset_location;
 
 
- struct argos_register_field_desc interrupt_control_control;
 
 
 
+ ulong max_ddr_chunks_per_ctx_location;
 
 
- struct argos_register_field_desc interrupt_control_status;
 
 
 
+ ulong global_chip_state_location;
 
 
 
 
- struct argos_register_field_desc priority_algorithm_config;
+ ulong global_chip_ddr_state_location;
 
 
 
 
- struct argos_register_field_desc global_ddr_state_available_chunks;
 
-
-
-
-
- struct argos_register_field_desc dram_chunk_bitmap;
+ ulong dram_chunk_bitmap_location;
 
 
  struct {
@@ -288,7 +257,7 @@ struct argos_device_desc {
 
 
 
-  struct argos_register_field_desc control;
+  ulong control_location;
 
 
   int count;
@@ -297,91 +266,75 @@ struct argos_device_desc {
 
 
 
-  struct argos_register_field_desc rid_address;
+  ulong (*rid_address_location)(int reg_index);
 
 
 
 
 
-  struct argos_register_field_desc rid_mask;
+  ulong (*rid_mask_location)(int reg_index);
 
 
 
 
 
-  struct argos_register_field_desc read_valid;
+
+  ulong (*base_addr_location)(int reg_index);
+
+
+  ulong (*size_location)(int reg_index);
 
 
 
 
 
-  struct argos_register_field_desc write_valid;
+  ulong fault_location;
 
 
+  ulong read_fault_address_location;
+  ulong write_fault_address_location;
 
 
-
-  struct argos_register_field_desc base_addr;
-
-
-  struct argos_register_field_desc size;
-
-
-
-
-
-  struct argos_register_field_desc read_fault;
-  struct argos_register_field_desc write_fault;
-
-
-  struct argos_register_field_desc read_fault_clear;
-  struct argos_register_field_desc write_fault_clear;
-
-
-  struct argos_register_field_desc read_fault_address;
-  struct argos_register_field_desc write_fault_address;
-
-
-  struct argos_register_field_desc read_fault_rid;
-  struct argos_register_field_desc write_fault_rid;
+  ulong read_fault_rid_location;
+  ulong write_fault_rid_location;
 
 
   ulong bar_base_addr[GASKET_NUM_BARS];
  } rid_filter;
 
 
- const struct argos_mappable_regions mappable_regions;
+ struct argos_mappable_regions mappable_regions;
 };
-# 388 "./drivers/char/argos/argos_types.h"
+# 332 "./drivers/char/argos/argos_types.h"
 struct argos_device_callbacks {
-# 399 "./drivers/char/argos/argos_types.h"
+# 343 "./drivers/char/argos/argos_types.h"
  bool (*is_queue_ctx_failed_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx);
-# 414 "./drivers/char/argos/argos_types.h"
+# 358 "./drivers/char/argos/argos_types.h"
  int (*allocate_queue_ctx_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx,
   const struct argos_subcontainer_queue_ctx_config *config);
-# 432 "./drivers/char/argos/argos_types.h"
+# 376 "./drivers/char/argos/argos_types.h"
  int (*enable_queue_ctx_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx);
-# 449 "./drivers/char/argos/argos_types.h"
+# 393 "./drivers/char/argos/argos_types.h"
  int (*disable_queue_ctx_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx,
   struct gasket_mappable_region *mappable_region);
-# 464 "./drivers/char/argos/argos_types.h"
+# 408 "./drivers/char/argos/argos_types.h"
  int (*deallocate_queue_ctx_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx);
-# 492 "./drivers/char/argos/argos_types.h"
+# 436 "./drivers/char/argos/argos_types.h"
  int (*allocate_direct_mapping_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx,
   struct direct_mapping *direct_mapping);
-# 509 "./drivers/char/argos/argos_types.h"
+# 453 "./drivers/char/argos/argos_types.h"
  int (*deallocate_direct_mapping_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx,
@@ -408,7 +361,7 @@ struct argos_common_device_data {
 
 
  DECLARE_HASHTABLE(tgid_to_open_count, 5);
-# 544 "./drivers/char/argos/argos_types.h"
+# 488 "./drivers/char/argos/argos_types.h"
  struct mutex mutex;
 
 
@@ -450,7 +403,7 @@ struct argos_common_device_data {
 
 
  int allocated_chunks;
-# 602 "./drivers/char/argos/argos_types.h"
+# 546 "./drivers/char/argos/argos_types.h"
  u8 *chunk_map;
 
 
@@ -458,24 +411,9 @@ struct argos_common_device_data {
 
 
  struct mutex rid_filter_lock;
-# 617 "./drivers/char/argos/argos_types.h"
+# 561 "./drivers/char/argos/argos_types.h"
  u8 *rid_filter_assignments;
 };
-
-
-
-
-
-enum ddr_status_value {
- DDR_STATUS_VALUE_SUCCESS = 0,
- DDR_STATUS_VALUE_NOT_ENOUGH_AVAILABLE = 1,
- DDR_STATUS_VALUE_TOO_LARGE = 2,
- DDR_STATUS_VALUE_IN_PROGRESS = 3,
- DDR_STATUS_VALUE_QUEUE_NOT_DISABLED = 4,
- DDR_STATUS_VALUE_INVALID_REQUEST_TYPE = 5,
- DDR_STATUS_VALUE_CHUNK_ALREADY_RESERVED = 6,
-};
-
 
 
 #endif
