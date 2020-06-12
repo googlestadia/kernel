@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Google LLC.
+ * Copyright (C) 2020 Google LLC.
  */
 # 1 "./drivers/gasket/gasket_ioctl.c"
 #include "gasket_ioctl.h"

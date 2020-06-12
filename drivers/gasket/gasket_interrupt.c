@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Google LLC.
+ * Copyright (C) 2020 Google LLC.
  */
 # 2 "./drivers/gasket/gasket_interrupt.c"
 #include "gasket_interrupt.h"
@@ -907,12 +907,20 @@ int gasket_interrupt_register_mapping(struct gasket_dev *gasket_dev,
  }
 
  ret = gasket_interrupt_set_eventfd(interrupt_data, interrupt, event_fd);
- if (ret)
+ if (ret) {
+  gasket_log_error(gasket_dev,
+   "Error when setting eventfd %d for interrupt %d: %d",
+   event_fd, interrupt, ret);
   return ret;
+ }
 
  ret = gasket_interrupt_configure(gasket_dev, interrupt);
- if (ret)
+ if (ret) {
+  gasket_log_error(gasket_dev,
+   "Error when configuring interrupt %d: %d",
+   interrupt, ret);
   goto fail_interrupt_configure;
+ }
 
  gasket_dev_write_64(gasket_dev, interrupt, bar_index, reg);
 
