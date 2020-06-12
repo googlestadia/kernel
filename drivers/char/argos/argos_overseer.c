@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Google LLC.
+ * Copyright (C) 2020 Google LLC.
  */
 # 2 "./drivers/char/argos/argos_overseer.c"
 #include <linux/accel.h>
@@ -61,6 +61,7 @@ static void init_device_data(
  dst_data->is_real_hardware = src_data->is_real_hardware;
  dst_data->timeout_scaling = src_data->timeout_scaling;
  dst_data->chunk_map = src_data->chunk_map;
+        dst_data->max_chunks_per_queue_ctx = src_data->max_chunks_per_queue_ctx;
 }
 
 
@@ -129,7 +130,7 @@ static int create_dev_nodes(struct argos_common_device_data *device_data)
   subcontainer->registered = true;
 
   init_device_data(device_data, subcontainer->gasket_dev.cb_data);
-# 139 "./drivers/char/argos/argos_overseer.c"
+# 140 "./drivers/char/argos/argos_overseer.c"
   gasket_sysfs_create_entries(
     &subcontainer->gasket_dev.accel_dev.dev,
     subcontainer_sysfs_attrs);
@@ -184,7 +185,7 @@ static int argos_overseer_stop(struct argos_common_device_data *device_data)
  gasket_log_info(gasket_dev, "Entered normal execution mode.");
  return 0;
 }
-# 208 "./drivers/char/argos/argos_overseer.c"
+# 209 "./drivers/char/argos/argos_overseer.c"
 static int argos_overseer_set_mode(
  struct argos_common_device_data *device_data, ulong arg)
 {
@@ -243,7 +244,7 @@ out:
  mutex_unlock(&gasket_dev->mutex);
  return ret;
 }
-# 281 "./drivers/char/argos/argos_overseer.c"
+# 282 "./drivers/char/argos/argos_overseer.c"
 static int argos_overseer_reserve_resources(
  struct argos_common_device_data *device_data, ulong arg)
 {
@@ -532,7 +533,7 @@ int argos_subcontainer_argos_ioctl_has_permission(
  }
 }
 EXPORT_SYMBOL(argos_subcontainer_argos_ioctl_has_permission);
-# 580 "./drivers/char/argos/argos_overseer.c"
+# 581 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_subcontainers(
  struct argos_common_device_data *device_data, char *buf)
 {
@@ -594,7 +595,7 @@ static ssize_t sysfs_show_subcontainers(
 
  return bytes_written;
 }
-# 651 "./drivers/char/argos/argos_overseer.c"
+# 652 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_mem_alloc(
   struct argos_common_device_data *device_data, int mem_alloc,
   char *buf)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Google LLC.
+ * Copyright (C) 2020 Google LLC.
  */
 # 10 "./drivers/accel/accel.c"
 #include <linux/accel.h>
@@ -8,7 +8,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 
-#define ACCEL_MAX_DEVICES 256
+#define ACCEL_MAX_DEVICES 512
 
 static bool accel_class_registered;
 static struct class accel_class;
@@ -254,15 +254,32 @@ static ssize_t chip_revision_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(chip_revision);
 
+static ssize_t chip_serial_number_show(struct device *dev,
+           struct device_attribute *attr,
+           char *buf)
+{
+ struct accel_dev *adev = to_accel_dev(dev);
+ const char *v = adev->chip_serial_number;
+
+ if (!v)
+  v = "";
+ return sprintf(buf, "%s\n", v);
+}
+static DEVICE_ATTR_RO(chip_serial_number);
+
 static ssize_t fw_version_show(struct device *dev,
           struct device_attribute *attr,
           char *buf)
 {
  struct accel_dev *adev = to_accel_dev(dev);
 
- return sprintf(buf, "%d.%d.%d.%d\n",
-         adev->fw_version[0], adev->fw_version[1],
-         adev->fw_version[2], adev->fw_version[3]);
+ if (adev->fw_version_str) {
+  return sprintf(buf, "%s\n", adev->fw_version_str);
+ } else {
+  return sprintf(buf, "%u.%u.%u.%u\n",
+          adev->fw_version[0], adev->fw_version[1],
+          adev->fw_version[2], adev->fw_version[3]);
+ }
 }
 static DEVICE_ATTR_RO(fw_version);
 
@@ -336,6 +353,7 @@ static struct attribute *accel_dev_attrs[] = {
  &dev_attr_chip_vendor.attr,
  &dev_attr_chip_model.attr,
  &dev_attr_chip_revision.attr,
+ &dev_attr_chip_serial_number.attr,
  &dev_attr_fw_version.attr,
  &dev_attr_logic_vendor.attr,
  &dev_attr_logic_model.attr,
@@ -390,7 +408,7 @@ static struct class accel_class = {
  .dev_groups = accel_dev_groups,
  .dev_uevent = accel_dev_uevent,
 };
-# 460 "./drivers/accel/accel.c"
+# 478 "./drivers/accel/accel.c"
 int accel_add_physical_function(struct accel_dev *adev, struct device *dev)
 {
  if (WARN_ON(adev == NULL || dev == NULL))

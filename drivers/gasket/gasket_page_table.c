@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Google LLC.
+ * Copyright (C) 2020 Google LLC.
  */
 # 27 "./drivers/gasket/gasket_page_table.c"
 #include "gasket_page_table.h"
@@ -527,9 +527,8 @@ EXPORT_SYMBOL(gasket_page_table_is_dev_addr_bad);
 
 uint gasket_page_table_max_size(struct gasket_page_table *pg_tbl)
 {
- if (!pg_tbl) {
-  gasket_log_error(pg_tbl->gasket_dev,
-   "Passed a null page table.");
+ if (unlikely(!pg_tbl)) {
+  gasket_nodev_error("Passed a null page table.");
   return 0;
  }
  return pg_tbl->config->total_entries;
@@ -539,9 +538,8 @@ EXPORT_SYMBOL(gasket_page_table_max_size);
 
 uint gasket_page_table_num_entries(struct gasket_page_table *pg_tbl)
 {
- if (!pg_tbl) {
-  gasket_log_error(pg_tbl->gasket_dev,
-   "Passed a null page table.");
+ if (unlikely(!pg_tbl)) {
+  gasket_nodev_error("Passed a null page table.");
   return 0;
  }
 
@@ -552,9 +550,8 @@ EXPORT_SYMBOL(gasket_page_table_num_entries);
 
 uint gasket_page_table_num_simple_entries(struct gasket_page_table *pg_tbl)
 {
- if (!pg_tbl) {
-  gasket_log_error(pg_tbl->gasket_dev,
-   "Passed a null page table.");
+ if (unlikely(!pg_tbl)) {
+  gasket_nodev_error("Passed a null page table.");
   return 0;
  }
 
@@ -565,9 +562,8 @@ EXPORT_SYMBOL(gasket_page_table_num_simple_entries);
 
 uint gasket_page_table_num_extended_entries(struct gasket_page_table *pg_tbl)
 {
- if (!pg_tbl) {
-  gasket_log_error(pg_tbl->gasket_dev,
-   "Passed a null page table.");
+ if (unlikely(!pg_tbl)) {
+  gasket_nodev_error("Passed a null page table.");
   return 0;
  }
 
@@ -577,9 +573,8 @@ EXPORT_SYMBOL(gasket_page_table_num_extended_entries);
 
 uint gasket_page_table_num_active_pages(struct gasket_page_table *pg_tbl)
 {
- if (!pg_tbl) {
-  gasket_log_error(pg_tbl->gasket_dev,
-   "Passed a null page table.");
+ if (unlikely(!pg_tbl)) {
+  gasket_nodev_error("Passed a null page table.");
   return 0;
  }
 
@@ -590,9 +585,8 @@ EXPORT_SYMBOL(gasket_page_table_num_active_pages);
 
 int gasket_page_table_system_status(struct gasket_page_table *pg_tbl)
 {
- if (!pg_tbl) {
-  gasket_log_error(pg_tbl->gasket_dev,
-   "Passed a null page table.");
+ if (unlikely(!pg_tbl)) {
+  gasket_nodev_error("Passed a null page table.");
   return GASKET_STATUS_LAMED;
  }
 
@@ -604,7 +598,7 @@ int gasket_page_table_system_status(struct gasket_page_table *pg_tbl)
 
  return GASKET_STATUS_ALIVE;
 }
-# 682 "./drivers/gasket/gasket_page_table.c"
+# 676 "./drivers/gasket/gasket_page_table.c"
 static int gasket_map_simple_pages(struct gasket_page_table *pg_tbl,
  ulong host_addr, ulong dev_addr, uint num_pages)
 {
@@ -628,7 +622,7 @@ static int gasket_map_simple_pages(struct gasket_page_table *pg_tbl,
 
  return ret;
 }
-# 725 "./drivers/gasket/gasket_page_table.c"
+# 719 "./drivers/gasket/gasket_page_table.c"
 static int gasket_map_extended_pages(
  struct gasket_page_table *pg_tbl, ulong host_addr,
  ulong dev_addr, uint num_pages)
@@ -642,7 +636,7 @@ static int gasket_map_extended_pages(
 
  ret = gasket_alloc_extended_entries(pg_tbl, dev_addr, num_pages);
  if (ret) {
-  dev_addr_end = dev_addr + (num_pages / PAGE_SIZE) - 1;
+  dev_addr_end = dev_addr + (num_pages * PAGE_SIZE) - 1;
   gasket_pg_tbl_error(pg_tbl,
    "page table slots (%lu,%lu) (@ 0x%lx) to (%lu,%lu) are not available",
    gasket_extended_lvl0_page_idx(pg_tbl, dev_addr),
@@ -680,7 +674,7 @@ static int gasket_map_extended_pages(
 
  return 0;
 }
-# 798 "./drivers/gasket/gasket_page_table.c"
+# 792 "./drivers/gasket/gasket_page_table.c"
 static int perform_pfn_mapping(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *ptes, u64 __iomem *slots,
  ulong host_addr, ulong dev_addr, uint num_pages, int is_simple_mapping)
@@ -730,7 +724,7 @@ static int perform_pfn_mapping(struct gasket_page_table *pg_tbl,
 
 
  if (gasket_pci_is_iommu_enabled(pg_tbl->gasket_dev->pci_dev)) {
-# 869 "./drivers/gasket/gasket_page_table.c"
+# 863 "./drivers/gasket/gasket_page_table.c"
  } else {
 #ifdef CONFIG_VIRT_TO_BUS
   ret = 0;
@@ -786,7 +780,7 @@ error:
 
  return ret;
 }
-# 957 "./drivers/gasket/gasket_page_table.c"
+# 951 "./drivers/gasket/gasket_page_table.c"
 static int gasket_perform_mapping(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *ptes, u64 __iomem *slots,
  ulong host_addr, ulong dev_addr, uint num_pages, int is_simple_mapping)
@@ -814,7 +808,7 @@ static int gasket_perform_mapping(struct gasket_page_table *pg_tbl,
   return -ENOMEM;
 
  ret = get_user_pages(host_addr, num_pages, FOLL_WRITE, pages, NULL);
-# 992 "./drivers/gasket/gasket_page_table.c"
+# 986 "./drivers/gasket/gasket_page_table.c"
  if (ret == -EFAULT) {
   ret = perform_pfn_mapping(pg_tbl, ptes, slots, host_addr,
        dev_addr, num_pages,
@@ -901,7 +895,7 @@ exit:
  kfree(pages);
  return ret;
 }
-# 1095 "./drivers/gasket/gasket_page_table.c"
+# 1089 "./drivers/gasket/gasket_page_table.c"
 static int gasket_alloc_simple_entries(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -912,7 +906,7 @@ static int gasket_alloc_simple_entries(
 
  return 0;
 }
-# 1130 "./drivers/gasket/gasket_page_table.c"
+# 1124 "./drivers/gasket/gasket_page_table.c"
 static int gasket_alloc_extended_entries(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_entries)
 {
@@ -953,7 +947,7 @@ static int gasket_alloc_extended_entries(
 
  return 0;
 }
-# 1187 "./drivers/gasket/gasket_page_table.c"
+# 1181 "./drivers/gasket/gasket_page_table.c"
 static int gasket_alloc_extended_subtable(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *pte, u64 __iomem *slot)
 {
@@ -993,7 +987,7 @@ static int gasket_alloc_extended_subtable(struct gasket_page_table *pg_tbl,
 
  return 0;
 }
-# 1237 "./drivers/gasket/gasket_page_table.c"
+# 1231 "./drivers/gasket/gasket_page_table.c"
 static int gasket_page_table_unmap_nolock(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1006,7 +1000,7 @@ static int gasket_page_table_unmap_nolock(
   return gasket_unmap_extended_pages(
    pg_tbl, dev_addr, num_pages, true);
 }
-# 1260 "./drivers/gasket/gasket_page_table.c"
+# 1254 "./drivers/gasket/gasket_page_table.c"
 static int gasket_unmap_simple_pages(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1015,7 +1009,7 @@ static int gasket_unmap_simple_pages(
  return gasket_perform_unmapping(pg_tbl, pg_tbl->entries + slot,
   pg_tbl->base_slot + slot, dev_addr, num_pages, 1, NULL);
 }
-# 1286 "./drivers/gasket/gasket_page_table.c"
+# 1280 "./drivers/gasket/gasket_page_table.c"
 static int gasket_unmap_extended_pages(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages,
  bool strict)
@@ -1059,7 +1053,7 @@ static int gasket_unmap_extended_pages(
 
  return ret;
 }
-# 1340 "./drivers/gasket/gasket_page_table.c"
+# 1334 "./drivers/gasket/gasket_page_table.c"
 static int validate_pfn_mappings(struct gasket_page_table_entry *ptes,
     uint num_pages)
 {
@@ -1091,7 +1085,7 @@ static int validate_pfn_mappings(struct gasket_page_table_entry *ptes,
  }
  return 0;
 }
-# 1405 "./drivers/gasket/gasket_page_table.c"
+# 1399 "./drivers/gasket/gasket_page_table.c"
 static int gasket_perform_unmapping(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *ptes, u64 __iomem *slots,
  ulong dev_addr, uint num_pages, int is_simple_mapping,
@@ -1188,7 +1182,7 @@ static int gasket_perform_unmapping(struct gasket_page_table *pg_tbl,
 
  return 0;
 }
-# 1517 "./drivers/gasket/gasket_page_table.c"
+# 1511 "./drivers/gasket/gasket_page_table.c"
 static void gasket_free_extended_subtable(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *pte, u64 __iomem *slot)
 {
@@ -1243,7 +1237,7 @@ static inline int gasket_addr_is_simple(
  else
   return !((addr) & (pg_tbl)->extended_flag);
 }
-# 1582 "./drivers/gasket/gasket_page_table.c"
+# 1576 "./drivers/gasket/gasket_page_table.c"
 static int gasket_is_simple_dev_addr_bad(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1274,7 +1268,7 @@ static int gasket_is_simple_dev_addr_bad(
 
  return 0;
 }
-# 1623 "./drivers/gasket/gasket_page_table.c"
+# 1617 "./drivers/gasket/gasket_page_table.c"
 static int gasket_is_extended_dev_addr_bad(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1310,7 +1304,7 @@ static int gasket_is_extended_dev_addr_bad(
 
  return 0;
 }
-# 1670 "./drivers/gasket/gasket_page_table.c"
+# 1664 "./drivers/gasket/gasket_page_table.c"
 static int gasket_is_pte_range_free(
  struct gasket_page_table_entry *ptes, uint num_entries)
 {
@@ -1323,7 +1317,7 @@ static int gasket_is_pte_range_free(
 
  return 1;
 }
-# 1690 "./drivers/gasket/gasket_page_table.c"
+# 1684 "./drivers/gasket/gasket_page_table.c"
 static void gasket_page_table_garbage_collect_nolock(
  struct gasket_page_table *pg_tbl)
 {
@@ -1345,7 +1339,7 @@ static void gasket_page_table_garbage_collect_nolock(
   }
  }
 }
-# 1731 "./drivers/gasket/gasket_page_table.c"
+# 1725 "./drivers/gasket/gasket_page_table.c"
 static ulong gasket_components_to_dev_address(struct gasket_page_table *pg_tbl,
  int is_simple, uint page_index, uint offset)
 {
@@ -1356,28 +1350,28 @@ static ulong gasket_components_to_dev_address(struct gasket_page_table *pg_tbl,
   lvl0_index = page_index & (pg_tbl->config->total_entries - 1);
   return (lvl0_index << GASKET_SIMPLE_PAGE_SHIFT) | offset;
  }
-# 1749 "./drivers/gasket/gasket_page_table.c"
+# 1743 "./drivers/gasket/gasket_page_table.c"
  lvl0_index = page_index / GASKET_PAGES_PER_SUBTABLE;
  lvl1_index = page_index & (GASKET_PAGES_PER_SUBTABLE - 1);
  return (pg_tbl)->extended_flag |
         (lvl0_index << GASKET_EXTENDED_LVL0_SHIFT) |
         (lvl1_index << GASKET_EXTENDED_LVL1_SHIFT) | offset;
 }
-# 1767 "./drivers/gasket/gasket_page_table.c"
+# 1761 "./drivers/gasket/gasket_page_table.c"
 static int gasket_simple_page_idx(
  struct gasket_page_table *pg_tbl, ulong dev_addr)
 {
  return (dev_addr >> GASKET_SIMPLE_PAGE_SHIFT) &
         (pg_tbl->config->total_entries - 1);
 }
-# 1785 "./drivers/gasket/gasket_page_table.c"
+# 1779 "./drivers/gasket/gasket_page_table.c"
 static ulong gasket_extended_lvl0_page_idx(
  struct gasket_page_table *pg_tbl, ulong dev_addr)
 {
  return (dev_addr >> GASKET_EXTENDED_LVL0_SHIFT) &
         (pg_tbl->config->total_entries - 1);
 }
-# 1803 "./drivers/gasket/gasket_page_table.c"
+# 1797 "./drivers/gasket/gasket_page_table.c"
 static ulong gasket_extended_lvl1_page_idx(
  struct gasket_page_table *pg_tbl, ulong dev_addr)
 {

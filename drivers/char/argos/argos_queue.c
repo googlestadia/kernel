@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Google LLC.
+ * Copyright (C) 2020 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_queue.c"
 #include <linux/bitops.h>
@@ -9,10 +9,17 @@
 #include "argos_device.h"
 #include "argos_queue.h"
 #include "argos_types.h"
+#include "interrupt_control_accessors.h"
+#include "kernel_queue_accessors.h"
+#include "queue_control_accessors.h"
 #include "tgid_hash.h"
 
 
 #define QUEUE_CONTROL_DISABLE_TIMEOUT_SEC 2ul
+
+
+ARGOS_FIELD_DECODER_WRAPPER(queue_control_status_enabled)
+ARGOS_FIELD_DECODER_WRAPPER(queue_control_status_enable_pending)
 
 int argos_find_free_queue_ctx(
  struct argos_common_device_data *device_data)
@@ -281,7 +288,7 @@ out:
  return ret;
 }
 EXPORT_SYMBOL(argos_enable_queue_ctx);
-# 292 "./drivers/char/argos/argos_queue.c"
+# 299 "./drivers/char/argos/argos_queue.c"
 static void remove_all_mmaps(
  struct argos_common_device_data *device_data,
  int map_bar_index,
@@ -314,7 +321,7 @@ static void remove_all_mmaps(
    map_region->start,
    map_region->start + map_region->length_bytes);
 }
-# 337 "./drivers/char/argos/argos_queue.c"
+# 344 "./drivers/char/argos/argos_queue.c"
 static int remove_direct_mapping(
  struct argos_common_device_data *device_data,
  struct queue_ctx *queue_ctx,
@@ -560,19 +567,25 @@ EXPORT_SYMBOL(argos_disable_and_deallocate_all_queues);
 int argos_dram_request_evaluate_response(
   struct gasket_dev *gasket_dev, struct queue_ctx *queue_ctx)
 {
- int status, alloced_chunks;
+ int alloced_chunks;
+ u64 value;
+ kernel_queue_ddr_status_value_value status;
  const struct argos_common_device_data *device_data =
   gasket_dev->cb_data;
  const struct argos_device_desc *device_desc = device_data->device_desc;
+ const int fw_bar = device_desc->firmware_register_bar;
 
- status = argos_asic_read_64_indexed(device_data,
-  &device_desc->queue_ddr_status_value, queue_ctx->index);
- alloced_chunks = argos_asic_read_64_indexed(
-  device_data, &device_desc->queue_ddr_status_current_chunks,
-  queue_ctx->index);
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->kernel_queue_ddr_status_location(
+   queue_ctx->index));
+ status = kernel_queue_ddr_status_value(value);
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->kernel_queue_ddr_status_location(
+   queue_ctx->index));
+ alloced_chunks = kernel_queue_ddr_status_current_chunks(value);
 
  switch (status) {
- case DDR_STATUS_VALUE_SUCCESS:
+ case kKernelQueueDdrStatusValueValueSuccess:
   if (alloced_chunks != queue_ctx->dram_chunks) {
    gasket_log_error(gasket_dev,
     "HW/FW error: invalid chunks allocated. Requested %d, received %d.",
@@ -581,31 +594,35 @@ int argos_dram_request_evaluate_response(
    return -EIO;
   } else
    return 0;
- case DDR_STATUS_VALUE_NOT_ENOUGH_AVAILABLE:
+ case kKernelQueueDdrStatusValueValueNotEnoughAvailable:
   gasket_log_error(
    gasket_dev, "Insufficient DRAM chunks available.");
   return -ENOMEM;
- case DDR_STATUS_VALUE_TOO_LARGE:
+ case kKernelQueueDdrStatusValueValueTooLarge:
   gasket_log_error(
    gasket_dev, "Too many DRAM chunks requested.");
   return -EINVAL;
- case DDR_STATUS_VALUE_IN_PROGRESS:
+ case kKernelQueueDdrStatusValueValuePendingConfigInProgress:
   gasket_log_error(
    gasket_dev,
    "Another DDR reconfigure request was in progress.");
   return -EBUSY;
- case DDR_STATUS_VALUE_QUEUE_NOT_DISABLED:
+ case kKernelQueueDdrStatusValueValueQueueNotDisabled:
   gasket_log_error(gasket_dev,
      "The target queue ctx (%d) is not disabled!",
      queue_ctx->index);
   return -EBUSY;
- case DDR_STATUS_VALUE_INVALID_REQUEST_TYPE:
+ case kKernelQueueDdrStatusValueValueInvalidRequestType:
   gasket_log_error(gasket_dev,
      "Invalid DDR config request type.");
   return -EINVAL;
- case DDR_STATUS_VALUE_CHUNK_ALREADY_RESERVED:
+ case kKernelQueueDdrStatusValueValueChunkAlreadyReserved:
   gasket_log_error(gasket_dev,
      "Memory allocation conflicted with an existing allocation.");
+  return -ENOMEM;
+ case kKernelQueueDdrStatusValueValueNoChunkBitmap:
+  gasket_log_error(gasket_dev,
+     "No bitmap chunks available.");
   return -ENOMEM;
  default:
   gasket_log_error(
@@ -614,7 +631,7 @@ int argos_dram_request_evaluate_response(
  }
 }
 EXPORT_SYMBOL(argos_dram_request_evaluate_response);
-# 645 "./drivers/char/argos/argos_queue.c"
+# 662 "./drivers/char/argos/argos_queue.c"
 static int disable_firmware_queue_context(
  struct argos_common_device_data *device_data, int queue_idx,
  ulong control_offset, ulong status_offset)
@@ -623,14 +640,31 @@ static int disable_firmware_queue_context(
  const struct argos_device_desc *device_desc = device_data->device_desc;
  int ret;
 
+
+
+ ret = argos_wait_for_expected_value(device_data,
+  device_desc->firmware_register_bar,
+  status_offset, QUEUE_CONTROL_DISABLE_TIMEOUT_SEC,
+  ARGOS_NAME_FIELD_DECODER_WRAPPER(queue_control_status_enable_pending),
+  0);
+ if (ret == -ECANCELED)
+  return ret;
+ else if (ret == -ETIMEDOUT) {
+  gasket_log_error(gasket_dev,
+   "Queue %d did not finish enabling within timeout; status offset 0x%lx",
+   queue_idx, status_offset);
+  return -ETIMEDOUT;
+ }
+
  gasket_dev_write_64(
   gasket_dev, 0, device_desc->firmware_register_bar,
   control_offset);
 
- ret = argos_wait_for_value(device_data,
+ ret = argos_wait_for_expected_value(device_data,
   device_desc->firmware_register_bar,
   status_offset, QUEUE_CONTROL_DISABLE_TIMEOUT_SEC,
-  device_desc->control_status_enabled.mask, 0);
+  ARGOS_NAME_FIELD_DECODER_WRAPPER(queue_control_status_enabled),
+  0);
  if (ret == -ECANCELED)
   return ret;
  else if (ret == -ETIMEDOUT) {
@@ -648,15 +682,20 @@ int argos_clear_firmware_queue_status(
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  const struct argos_device_desc *device_desc = device_data->device_desc;
+ const int fw_bar = device_desc->firmware_register_bar;
+ u64 value;
  int ret = disable_firmware_queue_context(device_data, queue_idx,
-  device_desc->control_control.get_location(queue_idx),
-  device_desc->control_status_enabled.get_location(queue_idx));
- gasket_dev_write_64(
-  gasket_dev, 0, device_desc->firmware_register_bar,
-  device_desc->interrupt_control_control.get_location(queue_idx));
- gasket_dev_write_64(
-  gasket_dev, 0, device_desc->firmware_register_bar,
-  device_desc->interrupt_control_status.get_location(queue_idx));
+  device_desc->queue_control_control_location(queue_idx),
+  device_desc->queue_control_status_location(queue_idx));
+
+ value = 0;
+ set_interrupt_control_control_enabled(&value, 0);
+ gasket_dev_write_64(gasket_dev, value, fw_bar,
+  device_desc->interrupt_control_control_location(queue_idx));
+ value = 0;
+ set_interrupt_control_status_hot(&value, 0);
+ gasket_dev_write_64(gasket_dev, value, fw_bar,
+  device_desc->interrupt_control_status_location(queue_idx));
  return ret;
 }
 EXPORT_SYMBOL(argos_clear_firmware_queue_status);
@@ -668,9 +707,13 @@ int argos_common_allocate_queue_ctx_callback(
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  const struct argos_device_desc *device_desc = device_data->device_desc;
+ const int fw_bar = device_desc->firmware_register_bar;
+ const ulong location =
+  device_desc->kernel_queue_control_location(queue_ctx->index);
  uint *bitmap_ints = NULL;
  int bitmap_num_ints = 0;
  int i, ret;
+ u64 value;
 
  if (config->use_chunk_bitmap) {
   bitmap_ints = (uint *) config->chunk_bitmap;
@@ -679,19 +722,15 @@ int argos_common_allocate_queue_ctx_callback(
  }
 
 
- gasket_read_modify_write_64(gasket_dev,
-  device_desc->firmware_register_bar,
-  device_desc->queue_control_priority_value.get_location(
-   queue_ctx->index),
-  config->priority,
-  hweight_long(device_desc->queue_control_priority_value.mask),
-  device_desc->queue_control_priority_value.shift);
+ value = gasket_dev_read_64(gasket_dev, fw_bar, location);
+ set_kernel_queue_control_priority_value(&value, config->priority);
+ gasket_dev_write_64(gasket_dev, value, fw_bar, location);
 
 
  ret = argos_configure_queue_ctx_dram(
    device_data, queue_ctx,
    bitmap_ints, bitmap_num_ints);
-# 730 "./drivers/char/argos/argos_queue.c"
+# 769 "./drivers/char/argos/argos_queue.c"
  if (ret)
   return ret;
 

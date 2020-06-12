@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Google LLC.
+ * Copyright (C) 2020 Google LLC.
  */
 # 4 "./include/linux/accel.h"
 #ifndef __ACCEL_H__
@@ -17,14 +17,16 @@
 #define ACCEL_BLOCK_MAJOR 121
 
 struct accel_dev;
-# 46 "./include/linux/accel.h"
+# 49 "./include/linux/accel.h"
 struct accel_dev {
 
  const char *accel_type;
  const char *chip_vendor;
  const char *chip_model;
  const char *chip_revision;
+ const char *chip_serial_number;
  unsigned int fw_version[4];
+ const char *fw_version_str;
  const char *logic_vendor;
  const char *logic_model;
  const char *logic_revision;
@@ -60,13 +62,13 @@ static inline struct accel_dev *accel_dev_get(struct accel_dev *adev)
   get_device(&adev->dev);
  return adev;
 }
-# 96 "./include/linux/accel.h"
+# 101 "./include/linux/accel.h"
 static inline void accel_dev_put(struct accel_dev *adev)
 {
  if (adev)
   put_device(&adev->dev);
 }
-# 113 "./include/linux/accel.h"
+# 118 "./include/linux/accel.h"
 static inline void accel_dev_set_state(struct accel_dev *adev,
            const char *state)
 {
