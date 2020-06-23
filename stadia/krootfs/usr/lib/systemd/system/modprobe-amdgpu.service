@@ -1,0 +1,14 @@
+[Unit]
+Description=Load amdgpu
+DefaultDependencies=no
+Conflicts=shutdown.target
+Before=sysinit.target shutdown.target
+Before=systemd-modules-load.service
+ConditionCapability=CAP_SYS_MODULE
+ConditionKernelCommandLine=|!nogpu
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/modprobe-amdgpu.sh
+TimeoutSec=90s
