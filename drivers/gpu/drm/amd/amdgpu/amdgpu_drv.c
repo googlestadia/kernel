@@ -91,6 +91,7 @@
 #define KMS_DRIVER_PATCHLEVEL	0
 
 #define AMDGPU_VERSION		"5.4.10"
+#define STR(x) __stringify(x)
 
 int amdgpu_vram_limit = 0;
 int amdgpu_vis_vram_limit = 0;
@@ -1619,6 +1620,7 @@ static int __init amdgpu_init(void)
 
 	DRM_INFO("amdgpu kernel modesetting enabled.\n");
 	DRM_INFO("amdgpu version: %s\n", AMDGPU_VERSION);
+	DRM_INFO("amdgpu internal version: %s\n", STR(INTERNAL_VER));
 #if defined(DRM_VER) && defined(DRM_PATCH) && defined(DRM_SUB)
 	DRM_INFO("OS DRM version: %d.%d.%d\n", DRM_VER, DRM_PATCH, DRM_SUB);
 #endif

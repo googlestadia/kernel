@@ -37,6 +37,14 @@ endif
 DISPLAY_FOLDER_NAME := display
 FULL_AMD_DISPLAY_PATH := $(FULL_AMD_PATH)/$(DISPLAY_FOLDER_NAME)
 
+VERSION_FILE = $(FULL_AMD_PATH)/amdgpu/VERSION
+getver = $(shell grep $1 $(VERSION_FILE) | awk -F'=' '{print $$2}')
+ifneq ("", "$(wildcard $(VERSION_FILE))")
+  INTERNAL_VER = $(call getver,client).$(call getver,major1).$(call getver,major2).$(call getver,minor).$(call getver,release)
+else
+  INTERNAL_VER = K.5.4.0.0
+endif
+
 ccflags-y := -I$(FULL_AMD_PATH)/include/asic_reg \
 	-I$(FULL_AMD_PATH)/include \
 	-I$(FULL_AMD_PATH)/amdgpu \
@@ -46,7 +54,8 @@ ccflags-y := -I$(FULL_AMD_PATH)/include/asic_reg \
 	-I$(FULL_AMD_DISPLAY_PATH)/include \
 	-I$(FULL_AMD_DISPLAY_PATH)/dc \
 	-I$(FULL_AMD_DISPLAY_PATH)/amdgpu_dm \
-	-I$(FULL_AMD_PATH)/amdkfd
+	-I$(FULL_AMD_PATH)/amdkfd \
+	-D INTERNAL_VER=$(INTERNAL_VER)
 
 amdgpu-y := amdgpu_drv.o
 
