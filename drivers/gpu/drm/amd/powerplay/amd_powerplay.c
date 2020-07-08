@@ -122,6 +122,19 @@ static int pp_hw_init(void *handle)
 
 	ret = hwmgr_hw_init(hwmgr);
 
+	if (adev->pdev->device == 0x6860 && adev->pdev->revision == 0x07) {
+		long param[5];
+		param[0] = 5;  // busy_set_point
+		param[1] = 60; // FPS
+		param[2] = 0;  // use_rlc_busy
+		param[3] = 3;  // min_active_level
+		param[4] = PP_SMC_POWER_PROFILE_CUSTOM;
+
+		mutex_lock(&hwmgr->smu_lock);
+		ret = hwmgr->hwmgr_func->set_power_profile_mode(hwmgr, param, 4);
+		mutex_unlock(&hwmgr->smu_lock);
+	}
+
 	if (ret)
 		pr_err("powerplay hw init failed\n");
 
