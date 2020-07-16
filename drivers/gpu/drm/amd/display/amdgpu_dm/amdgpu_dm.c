@@ -3938,7 +3938,6 @@ fill_blending_from_plane_state(const struct drm_plane_state *plane_state,
 	if (plane_state->plane->type != DRM_PLANE_TYPE_OVERLAY)
 		return;
 
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 19, 0)
 	if (plane_state->pixel_blend_mode == DRM_MODE_BLEND_PREMULTI) {
 		static const uint32_t alpha_formats[] = {
 			DRM_FORMAT_ARGB8888,
