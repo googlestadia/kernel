@@ -1747,6 +1747,7 @@ static int smu_enable_umd_pstate(void *handle,
 
 	struct smu_context *smu = (struct smu_context*)(handle);
 	struct smu_dpm_context *smu_dpm_ctx = &(smu->smu_dpm);
+	struct amdgpu_device *adev = smu->adev;
 
 	if (!smu->is_apu && (!smu->pm_enabled || !smu_dpm_ctx->dpm_context))
 		return -EINVAL;
@@ -1762,6 +1763,12 @@ static int smu_enable_umd_pstate(void *handle,
 			amdgpu_device_ip_set_powergating_state(smu->adev,
 							       AMD_IP_BLOCK_TYPE_GFX,
 							       AMD_PG_STATE_UNGATE);
+			if (adev->asic_type >= CHIP_NAVI10 &&
+				adev->asic_type <= CHIP_NAVI12 &&
+				(adev->pm.pp_feature & PP_GFXOFF_MASK || amdgpu_sriov_is_pp_one_vf(adev))) {
+				dev_dbg(smu->adev->dev, "Enter pstate, disable GFXOFF, re-init SPM golden\n");
+				amdgpu_gfx_init_spm_golden(adev);
+			}
 		}
 	} else {
 		/* exit umd pstate, restore level, enable gfx cg*/
