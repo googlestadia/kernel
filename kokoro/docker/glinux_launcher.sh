@@ -56,6 +56,7 @@ fi
 download_wget "${AMDGPU_FIRMWARE_URL}" \
   "${BUILD_DIR}/gfile/amdgpu-firmware.tar.gz" "${AMDGPU_FIRMWARE_SHA256}"
 
+${ENGINE_BIN} pull gcr.io/stadia-open-source/kernel/debian9:latest
 ${ENGINE_BIN} run \
   --volume ${BUILD_DIR}/tmp:/workspace/tmp \
   --volume ${BUILD_DIR}/artifacts:/workspace/artifacts \
@@ -71,7 +72,8 @@ ${ENGINE_BIN} run \
   --env "DOCKER_SRC_DIR=/workspace/src/kernel" \
   --net=host \
   --privileged=true \
-  -t gcr.io/stadia-open-source/kernel/debian9:latest \
+  --tty \
+  gcr.io/stadia-open-source/kernel/debian9:latest \
   /container_tools/fix_permissions.sh --user "$(id -u):$(id -g)" \
   -- \
   /workspace/src/kernel/kokoro/build.sh

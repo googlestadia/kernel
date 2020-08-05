@@ -33,6 +33,7 @@ gcloud auth activate-service-account --key-file \
   "${KOKORO_NONBUILD_ARTIFACTS}/keystore/71274_kokoro_service_key_json"
 gcloud auth configure-docker
 
+docker pull gcr.io/stadia-open-source/kernel/debian9:latest
 docker run \
   --volume "${TMPDIR}":/workspace/tmp \
   --volume "${KOKORO_ARTIFACTS_DIR}":/workspace/artifacts \
@@ -56,7 +57,8 @@ docker run \
   --env "TMP=/workspace/tmp" \
   --net=host \
   --privileged=true \
-  -t gcr.io/stadia-open-source/kernel/debian9:latest \
+  --tty \
+  gcr.io/stadia-open-source/kernel/debian9:latest \
   /container_tools/fix_permissions.sh --user "$(id -u):$(id -g)" \
   -- \
   /workspace/src/kernel/kokoro/build.sh
