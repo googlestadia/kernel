@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y \
   bison \
   build-essential \
   cpio \
+  dosfstools \
   dpkg-dev \
   e2fsprogs \
   extlinux \
@@ -28,11 +29,14 @@ RUN apt-get update && apt-get install -y \
   flex \
   g++ \
   gcc \
+  gdisk \
   git \
   google-cloud-sdk \
   kernel-wedge \
   kmod \
+  kpartx \
   libelf-dev \
+  liblzma-dev \
   libssl-dev \
   parted \
   pigz \
@@ -40,5 +44,8 @@ RUN apt-get update && apt-get install -y \
   rsync \
   squashfs-tools \
   strace \
+  syslinux-common \
+  syslinux-efi \
+  util-linux \
   wget \
   && rm -rf /var/lib/apt/lists/*
