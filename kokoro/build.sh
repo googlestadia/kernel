@@ -273,17 +273,9 @@ function build_boot_disk() {
   readonly BOOT_DISK_NAME="disk-${KERNELRELEASE}-${ARCH}.raw"
   readonly BOOT_DISK="${KBUILD_OUTPUT}/${BOOT_DISK_NAME}"
   readonly BOOT_DISK_GZ="${BOOT_DISK}.gz"
-  local -r boot_disk_mount_dir="${KBUILD_OUTPUT}/boot-mount"
-  rm -f "${BOOT_DISK}"
-  touch "${BOOT_DISK}"
-  fallocate --zero-range --length 35M "${BOOT_DISK}"
-  /sbin/parted --script "${BOOT_DISK}" -- mklabel msdos mkpart primary ext2 \
-    2048s -1s set 1 boot on
-  /sbin/mkfs.ext2 -F -L GGPBOOTFS -Eoffset=1048576 "${BOOT_DISK}"
-  "${SCRIPT_DIR}"/build_boot_disk_helper.sh "${BOOT_DISK}" \
-    "${boot_disk_mount_dir}" "${TAR_INSTALL_DIR}" "${VMLINUZ_NAME}" \
-    "${INITRD_NAME}"
-  dd if=/usr/lib/syslinux/mbr/mbr.bin of="${BOOT_DISK}" conv=notrunc
+  local -r mounts_dir="${KBUILD_OUTPUT}/mnt"
+  "${SCRIPT_DIR}"/build_boot_disk_helper.sh "${BOOT_DISK}" "${mounts_dir}" \
+    "${TAR_INSTALL_DIR}" "${VMLINUZ_NAME}" "${INITRD_NAME}"
   pigz --keep --force "${BOOT_DISK}"
   ln -sf "$(basename "${BOOT_DISK}")" \
     "$(dirname "${BOOT_DISK}")/disk-latest.raw"
