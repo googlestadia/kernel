@@ -4,7 +4,7 @@
 #
 
 #
-# Compiler: gcc (Debian 9.3.0-8) 9.3.0
+# Compiler: gcc (Debian 9.3.0-11) 9.3.0
 #
 CONFIG_CC_IS_GCC=y
 CONFIG_GCC_VERSION=90300
@@ -3472,8 +3472,12 @@ CONFIG_CACHEFILES=y
 #
 # DOS/FAT/NT Filesystems
 #
+CONFIG_FAT_FS=y
 # CONFIG_MSDOS_FS is not set
-# CONFIG_VFAT_FS is not set
+CONFIG_VFAT_FS=y
+CONFIG_FAT_DEFAULT_CODEPAGE=437
+CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+CONFIG_FAT_DEFAULT_UTF8=y
 # CONFIG_NTFS_FS is not set
 # end of DOS/FAT/NT Filesystems
 
