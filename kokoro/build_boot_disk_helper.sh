@@ -52,24 +52,24 @@ readonly EFI_MOUNT_DIR="${MOUNTS_DIR}"/efi
 mkdir -p "${EFI_MOUNT_DIR}"
 mount /dev/mapper/loop0p1 "${EFI_MOUNT_DIR}"
 
-rsync -a "${TAR_INSTALL_DIR}"/ "${EFI_MOUNT_DIR}"/
+rsync -a "${TAR_INSTALL_DIR}"/boot/ "${EFI_MOUNT_DIR}"/
 
-mkdir -p "${EFI_MOUNT_DIR}"/boot/syslinux
+mkdir -p "${EFI_MOUNT_DIR}"/syslinux
 echo "SERIAL 0
 CONSOLE 0
 DEFAULT stadia
 TIMEOUT 0
 LABEL stadia
-  KERNEL /boot/${VMLINUZ_NAME}
-  APPEND initrd=/boot/${INITRD_NAME} root=auto ro console=ttyS0
-" > "${EFI_MOUNT_DIR}"/boot/syslinux/syslinux.cfg
-extlinux --install "${EFI_MOUNT_DIR}"/boot/syslinux
+  KERNEL /${VMLINUZ_NAME}
+  APPEND initrd=/${INITRD_NAME} root=auto ro console=ttyS0
+" > "${EFI_MOUNT_DIR}"/syslinux/syslinux.cfg
+extlinux --install "${EFI_MOUNT_DIR}"/syslinux
 
 mkdir -p "${EFI_MOUNT_DIR}"/EFI/BOOT
 cp /usr/lib/SYSLINUX.EFI/efi64/syslinux.efi \
   "${EFI_MOUNT_DIR}"/EFI/BOOT/BOOTX64.EFI
 cp /usr/lib/syslinux/modules/efi64/ldlinux.e64 \
-  "${EFI_MOUNT_DIR}"/boot/syslinux/syslinux.cfg \
+  "${EFI_MOUNT_DIR}"/syslinux/syslinux.cfg \
   "${EFI_MOUNT_DIR}"/EFI/BOOT/
 
 # Copy the "boot sector" to its backup for fsck.fat, after unmounting.
