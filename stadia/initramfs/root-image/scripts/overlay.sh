@@ -26,7 +26,6 @@ mount_root_overlayfs() {
 	local ofs_dir="/run/ofs"
 	mkdir -p "${ofs_dir}"
 
-	local boot_mnt="${ofs_dir}/boot"
 	local root_mnt="${ofs_dir}/root"
 	local krootfs_mnt="${ofs_dir}/krootfs"
 	local rwfs_mnt="${ofs_dir}/rwfs"
@@ -150,18 +149,6 @@ EOT
 $(lsblk -P -o NAME,FSTYPE,LABEL,UUID,RO)
 EOT
 
-	# If a boot fs was found, mount it read-only and prepend its mount path
-	# to `lowerdir`. overlayfs stacks layers from right to left (leftmost is
-	# top).
-	# NOTE: By design, stacked squashfs filesystems and the root fs (if any)
-	# do not override or mask the contents of the boot fs.
-	if [ -n "${bootfs_dev}" ]; then
-		mkdir "${boot_mnt}"
-		mount -t "${bootfs_fstype}" -r "${bootfs_dev}" "${boot_mnt}" \
-			|| return 1
-		lowerdir="${boot_mnt}:${lowerdir}"
-	fi
-
 	# If a kernel rootfs was bundled with the initramfs, mount it and
 	# prepend its mount path to `lowerdir`. overlayfs stacks layers from
 	# right to left (leftmost is top).
@@ -205,6 +192,15 @@ EOT
 		"lowerdir=${lowerdir},upperdir=${upperdir},workdir=${workdir}" \
 		/root || return 1
 
+	# If a boot fs was found, mount it read-only at /root/boot (which will become
+	# /boot). With hybrid BIOS/UEFI boot images, the boot fs is the VFAT EFI
+	# system partition and thus cannot be included in the overlayfs.
+	# NOTE: By design, stacked squashfs filesystems and the root fs (if any)
+	# do not override or mask the contents of the boot fs.
+	if [ -n "${bootfs_dev}" ]; then
+		mkdir /root/boot
+		mount -t "${bootfs_fstype}" -r "${bootfs_dev}" /root/boot || return 1
+	fi
 
 	# WORKAROUND: Create /mnt/package in the root overlayfs.
 	# TODO(b/139151730): ESC asset mounting broken

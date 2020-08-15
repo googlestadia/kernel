@@ -72,18 +72,14 @@ mount_root_overlayfs || rescue_shell
 
 # Move filesystems to the final root fs.
 
-# gpuvm's synthesized root fs does not have /run.
-# See https://cs.corp.google.com/piper///depot/google3/platforms/gpus/testing/gpuminivmm/mini_vmm_helper.cc?g=0&l=25
-if [ -d /root/run ]; then
-	tmpfsmnt=/root/run
-else
-	tmpfsmnt=/root/tmp
-fi
-
+[ -d /root/sys ] || mkdir /root/sys
 mount -n -o move /sys /root/sys || rescue_shell
+[ -d /root/proc ] || mkdir /root/proc
 mount -n -o move /proc /root/proc || rescue_shell
+[ -d /root/dev ] || mkdir -m 0755 /root/dev
 mount -n -o move /dev /root/dev || rescue_shell
-mount -n -o move /run "${tmpfsmnt}" || rescue_shell
+[ -d /root/run ] || mkdir -m 0755 /root/run
+mount -n -o move /run /root/run || rescue_shell
 
 # Keep /dev available (for /dev/console, below).
 rm -rf /dev
