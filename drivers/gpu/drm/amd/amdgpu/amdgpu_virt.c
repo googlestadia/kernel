@@ -677,12 +677,11 @@ static int amdgpu_virt_read_pf2vf_data(struct amdgpu_device *adev)
 			((struct amdgim_pf2vf_info_v1 *)pf2vf_info)->feature_flags;
 		break;
 	case 2:
-		/* TODO: missing key, need to add it later */
 		checksum = ((struct amd_sriov_msg_pf2vf_info *)pf2vf_info)->checksum;
 		checkval = amd_sriov_msg_checksum(
 			adev->virt.fw_reserve.p_pf2vf, pf2vf_info->size,
-			0, checksum);
-		if (checksum != checkval) {
+			adev->virt.fw_reserve.checksum_key, checksum);
+		if (checksum != 0 && checksum != checkval) {
 			DRM_ERROR("invalid pf2vf message\n");
 			return -EINVAL;
 		}
