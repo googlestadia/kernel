@@ -368,6 +368,7 @@ static void amdgpu_virt_ras_reserve_bps(struct amdgpu_device *adev)
 	struct amdgpu_bo *bo = NULL;
 	uint64_t bp;
 	int i;
+	bool reserve_success = true;
 
 	if (!data)
 		return;
@@ -383,13 +384,18 @@ static void amdgpu_virt_ras_reserve_bps(struct amdgpu_device *adev)
 		if (amdgpu_bo_create_kernel_at(adev, bp << AMDGPU_GPU_PAGE_SHIFT,
 					       AMDGPU_GPU_PAGE_SIZE,
 					       AMDGPU_GEM_DOMAIN_VRAM,
-					       &bo, NULL))
-			DRM_DEBUG("RAS WARN: reserve vram for retired page %llx fail\n", bp);
+					       &bo, NULL)) {
+			DRM_WARN("RAS WARN: reserve vram for retired page %llx fail\n", bp);
+			reserve_success = false;
+		}
 
 		data->bps_bo[i] = bo;
 		data->last_reserved = i + 1;
 		bo = NULL;
 	}
+
+	if (reserve_success)
+		DRM_INFO("RAS INFO: reserve vram for retired pages succeeded\n");
 }
 
 static bool amdgpu_virt_ras_check_bad_page(struct amdgpu_device *adev,
