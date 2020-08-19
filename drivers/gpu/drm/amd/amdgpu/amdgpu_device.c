@@ -4021,9 +4021,12 @@ static int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 	int i, r = 0;
 	bool need_full_reset  = *need_full_reset_arg;
 
-	if (amdgpu_sriov_vf(adev))
+	if (amdgpu_sriov_vf(adev)) {
 		if (!amdgpu_virt_notify_booked(adev, job))
 			amdgpu_virt_wait_dump(adev, MAX_SCHEDULE_TIMEOUT);
+		/* stop the data exchange thread */
+		amdgpu_virt_fini_data_exchange(adev);
+	}
 
 	/* block all schedulers and reset given job's ring */
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
