@@ -1874,7 +1874,7 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 		}
 	}
 
-	if (amdgpu_sriov_vf(adev)) {
+	if (amdgpu_sriov_vf(adev) || amdgpu_passthrough(adev)) {
 		adev->cg_flags &= amdgpu_cg_mask;
 		adev->pg_flags &= amdgpu_pg_mask;
 	} else {
