@@ -262,7 +262,7 @@ function build_linux_tar_xz() {
   # into the tar archive. Use GNU tar's --mode flag to forcefully remove them.
   # https://cs.corp.google.com/piper///depot/google3/devtools/kokoro/vanadium/linux_scripts/usr/local/bin/format_tmpfs.sh
   chmod 00755 "${TAR_INSTALL_DIR}" "${TAR_INSTALL_DIR}"/*
-  tar -cf - --owner=root --group=root --mode='u-s,g-s' \
+  tar -cf - --hard-dereference --owner=root --group=root --mode='u-s,g-s' \
     -C "${TAR_INSTALL_DIR}" . | xz --threads=0 > "${LINUX_TAR_XZ}"
   # Print the content of the archive for the build log.
   tar -tvf "${LINUX_TAR_XZ}"
@@ -325,7 +325,7 @@ function build_perf_tar_xz() {
   # into the tar archive. Use GNU tar's --mode flag to forcefully remove them.
   # https://cs.corp.google.com/piper///depot/google3/devtools/kokoro/vanadium/linux_scripts/usr/local/bin/format_tmpfs.sh
   chmod 00755 "${PERF_INSTALL_DIR}" "${PERF_INSTALL_DIR}"/*
-  tar -cf - --owner=root --group=root --mode='u-s,g-s' \
+  tar -cf - --hard-dereference --owner=root --group=root --mode='u-s,g-s' \
     -C "${PERF_INSTALL_DIR}" . | xz --threads=0 > "${PERF_TAR_XZ}"
   # Print the content of the archive for the build log.
   tar -tvf "${PERF_TAR_XZ}"
