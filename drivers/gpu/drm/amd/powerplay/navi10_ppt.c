@@ -2331,6 +2331,7 @@ static const struct pptable_funcs navi10_ppt_funcs = {
 	.init_power = smu_v11_0_init_power,
 	.fini_power = smu_v11_0_fini_power,
 	.check_fw_status = smu_v11_0_check_fw_status,
+	.wait_smu_idle = smu_v11_0_wait_smu_idle,
 	.setup_pptable = smu_v11_0_setup_pptable,
 	.get_vbios_bootup_values = smu_v11_0_get_vbios_bootup_values,
 	.get_clk_info_from_vbios = smu_v11_0_get_clk_info_from_vbios,

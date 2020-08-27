@@ -500,6 +500,7 @@ struct pptable_funcs {
 	int (*init_power)(struct smu_context *smu);
 	int (*fini_power)(struct smu_context *smu);
 	int (*check_fw_status)(struct smu_context *smu);
+	int (*wait_smu_idle)(struct smu_context *smu);
 	int (*setup_pptable)(struct smu_context *smu);
 	int (*get_vbios_bootup_values)(struct smu_context *smu);
 	int (*get_clk_info_from_vbios)(struct smu_context *smu);

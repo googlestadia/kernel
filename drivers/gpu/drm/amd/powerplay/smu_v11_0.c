@@ -33,6 +33,7 @@
 #include "amdgpu_atomfirmware.h"
 #include "smu_v11_0.h"
 #include "smu_v11_0_pptable.h"
+#include "smu_v11_0_ppsmc.h"
 #include "soc15_common.h"
 #include "atom.h"
 #include "amd_pcie.h"
@@ -91,6 +92,36 @@ static int smu_v11_0_wait_for_response(struct smu_context *smu)
 	return RREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90) == 0x1 ? 0 : -EIO;
 }
 
+int smu_v11_0_wait_smu_idle(struct smu_context *smu)
+{
+	struct amdgpu_device *adev = smu->adev;
+	uint32_t cur_value, i, timeout = adev->usec_timeout * 10;
+	uint32_t param = 0xff00011;
+
+	/*
+	 * use PPSMC_MSG_TestMessage to check whether SMU is idle
+	 * if SMU is idle, it will response
+	 * the response will be the param you pass + 1
+	 */
+	WREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90, 0);
+	WREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_82, param);
+	WREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_66, PPSMC_MSG_TestMessage);
+
+	for (i = 0; i < timeout; i++) {
+		cur_value = RREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90);
+		if ((cur_value & MP1_C2PMSG_90__CONTENT_MASK) != 0)
+			break;
+
+		udelay(1);
+	}
+
+	/* timeout means wrong logic */
+	if (i >= timeout)
+		return -ETIME;
+
+	return RREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90) == param + 1 ? 0 : -EIO;
+}
+
 int
 smu_v11_0_send_msg_with_param(struct smu_context *smu,
 			      enum smu_message_type msg,
@@ -107,9 +138,16 @@ smu_v11_0_send_msg_with_param(struct smu_context *smu,
 	mutex_lock(&smu->message_lock);
 	ret = smu_v11_0_wait_for_response(smu);
 	if (ret) {
-		pr_err("Msg issuing pre-check failed and "
-		       "SMU may be not in the right state!\n");
-		goto out;
+		if (smu_v11_0_wait_smu_idle(smu)) {
+			pr_err("Msg issuing pre-check failed and "
+				"SMU may be not in the right state!\n");
+			pr_err("SMU is not idle, "
+				"SMU responds to test message fail\n");
+			goto out;
+		} else {
+			pr_info("SMU is actually idle, "
+				"SMU responds to test message pass\n");
+		}
 	}
 
 	WREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90, 0);

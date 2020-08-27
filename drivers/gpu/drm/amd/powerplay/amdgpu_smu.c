@@ -1320,6 +1320,12 @@ static int smu_start_smc_engine(struct smu_context *smu)
 			pr_err("SMC is not ready\n");
 	}
 
+	if (smu->ppt_funcs->wait_smu_idle) {
+		ret = smu->ppt_funcs->wait_smu_idle(smu);
+		if (ret)
+			pr_err("SMU is not idle\n");
+	}
+
 	return ret;
 }
 

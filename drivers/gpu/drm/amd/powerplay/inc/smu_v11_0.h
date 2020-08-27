@@ -153,6 +153,8 @@ int smu_v11_0_fini_power(struct smu_context *smu);
 
 int smu_v11_0_check_fw_status(struct smu_context *smu);
 
+int smu_v11_0_wait_smu_idle(struct smu_context *smu);
+
 int smu_v11_0_setup_pptable(struct smu_context *smu);
 
 int smu_v11_0_get_vbios_bootup_values(struct smu_context *smu);
