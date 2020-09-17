@@ -4,6 +4,7 @@ DefaultDependencies=no
 Conflicts=shutdown.target
 Before=sysinit.target shutdown.target
 Before=systemd-modules-load.service
+After=local-fs.target
 ConditionCapability=CAP_SYS_MODULE
 ConditionKernelCommandLine=|!nogpu
 
