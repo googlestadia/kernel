@@ -101,7 +101,7 @@ int smu_v11_0_wait_smu_idle(struct smu_context *smu)
 	/*
 	 * use PPSMC_MSG_TestMessage to check whether SMU is idle
 	 * if SMU is idle, it will response
-	 * the response will be the param you pass + 1
+	 * the returned paramter will be the param you pass + 1
 	 */
 	WREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90, 0);
 	WREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_82, param);
@@ -119,7 +119,7 @@ int smu_v11_0_wait_smu_idle(struct smu_context *smu)
 	if (i >= timeout)
 		return -ETIME;
 
-	return RREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_90) == param + 1 ? 0 : -EIO;
+	return RREG32_SOC15_NO_KIQ(MP1, 0, mmMP1_SMN_C2PMSG_82) == param + 1 ? 0 : -EIO;
 }
 
 int
