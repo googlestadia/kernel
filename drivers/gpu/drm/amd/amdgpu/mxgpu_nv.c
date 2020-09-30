@@ -282,6 +282,7 @@ static void xgpu_nv_mailbox_flr_work(struct work_struct *work)
 	if (!locked)
 		return;
 
+	amdgpu_virt_fini_data_exchange(adev);
 	adev->in_gpu_reset = true;
 	do {
 		if (xgpu_nv_mailbox_peek_msg(adev) == IDH_FLR_NOTIFICATION_CMPL)
