@@ -9,3 +9,5 @@ argos_shared-objs		:= argos_device.o argos_ioctl.o argos_overseer.o argos_common
 obj-$(CONFIG_VARGOS_DRIVER) 	+= vargos.o
 
 vargos-objs                     := vargos_driver.o
+
+GCOV_PROFILE := y

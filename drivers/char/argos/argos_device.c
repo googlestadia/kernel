@@ -16,6 +16,7 @@
 #include "argos_queue.h"
 #include "argos_types.h"
 #include "chip_global_accessors.h"
+#include "firmware_version_accessors.h"
 #include "kernel_chip_global_accessors.h"
 #include "kernel_queue_accessors.h"
 #include "rid_filter.h"
@@ -57,12 +58,6 @@ int argos_wait_for_expected_value(
 
  deadline = jiffies + timeout * device_data->timeout_scaling * HZ;
  do {
-  if (gasket_dev->status == GASKET_STATUS_DRIVER_EXIT) {
-   gasket_log_warn(gasket_dev,
-    "Aborting FW handshake due to driver exit.");
-   return -ECANCELED;
-  }
-
   value = gasket_dev_read_64(gasket_dev, bar, offset);
   if (get_decoded_value(value) == expected_value)
    return 0;
@@ -409,7 +404,7 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
  return 0;
 }
 EXPORT_SYMBOL(argos_device_reset);
-# 418 "./drivers/char/argos/argos_device.c"
+# 413 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_count_based(
   struct argos_common_device_data *device_data,
   const struct queue_ctx *queue_ctx,
@@ -446,7 +441,7 @@ static int argos_dram_request_send_count_based(
 
  return 0;
 }
-# 464 "./drivers/char/argos/argos_device.c"
+# 459 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_bitmap_based(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx, int original_chunks,
@@ -496,7 +491,7 @@ static int argos_dram_request_send_bitmap_based(
 
  return 0;
 }
-# 521 "./drivers/char/argos/argos_device.c"
+# 516 "./drivers/char/argos/argos_device.c"
 static int get_dram_configuration_response(
  struct argos_common_device_data *device_data,
  int queue_index)
@@ -512,9 +507,7 @@ static int get_dram_configuration_response(
    DDR_CHUNK_ACK_TIMEOUT_SEC,
    ARGOS_NAME_FIELD_DECODER_WRAPPER(
     kernel_queue_ddr_control_change_requested), 0);
- if (ret == -ECANCELED)
-  return ret;
- else if (ret == -ETIMEDOUT) {
+ if (ret == -ETIMEDOUT) {
   gasket_log_error(gasket_dev,
    "HW/FW error: DDR config request not acked! Marking device unhealthy.");
   gasket_dev->status = GASKET_STATUS_DEAD;
@@ -529,9 +522,7 @@ static int get_dram_configuration_response(
    DDR_CHUNK_ACK_TIMEOUT_SEC,
    ARGOS_NAME_FIELD_DECODER_WRAPPER(
     kernel_queue_ddr_status_pending_config), 0);
- if (ret == -ECANCELED)
-  return ret;
- else if (ret == -ETIMEDOUT) {
+ if (ret == -ETIMEDOUT) {
   gasket_log_error(
    gasket_dev,
    "HW/FW error: DDR config timed out! Marking device unhealthy.");
@@ -640,7 +631,7 @@ void argos_populate_queue_mappable_region(
  mappable_region->flags = VM_READ | VM_WRITE;
 }
 EXPORT_SYMBOL(argos_populate_queue_mappable_region);
-# 672 "./drivers/char/argos/argos_device.c"
+# 663 "./drivers/char/argos/argos_device.c"
 int argos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -651,6 +642,8 @@ int argos_get_mappable_regions_cb(
  const struct gasket_driver_desc *driver_desc;
  const struct gasket_bar_desc *bar_desc;
  const struct argos_mappable_regions *desc_map_regions;
+ const struct gasket_mappable_region *mappable_bar_region;
+ enum argos_security_level security_level;
  struct queue_ctx *queue_ctxs;
  bool return_all = false;
  int i, output_index = 0;
@@ -675,13 +668,20 @@ int argos_get_mappable_regions_cb(
   return -EFAULT;
  }
 
+ if (capable(CAP_SYS_ADMIN)) {
+  security_level = ARGOS_SECURITY_LEVEL_ROOT;
+ } else {
+  security_level = ARGOS_SECURITY_LEVEL_USER;
+ }
+
  if (bar_index == device_desc->firmware_register_bar) {
 
   *num_mappable_regions = 1;
 
 
   if ((gasket_dev->ownership.owner == current->tgid ||
-       capable(CAP_SYS_ADMIN)) && !gasket_dev->parent) {
+   security_level == ARGOS_SECURITY_LEVEL_ROOT) &&
+   !gasket_dev->parent) {
    return_all = true;
 
    (*num_mappable_regions)++;
@@ -748,7 +748,7 @@ int argos_get_mappable_regions_cb(
 
 #ifndef STADIA_KERNEL
 
-  if (!capable(CAP_SYS_ADMIN))
+  if (security_level != ARGOS_SECURITY_LEVEL_ROOT)
    return 0;
 #endif
 
@@ -759,28 +759,44 @@ int argos_get_mappable_regions_cb(
     *num_mappable_regions, GFP_KERNEL);
   bar_desc =
    &driver_desc->bar_descriptions[device_desc->dram_bar];
-  memcpy(*mappable_regions, &bar_desc->mappable_regions,
+  memcpy(*mappable_regions, bar_desc->mappable_regions,
    sizeof(struct gasket_mappable_region) *
     *num_mappable_regions);
 
  } else if (bar_index == device_desc->debug_bar) {
 
   if ((gasket_dev->ownership.owner != current->tgid &&
-   !capable(CAP_SYS_ADMIN)) || gasket_dev->parent) {
+   security_level != ARGOS_SECURITY_LEVEL_ROOT) ||
+   gasket_dev->parent) {
    return 0;
   }
 
-  *num_mappable_regions =
-   desc_map_regions->num_mappable_debug_regions;
+  *num_mappable_regions = device_desc->get_bar_region_count(
+    bar_index, security_level);
+  if (*num_mappable_regions <= 0)
+   return *num_mappable_regions;
+
+  mappable_bar_region = device_desc->get_bar_regions(
+    bar_index, security_level);
+  if (mappable_bar_region == NULL) {
+   gasket_log_error(gasket_dev,
+    "Could not determine mappable regions for debug bar!");
+   return -EINVAL;
+  }
+
   *mappable_regions = kmalloc(
    sizeof(struct gasket_mappable_region) *
     *num_mappable_regions, GFP_KERNEL);
-  bar_desc =
-   &driver_desc->bar_descriptions[device_desc->debug_bar];
-  memcpy(*mappable_regions,
-   &bar_desc->mappable_regions,
-   sizeof(struct gasket_mappable_region) *
-    *num_mappable_regions);
+  if (*mappable_regions == NULL) {
+   gasket_log_error(gasket_dev,
+    "Unable to alloc mappable region block!");
+   *num_mappable_regions = 0;
+   return -ENOMEM;
+  }
+
+  for (i = 0; i < *num_mappable_regions; i++)
+   (*mappable_regions)[i] = mappable_bar_region[i];
+
  } else {
   gasket_log_error(
    gasket_dev, "Invalid BAR specified: %d", bar_index);
@@ -828,3 +844,61 @@ bool argos_owns_page_table(struct gasket_dev *gasket_dev,
  return false;
 }
 EXPORT_SYMBOL(argos_owns_page_table);
+
+int argos_device_firmware_version_cb(struct gasket_dev *gasket_dev,
+         unsigned int *major,
+         unsigned int *minor,
+         unsigned int *point,
+         unsigned int *subpoint)
+{
+ struct argos_common_device_data *device_data;
+ const struct argos_device_desc *device_desc;
+ int fw_bar;
+ u64 value;
+ firmware_version_image_info_current_type_value image_type;
+
+ if (gasket_dev->cb_data == NULL) {
+  gasket_log_error(gasket_dev, "Callback data is NULL!");
+  return -EINVAL;
+ }
+ device_data = gasket_dev->cb_data;
+ device_desc = device_data->device_desc;
+ fw_bar = device_desc->firmware_register_bar;
+
+
+ value = gasket_dev_read_64(gasket_dev, fw_bar,
+  device_desc->firmware_image_info_location);
+ image_type = firmware_version_image_info_current_type(value);
+
+ switch (image_type) {
+ case kFirmwareVersionImageInfoCurrentTypeValuePrimary:
+  value = gasket_dev_read_64(gasket_dev, fw_bar,
+   device_desc->firmware_primary_version_location);
+  *major = firmware_version_primary_version_major(value);
+  *minor = firmware_version_primary_version_minor(value);
+  *point = firmware_version_primary_version_point(value);
+  *subpoint = firmware_version_primary_version_subpoint(value);
+  return 0;
+ case kFirmwareVersionImageInfoCurrentTypeValueSecondary:
+  value = gasket_dev_read_64(gasket_dev, fw_bar,
+   device_desc->firmware_secondary_version_location);
+  *major = firmware_version_secondary_version_major(value);
+  *minor = firmware_version_secondary_version_minor(value);
+  *point = firmware_version_secondary_version_point(value);
+  *subpoint = firmware_version_secondary_version_subpoint(value);
+  return 0;
+ default:
+
+
+
+
+  gasket_log_warn(gasket_dev,
+   "Cannot determine firmware version because image type is unknown!");
+  *major = 0;
+  *minor = 0;
+  *point = 0;
+  *subpoint = 0;
+  return 0;
+ }
+}
+EXPORT_SYMBOL(argos_device_firmware_version_cb);

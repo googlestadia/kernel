@@ -1658,22 +1658,22 @@ static bool gasket_mm_get_mapping_addrs(
 
   return false;
  } else if (bar_offset <= range_start) {
-# 1833 "./drivers/gasket/gasket_core.c"
+# 1834 "./drivers/gasket/gasket_core.c"
   mappable_region->start =
    range_start + region->legacy_mmap_address_offset;
   *virt_offset = range_start - bar_offset;
   mappable_region->length_bytes =
    min(requested_length - *virt_offset, range_length);
-  return true;
+  return (mappable_region->length_bytes != 0);
  } else if (bar_offset > range_start &&
      bar_offset < range_end) {
-# 1851 "./drivers/gasket/gasket_core.c"
+# 1853 "./drivers/gasket/gasket_core.c"
   mappable_region->start =
    bar_offset + region->legacy_mmap_address_offset;
   *virt_offset = 0;
   mappable_region->length_bytes = min(
    requested_length, range_end - bar_offset);
-  return true;
+  return (mappable_region->length_bytes != 0);
  }
 
 
@@ -1787,7 +1787,7 @@ static enum do_map_region_status do_map_region(
 
  return DO_MAP_REGION_SUCCESS;
 }
-# 1981 "./drivers/gasket/gasket_core.c"
+# 1983 "./drivers/gasket/gasket_core.c"
 static int gasket_mmap(struct file *filp, struct vm_area_struct *vma)
 {
  int i, ret;
@@ -1968,7 +1968,7 @@ void gasket_mapped_unforkable_page(struct gasket_dev *gasket_dev)
 
 }
 EXPORT_SYMBOL(gasket_mapped_unforkable_page);
-# 2170 "./drivers/gasket/gasket_core.c"
+# 2172 "./drivers/gasket/gasket_core.c"
 static int gasket_get_hw_status(struct gasket_dev *gasket_dev)
 {
  int i;
@@ -2007,7 +2007,7 @@ static int gasket_get_hw_status(struct gasket_dev *gasket_dev)
 
  return GASKET_STATUS_ALIVE;
 }
-# 2220 "./drivers/gasket/gasket_core.c"
+# 2222 "./drivers/gasket/gasket_core.c"
 static long gasket_ioctl(struct file *filp, uint cmd, ulong arg)
 {
  struct gasket_dev *gasket_dev;

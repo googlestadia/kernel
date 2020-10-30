@@ -23,14 +23,15 @@
 #include "argos_ioctl.h"
 #include "argos_queue.h"
 #include "argos_types.h"
-#include "tgid_hash.h"
 #include "vargos_mailbox_types.h"
 
 
 #define VARGOS_PCI_VENDOR_ID 0x1ae0
-#define VARGOS_PCI_DEVICE_ID 0xffd1
+#define VARGOS_V1_PCI_DEVICE_ID 0xffd1
+#define VARGOS_V2_PCI_DEVICE_ID 0xffa0
 #define VARGOS_PCI_SUBSYSTEM_VENDOR_ID 0x1ae0
-#define VARGOS_PCI_SUBSYSTEM_DEVICE_ID 0xffd1
+#define VARGOS_V1_PCI_SUBSYSTEM_DEVICE_ID 0xffd1
+#define VARGOS_V2_PCI_SUBSYSTEM_DEVICE_ID 0xffa0
 
 
 
@@ -101,12 +102,8 @@
 
 #define VARGOS_FAKE_STICKY_START 0x02106000
 #define VARGOS_FAKE_STICKY_SIZE PAGE_SIZE
-# 109 "./drivers/char/argos/vargos_driver.c"
+# 110 "./drivers/char/argos/vargos_driver.c"
 #define VARGOS_MAILBOX_TIMEOUT (msecs_to_jiffies(500))
-
-#if VARGOS_QUEUE_CTX_COUNT > TGID_HASH_MAX_QUEUE_COUNT
-#error "VArgos requires more queues than tgid_hash supports"
-#endif
 
 
 enum sysfs_attribute_type {
@@ -232,7 +229,9 @@ static const struct gasket_sysfs_attribute vargos_sysfs_attrs[] = {
 };
 
 static const struct pci_device_id pci_ids[] = {
- { PCI_DEVICE(VARGOS_PCI_VENDOR_ID, VARGOS_PCI_DEVICE_ID) }, { 0 }
+ { PCI_DEVICE(VARGOS_PCI_VENDOR_ID, VARGOS_V1_PCI_DEVICE_ID) },
+ { PCI_DEVICE(VARGOS_PCI_VENDOR_ID, VARGOS_V2_PCI_DEVICE_ID) },
+ { 0 }
 };
 
 static const struct gasket_mappable_region fw_bar_regions[] = {
@@ -343,7 +342,7 @@ static int __init vargos_init(void)
 {
  int i;
 
- gasket_nodev_info("Loading VArgos driver: eaeb1ed66054.");
+ gasket_nodev_info("Loading VArgos driver: ffbdb006109d.");
 
  i = vargos_wormhole_setup();
  if (i)
@@ -375,7 +374,7 @@ static int __init vargos_init(void)
 
  return gasket_register_device(&device_desc);
 }
-# 391 "./drivers/char/argos/vargos_driver.c"
+# 390 "./drivers/char/argos/vargos_driver.c"
 static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 {
  const int reg = PCI_BASE_ADDRESS_0 + 4 * bar;
@@ -407,7 +406,7 @@ static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 
  return ret;
 }
-# 435 "./drivers/char/argos/vargos_driver.c"
+# 434 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_move_bar(
  struct pci_dev *pdev, int bar, struct resource *wormhole_res,
  u64 wormhole_bar_base)
@@ -418,7 +417,7 @@ int vargos_wormhole_move_bar(
 
  if (!wormhole_bar_base)
   return 0;
-# 453 "./drivers/char/argos/vargos_driver.c"
+# 452 "./drivers/char/argos/vargos_driver.c"
  ret = -EINVAL;
  pci_bus_for_each_resource(pdev->bus, r, i) {
   if (!r || !resource_contains(r, bar_res))
@@ -490,7 +489,7 @@ int vargos_wormhole_move_bar(
 
  return 0;
 }
-# 532 "./drivers/char/argos/vargos_driver.c"
+# 531 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_setup(void)
 {
  struct pci_dev *pdev = NULL;
@@ -499,29 +498,29 @@ int vargos_wormhole_setup(void)
  u64 wormhole_base, wormhole_size;
  u64 wormhole_bar[PCI_STD_RESOURCE_END + 1];
  struct resource wormhole_res;
+ const struct pci_device_id *id;
  int i;
 
- while ((pdev = pci_get_subsys(VARGOS_PCI_VENDOR_ID,
-  VARGOS_PCI_DEVICE_ID, VARGOS_PCI_SUBSYSTEM_VENDOR_ID,
-  VARGOS_PCI_SUBSYSTEM_DEVICE_ID, pdev)) != NULL) {
-  wormhole_base = 0;
-  wormhole_size = 0;
+ for (id = pci_ids; id->vendor && id->device; id++) {
+  while ((pdev = pci_get_device(id->vendor, id->device, pdev)) != NULL) {
+   wormhole_base = 0;
+   wormhole_size = 0;
 
-  ret = pci_enable_device(pdev);
-  if (ret) {
-   dev_warn(&pdev->dev,
-    "Unable to enable VArgos device: %d", ret);
-   continue;
-  }
+   ret = pci_enable_device(pdev);
+   if (ret) {
+    dev_warn(&pdev->dev,
+     "Unable to enable VArgos device: %d", ret);
+    continue;
+   }
 
-  ret = pci_request_region(pdev, VARGOS_FIRMWARE_BAR,
-   "vargos_wormhole_setup");
-  if (ret) {
-   dev_warn(&pdev->dev,
-    "Unable to reserve VArgos firmware BAR region: %d",
-    ret);
-   continue;
-  }
+   ret = pci_request_region(pdev, VARGOS_FIRMWARE_BAR,
+      "vargos_wormhole_setup");
+   if (ret) {
+    dev_warn(&pdev->dev,
+     "Unable to reserve VArgos firmware BAR region: %d",
+     ret);
+    continue;
+   }
 
   virt_base = ioremap(
    pci_resource_start(pdev, VARGOS_FIRMWARE_BAR),
@@ -533,42 +532,42 @@ int vargos_wormhole_setup(void)
    goto release_device;
   }
 
+   wormhole_base = readq(virt_base + VARGOS_WORMHOLE_BASE);
+   wormhole_size = readq(virt_base + VARGOS_WORMHOLE_SIZE);
+   wormhole_bar[0] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_0);
+   wormhole_bar[1] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_1);
+   wormhole_bar[2] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_2);
+   wormhole_bar[3] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_3);
+   wormhole_bar[4] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_4);
+   wormhole_bar[5] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_5);
 
-  wormhole_base = readq(virt_base + VARGOS_WORMHOLE_BASE);
-  wormhole_size = readq(virt_base + VARGOS_WORMHOLE_SIZE);
-  wormhole_bar[0] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_0);
-  wormhole_bar[1] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_1);
-  wormhole_bar[2] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_2);
-  wormhole_bar[3] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_3);
-  wormhole_bar[4] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_4);
-  wormhole_bar[5] = readq(virt_base + VARGOS_WORMHOLE_BAR_BASE_5);
-
-  wormhole_res.start = wormhole_base;
-  wormhole_res.end = wormhole_base + wormhole_size - 1;
-  wormhole_res.flags = IORESOURCE_MEM | IORESOURCE_MEM_64;
+   wormhole_res.start = wormhole_base;
+   wormhole_res.end = wormhole_base + wormhole_size - 1;
+   wormhole_res.flags = IORESOURCE_MEM | IORESOURCE_MEM_64;
 
 release_device:
-  if (virt_base)
-   iounmap(virt_base);
-  pci_release_region(pdev, VARGOS_FIRMWARE_BAR);
-  pci_disable_device(pdev);
+   if (virt_base)
+    iounmap(virt_base);
+   pci_release_region(pdev, VARGOS_FIRMWARE_BAR);
+   pci_disable_device(pdev);
 
-  if (wormhole_base == 0 && wormhole_size == 0) {
-   dev_warn(&pdev->dev,
-    "%s: Wormhole base and size are zero, disabling the feature",
-    __func__);
-   continue;
-  }
-  dev_info(&pdev->dev,
-   "%s: Found wormhole region %pR", __func__,
-   &wormhole_res);
+   if (wormhole_base == 0 && wormhole_size == 0) {
+    dev_warn(&pdev->dev,
+     "%s: Wormhole base and size are zero, disabling the feature",
+     __func__);
+    continue;
+   }
+   dev_info(&pdev->dev,
+    "%s: Found wormhole region %pR", __func__,
+    &wormhole_res);
 
-  for (i = 0; i < ARRAY_SIZE(wormhole_bar); i++) {
-   ret = vargos_wormhole_move_bar(
-    pdev, i, &wormhole_res, wormhole_bar[i]);
-   if (ret) {
-    pci_dev_put(pdev);
-    return ret;
+   for (i = 0; i < ARRAY_SIZE(wormhole_bar); i++) {
+    ret = vargos_wormhole_move_bar(
+     pdev, i, &wormhole_res, wormhole_bar[i]);
+    if (ret) {
+     pci_dev_put(pdev);
+     return ret;
+    }
    }
   }
  }

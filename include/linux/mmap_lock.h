@@ -1,5 +1,9 @@
+/*
+ * Copyright (C) 2020 Google LLC.
+ */
+# 1 "./include/linux/mmap_lock.h"
 #ifndef _LINUX_MMAP_LOCK_H
-#define _LINUX_MMAP_LOCK_H
+#define _LINUX_MMAP_LOCK_H 
 
 #include <linux/mmdebug.h>
 
@@ -92,4 +96,4 @@ static inline int mmap_lock_is_contended(struct mm_struct *mm)
 	return rwsem_is_contended(&mm->mmap_lock);
 }
 
-#endif /* _LINUX_MMAP_LOCK_H */
+#endif

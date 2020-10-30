@@ -12,7 +12,6 @@
 #include "argos_overseer.h"
 #include "argos_queue.h"
 #include "argos_types.h"
-#include "tgid_hash.h"
 
 
 
@@ -29,7 +28,7 @@ static int argos_ioctl_check_is_master(struct gasket_dev *gasket_dev, ulong arg)
 
  return 0;
 }
-# 36 "./drivers/char/argos/argos_ioctl.c"
+# 35 "./drivers/char/argos/argos_ioctl.c"
 static int argos_ioctl_allocate_queue_ctx(
  struct argos_common_device_data *device_data, ulong arg)
 {
@@ -51,7 +50,7 @@ static int argos_ioctl_allocate_queue_ctx(
  return argos_allocate_queue_ctx(
   device_data, &subcontainer_alloc_cfg);
 }
-# 65 "./drivers/char/argos/argos_ioctl.c"
+# 64 "./drivers/char/argos/argos_ioctl.c"
 static int argos_ioctl_subcontainer_allocate_queue_ctx(
  struct argos_common_device_data *device_data, ulong arg)
 {
@@ -154,13 +153,6 @@ static int argos_ioctl_deallocate_queue_ctx(
    "Disabling queue context %s (%i) during deallocation.",
    ctx_id, queue_ctx->index);
   ret = argos_disable_queue_ctx(device_data, queue_ctx);
-
-
-
-
-
-  ret |= tgid_hash_queue_remove(
-   device_data, queue_ctx->index, queue_owner);
  }
 
  ret |= argos_deallocate_queue_ctx(device_data, queue_ctx);
@@ -261,11 +253,6 @@ static int argos_ioctl_disable_queue_ctx(
  queue_owner = queue_ctx->owner;
  ret = argos_disable_queue_ctx(device_data, queue_ctx);
  mutex_unlock(&queue_ctx->mutex);
-
- mutex_lock(&device_data->mutex);
- ret = tgid_hash_queue_remove(
-  device_data, queue_ctx->index, current->tgid);
- mutex_unlock(&device_data->mutex);
 
  gasket_log_debug(gasket_dev, "tgid: %d: queue %d disabled (was owned by %d)",
   current->tgid, queue_ctx->index, queue_owner);
@@ -413,7 +400,7 @@ int argos_check_gasket_ioctl_permissions(
   if (interrupt_data.interrupt >=
    device_data->gasket_driver_desc->num_interrupts)
    return -EINVAL;
-# 434 "./drivers/char/argos/argos_ioctl.c"
+# 421 "./drivers/char/argos/argos_ioctl.c"
   if (is_master)
    return 1;
   else if (interrupt_data.interrupt ==
