@@ -42,7 +42,7 @@ ARGOS_NAME_FIELD_DECODER_WRAPPER(func_name)(const uint64 reg_value) \
 { \
  return func_name(reg_value); \
 }
-# 71 "./drivers/char/argos/argos_device.h"
+# 70 "./drivers/char/argos/argos_device.h"
 int argos_wait_for_expected_value(
  struct argos_common_device_data *device_data, int bar, ulong offset,
  ulong timeout, ulong (*get_decoded_value)(uint64),
@@ -63,7 +63,7 @@ static inline bool argos_check_ownership(struct gasket_dev *gasket_dev)
 
  return false;
 }
-# 99 "./drivers/char/argos/argos_device.h"
+# 98 "./drivers/char/argos/argos_device.h"
 int argos_sysfs_setup_cb(struct gasket_dev *gasket_dev);
 
 
@@ -93,13 +93,13 @@ int argos_device_disable_dev(struct gasket_dev *gasket_dev);
 
 
 int argos_device_open(struct gasket_dev *gasket_dev, struct file *filp);
-# 138 "./drivers/char/argos/argos_device.h"
+# 137 "./drivers/char/argos/argos_device.h"
 int argos_device_release(struct gasket_dev *gasket_dev, struct file *filp);
-# 149 "./drivers/char/argos/argos_device.h"
+# 148 "./drivers/char/argos/argos_device.h"
 long argos_device_ioctl(struct file *filp, uint cmd, ulong arg);
-# 160 "./drivers/char/argos/argos_device.h"
+# 159 "./drivers/char/argos/argos_device.h"
 int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type);
-# 173 "./drivers/char/argos/argos_device.h"
+# 172 "./drivers/char/argos/argos_device.h"
 int argos_configure_queue_ctx_dram(
  struct argos_common_device_data *device_data,
  struct queue_ctx *queue_ctx, uint *bitmap, int bitmap_elems);
@@ -113,7 +113,7 @@ int argos_configure_queue_ctx_dram(
 void argos_populate_queue_mappable_region(
  struct argos_common_device_data *device_data,
  int queue_idx, struct gasket_mappable_region *mappable_region);
-# 194 "./drivers/char/argos/argos_device.h"
+# 193 "./drivers/char/argos/argos_device.h"
 int argos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -125,5 +125,9 @@ int argos_get_mappable_regions_cb(
 
 
 bool argos_owns_page_table(struct gasket_dev *gasket_dev, int page_table_id);
+# 214 "./drivers/char/argos/argos_device.h"
+int argos_device_firmware_version_cb(
+ struct gasket_dev *gasket_dev, unsigned int *major, unsigned int *minor,
+ unsigned int *point, unsigned int *subpoint);
 
 #endif

@@ -5,6 +5,7 @@
 #include <linux/bitops.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
+#include <linux/mmap_lock.h>
 
 #include "../../gasket/gasket_logging.h"
 #include "argos_device.h"
@@ -132,12 +133,19 @@ int argos_allocate_queue_ctx(
  if (config->priority < 0 || config->priority > 7) {
   gasket_log_error(
    gasket_dev, "Priority must be in the range [0, 7].");
-  queue_ctx->allocated = 0;
-  mutex_unlock(&queue_ctx->mutex);
-  return -EINVAL;
+  ret = -EINVAL;
+  goto exit;
  }
 
  if (config->use_chunk_bitmap) {
+  if (!device_data->device_desc->bitmap_allocation_allowed) {
+   gasket_log_error(
+    gasket_dev,
+    "Bitmap based queue memory allocation is not allowed for this device!");
+   ret = -EINVAL;
+   goto exit;
+  }
+
 
   requested_chunks = 0;
   bitmap_ints = (uint *) config->chunk_bitmap;
@@ -158,9 +166,8 @@ int argos_allocate_queue_ctx(
    "Invalid DRAM chunks: %d. Valid range: [0-%d].",
    config->num_chunks,
    device_data->max_chunks_per_queue_ctx);
-  queue_ctx->allocated = 0;
-  mutex_unlock(&queue_ctx->mutex);
-  return -EINVAL;
+  ret = -EINVAL;
+  goto exit;
  }
 
 
@@ -174,6 +181,7 @@ int argos_allocate_queue_ctx(
  ret = device_data->argos_cb->allocate_queue_ctx_cb(
   device_data, queue_ctx, config);
 
+exit:
 
 
 
@@ -270,12 +278,6 @@ int argos_enable_queue_ctx(
   goto out;
  }
 
- ret = tgid_hash_queue_add(device_data, queue_ctx->index);
- if (ret) {
-  ret = -EINVAL;
-  goto out;
- }
-
  queue_ctx->owner = current->tgid;
  config->index = queue_ctx->index;
  config->dram_chunks = queue_ctx->dram_chunks;
@@ -289,7 +291,7 @@ out:
  return ret;
 }
 EXPORT_SYMBOL(argos_enable_queue_ctx);
-# 299 "./drivers/char/argos/argos_queue.c"
+# 301 "./drivers/char/argos/argos_queue.c"
 static void remove_all_mmaps(
  struct argos_common_device_data *device_data,
  int map_bar_index,
@@ -322,7 +324,7 @@ static void remove_all_mmaps(
    map_region->start,
    map_region->start + map_region->length_bytes);
 }
-# 344 "./drivers/char/argos/argos_queue.c"
+# 346 "./drivers/char/argos/argos_queue.c"
 static int remove_direct_mapping(
  struct argos_common_device_data *device_data,
  struct queue_ctx *queue_ctx,
@@ -436,32 +438,37 @@ EXPORT_SYMBOL(argos_disable_queue_ctx);
 
 
 
+
 static void disable_owned_queues(
  struct argos_common_device_data *device_data,
- struct tgid_hash_entry *hash_entry)
+ pid_t tgid)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  int i;
  struct queue_ctx *queue_ctx;
 
- gasket_log_debug(gasket_dev, "Disabling queues owned by TGID %d",
-  hash_entry->tgid);
+ gasket_log_debug(gasket_dev, "Disabling queues owned by TGID %d", tgid);
 
 
  for (i = 0; i < device_data->device_desc->queue_ctx_count; i++) {
-  if (tgid_hash_entry_queue_is_enabled(hash_entry, i)) {
-   gasket_log_debug(gasket_dev, "Disabling queue %d", i);
-   queue_ctx = &device_data->queue_ctxs[i];
+  bool contended = false;
+
+  queue_ctx = &device_data->queue_ctxs[i];
+
+  if (!mutex_trylock(&queue_ctx->mutex)) {
+   contended = true;
    mutex_lock(&queue_ctx->mutex);
+  }
+  if (queue_ctx->owner == tgid) {
+   gasket_log_debug(gasket_dev, "Disabling queue %d", i);
    argos_disable_queue_ctx(
     device_data, queue_ctx);
-   mutex_unlock(&queue_ctx->mutex);
-
-   schedule_timeout_interruptible(msecs_to_jiffies(1));
   }
- }
+  mutex_unlock(&queue_ctx->mutex);
 
- tgid_hash_entry_clear_queues(hash_entry);
+  if (contended)
+   cond_resched();
+ }
 }
 
 void argos_cleanup_hash_entry(struct kref *ref)
@@ -498,7 +505,7 @@ void argos_cleanup_hash_entry(struct kref *ref)
 
   hash_for_each(device_data->tgid_to_open_count, hash_idx,
    iterator, hlist_node)
-   disable_owned_queues(device_data, iterator);
+   disable_owned_queues(device_data, iterator->tgid);
 
   hash_for_each(device_data->tgid_to_open_count, hash_idx,
    iterator, hlist_node)
@@ -515,7 +522,7 @@ void argos_cleanup_hash_entry(struct kref *ref)
    }
   }
  } else {
-  disable_owned_queues(device_data, hash_entry);
+  disable_owned_queues(device_data, hash_entry->tgid);
  }
 
  tgid_hash_entry_free(hash_entry);
@@ -526,39 +533,54 @@ int argos_disable_and_deallocate_all_queues(
  struct argos_common_device_data *device_data)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
- struct queue_ctx *queue_ctxs;
- int i, ret = 0;
+ struct queue_ctx *queue_ctx;
+ int i, hash_idx, ret = 0;
+ struct hlist_node *tmp;
+ struct tgid_hash_entry *iterator;
 
 
 
 
 
- queue_ctxs = device_data->queue_ctxs;
+
+ hash_for_each_safe(device_data->tgid_to_open_count, hash_idx, tmp,
+  iterator, hlist_node) {
+  tgid_hash_entry_kill_worker(iterator);
+  tgid_hash_entry_free(iterator);
+ }
+
  for (i = 0; i < device_data->device_desc->queue_ctx_count; i++) {
+  queue_ctx = &device_data->queue_ctxs[i];
 
-  mutex_lock(&queue_ctxs[i].mutex);
-  if (queue_ctxs[i].allocated) {
-   if (queue_ctxs[i].owner != 0)
+
+  mutex_lock(&queue_ctx->mutex);
+  if (queue_ctx->allocated) {
+   if (queue_ctx->owner != 0)
     ret |= argos_disable_queue_ctx(
-     device_data, &queue_ctxs[i]);
+     device_data, queue_ctx);
 
    ret |= argos_deallocate_queue_ctx(
-    device_data, &queue_ctxs[i]);
+    device_data, queue_ctx);
   }
 
 
+  queue_ctx->owner = 0;
+  queue_ctx->allocated = false;
 
 
 
 
-  if (gasket_dev->parent && queue_ctxs[i].reserved) {
+
+
+  if (gasket_dev->parent && queue_ctx->reserved) {
    gasket_page_table_unmap_all(
-     queue_ctxs[i].pg_tbl);
+     queue_ctx->pg_tbl);
    gasket_page_table_garbage_collect(
-     queue_ctxs[i].pg_tbl);
+     queue_ctx->pg_tbl);
   }
-  mutex_unlock(&queue_ctxs[i].mutex);
+  mutex_unlock(&queue_ctx->mutex);
  }
+
 
  return ret;
 }
@@ -632,7 +654,7 @@ int argos_dram_request_evaluate_response(
  }
 }
 EXPORT_SYMBOL(argos_dram_request_evaluate_response);
-# 662 "./drivers/char/argos/argos_queue.c"
+# 684 "./drivers/char/argos/argos_queue.c"
 static int disable_firmware_queue_context(
  struct argos_common_device_data *device_data, int queue_idx,
  ulong control_offset, ulong status_offset)
@@ -648,9 +670,7 @@ static int disable_firmware_queue_context(
   status_offset, QUEUE_CONTROL_DISABLE_TIMEOUT_SEC,
   ARGOS_NAME_FIELD_DECODER_WRAPPER(queue_control_status_enable_pending),
   0);
- if (ret == -ECANCELED)
-  return ret;
- else if (ret == -ETIMEDOUT) {
+ if (ret == -ETIMEDOUT) {
   gasket_log_error(gasket_dev,
    "Queue %d did not finish enabling within timeout; status offset 0x%lx",
    queue_idx, status_offset);
@@ -666,9 +686,7 @@ static int disable_firmware_queue_context(
   status_offset, QUEUE_CONTROL_DISABLE_TIMEOUT_SEC,
   ARGOS_NAME_FIELD_DECODER_WRAPPER(queue_control_status_enabled),
   0);
- if (ret == -ECANCELED)
-  return ret;
- else if (ret == -ETIMEDOUT) {
+ if (ret == -ETIMEDOUT) {
   gasket_log_error(gasket_dev,
    "Queue %d did not become disabled within timeout; status offset 0x%lx",
    queue_idx, status_offset);
@@ -731,7 +749,7 @@ int argos_common_allocate_queue_ctx_callback(
  ret = argos_configure_queue_ctx_dram(
    device_data, queue_ctx,
    bitmap_ints, bitmap_num_ints);
-# 769 "./drivers/char/argos/argos_queue.c"
+# 787 "./drivers/char/argos/argos_queue.c"
  if (ret)
   return ret;
 
@@ -829,28 +847,6 @@ static int lookup_queue_ctx_by_index(
 
 
 
-
-
-static bool queue_is_enabled_by_current(
- struct argos_common_device_data *device_data,
- const struct queue_ctx *queue_ctx)
-{
- struct tgid_hash_entry *hash_entry;
-
- if (!queue_ctx->allocated)
-  return false;
-
- hash_entry = tgid_hash_find(device_data, current->tgid);
- if (!hash_entry)
-  return false;
-
- return tgid_hash_entry_queue_is_enabled(hash_entry, queue_ctx->index);
-}
-
-
-
-
-
 static int check_allocate_direct_mapping_request(
  const struct argos_common_device_data *device_data,
  const struct argos_direct_mapping_request *request)
@@ -923,7 +919,7 @@ int argos_allocate_direct_mapping(
  mutex_lock(&queue_ctx->mutex);
  mutex_lock(&queue_ctx->direct_mappings_mutex);
 
- if (!queue_is_enabled_by_current(device_data, queue_ctx)) {
+ if (queue_ctx->owner != current->tgid) {
   gasket_log_error(device_data->gasket_dev,
    "Queue %d is not enabled and owned by the process",
    request->queue_index);
@@ -1015,7 +1011,7 @@ int argos_deallocate_direct_mapping(
   mmap_read_lock(current->mm);
  mutex_lock(&queue_ctx->direct_mappings_mutex);
 
- if (!queue_is_enabled_by_current(device_data, queue_ctx)) {
+ if (queue_ctx->owner != current->tgid) {
   gasket_log_error(device_data->gasket_dev,
    "Queue %d is not enabled and owned by the process",
    request->queue_index);

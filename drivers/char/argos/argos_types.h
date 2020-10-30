@@ -16,7 +16,23 @@
 
 struct argos_common_device_data;
 struct argos_subcontainer_queue_ctx_config;
-# 27 "./drivers/char/argos/argos_types.h"
+
+
+
+
+
+
+enum argos_security_level {
+
+
+
+ ARGOS_SECURITY_LEVEL_ROOT,
+
+
+
+ ARGOS_SECURITY_LEVEL_USER,
+};
+# 41 "./drivers/char/argos/argos_types.h"
 struct direct_mapping {
 
 
@@ -62,6 +78,8 @@ struct queue_ctx {
  int dram_chunks;
 
 
+
+
  pid_t owner;
 
 
@@ -84,7 +102,7 @@ struct queue_ctx {
 
 
  bool reserved;
-# 104 "./drivers/char/argos/argos_types.h"
+# 120 "./drivers/char/argos/argos_types.h"
  struct mutex direct_mappings_mutex;
 
 
@@ -141,6 +159,12 @@ struct argos_device_desc {
 
 
  bool overseer_supported;
+
+
+
+
+
+ bool bitmap_allocation_allowed;
 
 
 
@@ -251,6 +275,14 @@ struct argos_device_desc {
  ulong dram_chunk_bitmap_location;
 
 
+
+
+
+ ulong firmware_primary_version_location;
+ ulong firmware_secondary_version_location;
+ ulong firmware_image_info_location;
+
+
  struct {
 
 
@@ -304,37 +336,44 @@ struct argos_device_desc {
 
 
  struct argos_mappable_regions mappable_regions;
+ int (*get_bar_region_count)(
+  int bar,
+  enum argos_security_level security_level);
+ const struct gasket_mappable_region *
+ (*get_bar_regions)(
+  int bar,
+  enum argos_security_level security_level);
 };
-# 332 "./drivers/char/argos/argos_types.h"
+# 369 "./drivers/char/argos/argos_types.h"
 struct argos_device_callbacks {
-# 343 "./drivers/char/argos/argos_types.h"
+# 380 "./drivers/char/argos/argos_types.h"
  bool (*is_queue_ctx_failed_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx);
-# 358 "./drivers/char/argos/argos_types.h"
+# 395 "./drivers/char/argos/argos_types.h"
  int (*allocate_queue_ctx_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx,
   const struct argos_subcontainer_queue_ctx_config *config);
-# 376 "./drivers/char/argos/argos_types.h"
+# 413 "./drivers/char/argos/argos_types.h"
  int (*enable_queue_ctx_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx);
-# 393 "./drivers/char/argos/argos_types.h"
+# 430 "./drivers/char/argos/argos_types.h"
  int (*disable_queue_ctx_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx,
   struct gasket_mappable_region *mappable_region);
-# 408 "./drivers/char/argos/argos_types.h"
+# 445 "./drivers/char/argos/argos_types.h"
  int (*deallocate_queue_ctx_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx);
-# 436 "./drivers/char/argos/argos_types.h"
+# 473 "./drivers/char/argos/argos_types.h"
  int (*allocate_direct_mapping_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx,
   struct direct_mapping *direct_mapping);
-# 453 "./drivers/char/argos/argos_types.h"
+# 490 "./drivers/char/argos/argos_types.h"
  int (*deallocate_direct_mapping_cb)(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx,
@@ -361,7 +400,7 @@ struct argos_common_device_data {
 
 
  DECLARE_HASHTABLE(tgid_to_open_count, 5);
-# 488 "./drivers/char/argos/argos_types.h"
+# 525 "./drivers/char/argos/argos_types.h"
  struct mutex mutex;
 
 
@@ -403,7 +442,7 @@ struct argos_common_device_data {
 
 
  int allocated_chunks;
-# 546 "./drivers/char/argos/argos_types.h"
+# 583 "./drivers/char/argos/argos_types.h"
  u8 *chunk_map;
 
 
@@ -411,8 +450,11 @@ struct argos_common_device_data {
 
 
  struct mutex rid_filter_lock;
-# 561 "./drivers/char/argos/argos_types.h"
+# 598 "./drivers/char/argos/argos_types.h"
  u8 *rid_filter_assignments;
+
+
+ void *chip_specific_data;
 };
 
 

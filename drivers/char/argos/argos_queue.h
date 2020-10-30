@@ -68,7 +68,7 @@ int argos_common_deallocate_queue_ctx_callback(
 # 220 "./drivers/char/argos/argos_queue.h"
 bool argos_should_map_queue(
  struct argos_common_device_data *device_data, int queue_idx);
-
+# 230 "./drivers/char/argos/argos_queue.h"
 int argos_disable_and_deallocate_all_queues(
  struct argos_common_device_data *device_data);
 
