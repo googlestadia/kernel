@@ -11,7 +11,7 @@
 #include <linux/pci_regs.h>
 #include <linux/uaccess.h>
 
-#define CREATE_TRACE_POINTS 
+#define CREATE_TRACE_POINTS
 #include <trace/events/vargos_driver.h>
 
 #include "../../pci/pci.h"
@@ -523,7 +523,7 @@ int vargos_wormhole_setup(void)
    continue;
   }
 
-  virt_base = ioremap_nocache(
+  virt_base = ioremap(
    pci_resource_start(pdev, VARGOS_FIRMWARE_BAR),
    VARGOS_FIRMWARE_BAR_SIZE);
   if (!virt_base) {

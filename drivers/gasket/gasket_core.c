@@ -16,7 +16,7 @@
 #include <linux/iommu.h>
 #include <linux/sched.h>
 
-#define CREATE_TRACE_POINTS 
+#define CREATE_TRACE_POINTS
 #include <trace/events/gasket_mmap.h>
 # 33 "./drivers/gasket/gasket_core.c"
 struct gasket_unforkable_mapping {
@@ -876,7 +876,7 @@ static int gasket_map_pci_bar(struct gasket_dev *gasket_dev, int bar_num)
  }
 
  gasket_dev->bar_data[bar_num].virt_base =
-  ioremap_nocache(gasket_dev->bar_data[bar_num].phys_base,
+  ioremap(gasket_dev->bar_data[bar_num].phys_base,
    gasket_dev->bar_data[bar_num].length_bytes);
  if (!gasket_dev->bar_data[bar_num].virt_base) {
   gasket_log_error(gasket_dev,

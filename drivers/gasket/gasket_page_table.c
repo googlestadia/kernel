@@ -7,6 +7,7 @@
 #include <linux/file.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/pagemap.h>
@@ -317,7 +318,7 @@ int gasket_page_table_map(struct gasket_page_table *pg_tbl, ulong host_addr,
  uint num_pages;
 
  if (current->mm)
-  down_read(&current->mm->mmap_sem);
+  mmap_read_lock(current->mm);
  mutex_lock(&pg_tbl->mutex);
 
  if (gasket_page_table_are_addrs_bad(pg_tbl, host_addr, dev_addr,
@@ -340,7 +341,7 @@ int gasket_page_table_map(struct gasket_page_table *pg_tbl, ulong host_addr,
 
  mutex_unlock(&pg_tbl->mutex);
  if (current->mm)
-  up_read(&current->mm->mmap_sem);
+  mmap_read_unlock(current->mm);
  return ret;
 }
 EXPORT_SYMBOL(gasket_page_table_map);
