@@ -3,6 +3,7 @@
  */
 # 1 "./drivers/char/argos/argos_queue.c"
 #include <linux/bitops.h>
+#include <linux/mm.h>
 #include <linux/mman.h>
 
 #include "../../gasket/gasket_logging.h"
@@ -297,7 +298,7 @@ static void remove_all_mmaps(
  bool unmapped = false;
  struct vm_area_struct *vma = NULL, *next_vma;
 
- lockdep_assert_held_once(&current->mm->mmap_sem);
+ mmap_assert_locked(current->mm);
 
  vma = current->mm->mmap;
 
@@ -367,7 +368,7 @@ int argos_disable_queue_ctx(
   return 1;
 
  if (current->mm)
-  down_read(&current->mm->mmap_sem);
+  mmap_read_lock(current->mm);
  mutex_lock(&queue_ctx->direct_mappings_mutex);
  list_for_each_entry_safe(direct_mapping, next_direct_mapping,
      &queue_ctx->direct_mappings, list) {
@@ -379,7 +380,7 @@ int argos_disable_queue_ctx(
  }
  mutex_unlock(&queue_ctx->direct_mappings_mutex);
  if (current->mm)
-  up_read(&current->mm->mmap_sem);
+  mmap_read_unlock(current->mm);
 
  if (dm_ret) {
 
@@ -412,7 +413,7 @@ int argos_disable_queue_ctx(
 
 
  if (current->mm) {
-  down_read(&current->mm->mmap_sem);
+  mmap_read_lock(current->mm);
   if (queue_ctx->owner == current->tgid &&
    gasket_dev->ownership.owner != current->tgid &&
    !capable(CAP_SYS_ADMIN))
@@ -420,7 +421,7 @@ int argos_disable_queue_ctx(
     device_data,
     device_data->device_desc->firmware_register_bar,
     &map_region);
-  up_read(&current->mm->mmap_sem);
+  mmap_read_unlock(current->mm);
  }
 
  if (queue_ctx->pg_tbl)
@@ -1011,7 +1012,7 @@ int argos_deallocate_direct_mapping(
 
 
  if (current->mm)
-  down_read(&current->mm->mmap_sem);
+  mmap_read_lock(current->mm);
  mutex_lock(&queue_ctx->direct_mappings_mutex);
 
  if (!queue_is_enabled_by_current(device_data, queue_ctx)) {
@@ -1056,7 +1057,7 @@ int argos_deallocate_direct_mapping(
 
 exit:
  if (current->mm)
-  up_read(&current->mm->mmap_sem);
+  mmap_read_unlock(current->mm);
  mutex_unlock(&queue_ctx->direct_mappings_mutex);
  mutex_unlock(&queue_ctx->mutex);
  return ret;
