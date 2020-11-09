@@ -158,8 +158,6 @@ static void ttm_bo_add_mem_to_lru(struct ttm_buffer_object *bo,
 	struct ttm_bo_device *bdev = bo->bdev;
 	struct ttm_mem_type_manager *man;
 
-	dma_resv_assert_held(amdkcl_ttm_resvp(bo));
-
 	if (!list_empty(&bo->lru))
 		return;
 
@@ -543,7 +541,7 @@ static bool ttm_bo_delayed_delete(struct ttm_bo_device *bdev, bool remove_all)
 		if (!ttm_bo_get_unless_zero(bo))
 			continue;
 
-		if (remove_all || amdkcl_ttm_resvp(bo) != &amdkcl_ttm_resv(bo)) {
+		if (remove_all) {
 			spin_unlock(&glob->lru_lock);
 			dma_resv_lock(amdkcl_ttm_resvp(bo), NULL);
 
@@ -618,7 +616,8 @@ static void ttm_bo_release(struct kref *kref)
 		 */
 		if (bo->mem.placement & TTM_PL_FLAG_NO_EVICT) {
 			bo->mem.placement &= ~TTM_PL_FLAG_NO_EVICT;
-			ttm_bo_move_to_lru_tail(bo, NULL);
+			ttm_bo_del_from_lru(bo);
+			ttm_bo_add_mem_to_lru(bo, &bo->mem);
 		}
 
 		kref_init(&bo->kref);

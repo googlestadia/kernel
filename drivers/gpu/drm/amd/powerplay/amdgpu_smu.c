@@ -1320,17 +1320,26 @@ static int smu_start_smc_engine(struct smu_context *smu)
 			pr_err("SMC is not ready\n");
 	}
 
+	if (smu->ppt_funcs->wait_smu_idle) {
+		ret = smu->ppt_funcs->wait_smu_idle(smu);
+		if (ret)
+			pr_err("SMU is not idle\n");
+	}
+
 	return ret;
 }
 
 static int smu_hw_init(void *handle)
 {
-	int ret;
+	int ret = 0;
 	struct amdgpu_device *adev = (struct amdgpu_device *)handle;
 	struct smu_context *smu = &adev->smu;
 
-	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev))
-		return 0;
+	/* SMU is supported only in 1 VF mode on SRIOV */
+	if (amdgpu_sriov_vf(adev) && !amdgpu_sriov_is_pp_one_vf(adev)) {
+		smu->pm_enabled = false;
+		return ret;
+	}
 
 	ret = smu_start_smc_engine(smu);
 	if (ret) {
@@ -1744,6 +1753,7 @@ static int smu_enable_umd_pstate(void *handle,
 
 	struct smu_context *smu = (struct smu_context*)(handle);
 	struct smu_dpm_context *smu_dpm_ctx = &(smu->smu_dpm);
+	struct amdgpu_device *adev = smu->adev;
 
 	if (!smu->is_apu && (!smu->pm_enabled || !smu_dpm_ctx->dpm_context))
 		return -EINVAL;
@@ -1759,6 +1769,12 @@ static int smu_enable_umd_pstate(void *handle,
 			amdgpu_device_ip_set_powergating_state(smu->adev,
 							       AMD_IP_BLOCK_TYPE_GFX,
 							       AMD_PG_STATE_UNGATE);
+			if (adev->asic_type >= CHIP_NAVI10 &&
+				adev->asic_type <= CHIP_NAVI12 &&
+				(adev->pm.pp_feature & PP_GFXOFF_MASK || amdgpu_sriov_is_pp_one_vf(adev))) {
+				dev_dbg(smu->adev->dev, "Enter pstate, disable GFXOFF, re-init SPM golden\n");
+				amdgpu_gfx_init_spm_golden(adev);
+			}
 		}
 	} else {
 		/* exit umd pstate, restore level, enable gfx cg*/

@@ -536,23 +536,25 @@ int amdgpu_fence_driver_init(struct amdgpu_device *adev)
  *
  * Tear down the fence driver for all possible rings (all asics).
  */
-void amdgpu_fence_driver_fini(struct amdgpu_device *adev)
+void amdgpu_fence_driver_fini(struct amdgpu_device *adev, int skip_hw)
 {
 	unsigned i, j;
-	int r;
+	int r = 0;
 
 	for (i = 0; i < AMDGPU_MAX_RINGS; i++) {
 		struct amdgpu_ring *ring = adev->rings[i];
 
 		if (!ring || !ring->fence_drv.initialized)
 			continue;
-		r = amdgpu_fence_wait_empty(ring);
-		if (r) {
+		if (!skip_hw)
+			r = amdgpu_fence_wait_empty(ring);
+		if (r || skip_hw) {
 			/* no need to trigger GPU reset as we are unloading */
 			amdgpu_fence_driver_force_completion(ring);
 		}
-		amdgpu_irq_put(adev, ring->fence_drv.irq_src,
-			       ring->fence_drv.irq_type);
+		if (!skip_hw)
+			amdgpu_irq_put(adev, ring->fence_drv.irq_src,
+					ring->fence_drv.irq_type);
 		drm_sched_fini(&ring->sched);
 		del_timer_sync(&ring->fence_drv.fallback_timer);
 		for (j = 0; j <= ring->fence_drv.num_fences_mask; ++j)

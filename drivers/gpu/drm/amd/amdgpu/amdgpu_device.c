@@ -1874,8 +1874,13 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 		}
 	}
 
-	adev->cg_flags &= amdgpu_cg_mask;
-	adev->pg_flags &= amdgpu_pg_mask;
+	if (amdgpu_sriov_vf(adev) || amdgpu_passthrough(adev)) {
+		adev->cg_flags &= amdgpu_cg_mask;
+		adev->pg_flags &= amdgpu_pg_mask;
+	} else {
+		adev->cg_flags &= 0xffffffff;
+		adev->pg_flags &= 0xffffffff;
+	}
 
 	return 0;
 }
@@ -2318,50 +2323,55 @@ static int amdgpu_device_ip_late_init(struct amdgpu_device *adev)
  * and sw_fini tears down any software state associated with each IP.
  * Returns 0 on success, negative error code on failure.
  */
-static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
+static int amdgpu_device_ip_fini(struct amdgpu_device *adev, int skip_hw)
 {
 	int i, r;
+
+	if (amdgpu_sriov_vf(adev) && adev->virt.ras_init_done)
+		amdgpu_virt_release_ras_err_handler_data(adev);
 
 	amdgpu_ras_pre_fini(adev);
 
 	if (adev->gmc.xgmi.num_physical_nodes > 1)
 		amdgpu_xgmi_remove_device(adev);
 
-	amdgpu_amdkfd_device_fini(adev);
+	if (!skip_hw)
+		amdgpu_amdkfd_device_fini(adev);
 
 	amdgpu_device_set_pg_state(adev, AMD_PG_STATE_UNGATE);
 	amdgpu_device_set_cg_state(adev, AMD_CG_STATE_UNGATE);
 
-	/* need to disable SMC first */
-	for (i = 0; i < adev->num_ip_blocks; i++) {
-		if (!adev->ip_blocks[i].status.hw)
-			continue;
-		if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_SMC) {
+	if (!skip_hw) {
+		/* need to disable SMC first */
+		for (i = 0; i < adev->num_ip_blocks; i++) {
+			if (!adev->ip_blocks[i].status.hw)
+				continue;
+			if (adev->ip_blocks[i].version->type == AMD_IP_BLOCK_TYPE_SMC) {
+				r = adev->ip_blocks[i].version->funcs->hw_fini((void *)adev);
+				/* XXX handle errors */
+				if (r) {
+					DRM_DEBUG("hw_fini of IP block <%s> failed %d\n",
+							adev->ip_blocks[i].version->funcs->name, r);
+				}
+				adev->ip_blocks[i].status.hw = false;
+				break;
+			}
+		}
+
+		for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
+			if (!adev->ip_blocks[i].status.hw)
+				continue;
+
 			r = adev->ip_blocks[i].version->funcs->hw_fini((void *)adev);
 			/* XXX handle errors */
 			if (r) {
 				DRM_DEBUG("hw_fini of IP block <%s> failed %d\n",
-					  adev->ip_blocks[i].version->funcs->name, r);
+						adev->ip_blocks[i].version->funcs->name, r);
 			}
+
 			adev->ip_blocks[i].status.hw = false;
-			break;
 		}
 	}
-
-	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
-		if (!adev->ip_blocks[i].status.hw)
-			continue;
-
-		r = adev->ip_blocks[i].version->funcs->hw_fini((void *)adev);
-		/* XXX handle errors */
-		if (r) {
-			DRM_DEBUG("hw_fini of IP block <%s> failed %d\n",
-				  adev->ip_blocks[i].version->funcs->name, r);
-		}
-
-		adev->ip_blocks[i].status.hw = false;
-	}
-
 
 	for (i = adev->num_ip_blocks - 1; i >= 0; i--) {
 		if (!adev->ip_blocks[i].status.sw)
@@ -2534,15 +2544,22 @@ static int amdgpu_device_ip_suspend_phase2(struct amdgpu_device *adev)
  */
 int amdgpu_device_ip_suspend(struct amdgpu_device *adev)
 {
-	int r;
+	int r = 0;
+	int skip_hw = 0;
 
 	if (amdgpu_sriov_vf(adev))
-		amdgpu_virt_request_full_gpu(adev, false);
+		skip_hw = amdgpu_virt_request_full_gpu(adev, false);
 
-	r = amdgpu_device_ip_suspend_phase1(adev);
-	if (r)
-		return r;
-	r = amdgpu_device_ip_suspend_phase2(adev);
+	/* In case amdgpu_virt_request_full_gpu failed and vm cannot get
+	 * full access, we should skip touching hw and let poweroff continue
+	 */
+
+	if (!skip_hw) {
+		r = amdgpu_device_ip_suspend_phase1(adev);
+		if (r)
+			return r;
+		r = amdgpu_device_ip_suspend_phase2(adev);
+	}
 
 	if (amdgpu_sriov_vf(adev))
 		amdgpu_virt_release_full_gpu(adev, false);
@@ -3345,7 +3362,11 @@ failed:
  */
 void amdgpu_device_fini(struct amdgpu_device *adev)
 {
-	int r;
+	int r = 0;
+	/* In case amdgpu_virt_request_full_gpu failed and vm cannot get
+	* full access, we should skip touching hw and let unload continue
+	*/
+	int skip_hw = 0;
 
 	DRM_INFO("amdgpu: finishing device.\n");
 	if (!amdgpu_sriov_vf(adev))
@@ -3355,11 +3376,14 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 	/* make sure IB test finished before entering exclusive mode
 	 * to avoid preemption on IB test
 	 * */
-	if (amdgpu_sriov_vf(adev))
-		amdgpu_virt_request_full_gpu(adev, false);
+	if (amdgpu_sriov_vf(adev)) {
+		skip_hw = amdgpu_virt_request_full_gpu(adev, false);
+		amdgpu_virt_fini_data_exchange(adev);
+	}
 
 	/* disable all interrupts */
-	amdgpu_irq_disable_all(adev);
+	if (!skip_hw)
+		amdgpu_irq_disable_all(adev);
 	if (adev->mode_info.mode_config_initialized){
 		if (!amdgpu_device_has_dc_support(adev))
 			drm_helper_force_disable_all(adev->ddev);
@@ -3368,11 +3392,11 @@ void amdgpu_device_fini(struct amdgpu_device *adev)
 			drm_atomic_helper_shutdown(adev->ddev);
 #endif
 	}
-	amdgpu_fence_driver_fini(adev);
+	amdgpu_fence_driver_fini(adev, skip_hw);
 	if (adev->pm_sysfs_en)
 		amdgpu_pm_sysfs_fini(adev);
 	amdgpu_fbdev_fini(adev);
-	r = amdgpu_device_ip_fini(adev);
+	r = amdgpu_device_ip_fini(adev, skip_hw);
 	if (adev->firmware.gpu_info_fw) {
 		release_firmware(adev->firmware.gpu_info_fw);
 		adev->firmware.gpu_info_fw = NULL;
@@ -3997,9 +4021,12 @@ static int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 	int i, r = 0;
 	bool need_full_reset  = *need_full_reset_arg;
 
-	if (amdgpu_sriov_vf(adev))
+	if (amdgpu_sriov_vf(adev)) {
 		if (!amdgpu_virt_notify_booked(adev, job))
 			amdgpu_virt_wait_dump(adev, MAX_SCHEDULE_TIMEOUT);
+		/* stop the data exchange thread */
+		amdgpu_virt_fini_data_exchange(adev);
+	}
 
 	/* block all schedulers and reset given job's ring */
 	for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {

@@ -561,6 +561,7 @@ amdgpu_gem_prime_import_sg_table(struct drm_device *dev,
 	bo->tbo.ttm->sg = sg;
 	bo->allowed_domains = AMDGPU_GEM_DOMAIN_GTT;
 	bo->preferred_domains = AMDGPU_GEM_DOMAIN_GTT;
+	bo->tbo.mem.mem_type = TTM_PL_TT;
 #if defined(AMDKCL_AMDGPU_DMABUF_OPS)
 	if (attach->dmabuf->ops != &amdgpu_dmabuf_ops)
 #endif
