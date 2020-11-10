@@ -229,14 +229,16 @@ function build_kernel_rootfs() {
 
 function build_initramfs() {
   pushd "${KBUILD_OUTPUT}"
-  readonly INITRAMFS_DATA_CPIO_XZ="${KBUILD_OUTPUT}/initramfs_data.cpio.xz"
-  "${SRC_DIR}"/usr/gen_initramfs_list.sh \
-    -o "${INITRAMFS_DATA_CPIO_XZ}" \
+  readonly INITRAMFS_DATA_CPIO="${KBUILD_OUTPUT}/initramfs_data.cpio"
+  readonly INITRAMFS_DATA_CPIO_XZ="${INITRAMFS_DATA_CPIO}.xz"
+  "${SRC_DIR}"/usr/gen_initramfs.sh \
+    -o "${INITRAMFS_DATA_CPIO}" \
     -u -1 -g -1 \
     "${SRC_DIR}"/stadia/initramfs/root-files \
     "${SRC_DIR}"/stadia/initramfs/root-image \
     "${INITRAMFS_INSTALL_DIR}" \
     "${TMP_INITRAMFS_DIR}"
+  xz --threads=0 -f --check=crc32 --lzma2=dict=1MiB "${INITRAMFS_DATA_CPIO}"
   popd
 }
 
@@ -311,8 +313,6 @@ function build_perf() {
     NO_GTK2=1 \
     NO_LIBPERL=1 \
     NO_JVMTI=1 \
-    LIBCLANGLLVM=1 \
-    LLVM_CONFIG=/usr/bin/llvm-config-3.9 \
     WERROR=0 \
     "${MAKE_ARGS[@]}"
   popd
