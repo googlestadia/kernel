@@ -61,7 +61,7 @@ static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 	p->uf_entry.tv.num_shared = 2;
 	p->uf_entry.user_pages = NULL;
 
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 
 	size = amdgpu_bo_size(bo);
 	if (size != PAGE_SIZE || (data->offset + 8) > size) {

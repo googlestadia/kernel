@@ -2,8 +2,6 @@
 #include <linux/version.h>
 #include "kcl_common.h"
 
-const unsigned char *_kcl_pcie_link_speed;
-
 const unsigned char _kcl_pcie_link_speed_stub[] = {
 	PCI_SPEED_UNKNOWN,              /* 0 */
 	PCIE_SPEED_2_5GT,               /* 1 */
@@ -95,11 +93,6 @@ EXPORT_SYMBOL(_kcl_pcie_get_width_cap);
 
 void amdkcl_pci_init(void)
 {
-#if !defined(HAVE_PCIE_GET_SPEED_AND_WIDTH_CAP)
-	_kcl_pcie_get_speed_cap = amdkcl_fp_setup("pcie_get_speed_cap", pcie_get_speed_cap);
-	_kcl_pcie_get_width_cap = amdkcl_fp_setup("pcie_get_width_cap", pcie_get_width_cap);
-#endif
-	_kcl_pcie_link_speed = (const unsigned char *) amdkcl_fp_setup("pcie_link_speed", _kcl_pcie_link_speed_stub);
 }
 
 #if !defined(HAVE_PCIE_ENABLE_ATOMIC_OPS_TO_ROOT)
@@ -223,7 +216,7 @@ u32 _kcl_pcie_bandwidth_available(struct pci_dev *dev, struct pci_dev **limiting
 	while (dev) {
 		pcie_capability_read_word(dev, PCI_EXP_LNKSTA, &lnksta);
 
-		next_speed = _kcl_pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
+		next_speed = pcie_link_speed[lnksta & PCI_EXP_LNKSTA_CLS];
 		next_width = (lnksta & PCI_EXP_LNKSTA_NLW) >>
 		PCI_EXP_LNKSTA_NLW_SHIFT;
 

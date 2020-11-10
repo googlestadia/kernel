@@ -71,42 +71,4 @@ static inline int kcl_amdgpu_get_crtc_scanout_position(struct drm_device *dev, i
 }
 #endif
 
-#if defined(HAVE_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER_HAS_KTIME_T)
-static inline bool kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
-					int *max_error,	ktime_t *vblank_time,
-					bool in_vblank_irq)
-{
-	return drm_calc_vbltimestamp_from_scanoutpos(dev, pipe, max_error, vblank_time, in_vblank_irq);
-}
-#elif defined(HAVE_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER_HAS_BOOL_IN_VBLANK_IRQ)
-static inline bool kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
-						int *max_error, struct timeval *vblank_time,
-						bool in_vblank_irq)
-{
-	return !!amdgpu_get_vblank_timestamp_kms(dev, pipe, max_error, vblank_time, in_vblank_irq);
-}
-#elif defined(HAVE_GET_VBLANK_TIMESTAMP_IN_DRM_DRIVER_RETURN_BOOL)
-static inline bool kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
-						int *max_error, struct timeval *vblank_time,
-						unsigned flags)
-{
-	return !!amdgpu_get_vblank_timestamp_kms(dev, pipe, max_error, vblank_time, flags);
-}
-#elif defined(HAVE_VGA_USE_UNSIGNED_INT_PIPE)
-static inline int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, unsigned int pipe,
-					int *max_error,	struct timeval *vblank_time,
-					unsigned flags)
-{
-	return amdgpu_get_vblank_timestamp_kms(dev, pipe, max_error, vblank_time, flags);
-}
-#else
-static inline int kcl_amdgpu_get_vblank_timestamp_kms(struct drm_device *dev, int crtc,
-					int *max_error,
-					struct timeval *vblank_time,
-					unsigned flags)
-{
-	return amdgpu_get_vblank_timestamp_kms(dev, crtc, max_error, vblank_time, flags);
-}
-#endif
-
 #endif /* AMDGPU_BACKPORT_KCL_AMDGPU_H */

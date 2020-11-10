@@ -146,7 +146,7 @@ void amdgpu_gem_force_release(struct amdgpu_device *adev)
 #ifndef HAVE_DRM_DEVICE_FILELIST_MUTEX
 			drm_gem_object_unreference(gobj);
 #else
-			drm_gem_object_put_unlocked(gobj);
+			drm_gem_object_put(gobj);
 #endif
 		}
 		idr_destroy(&file->object_idr);
@@ -324,7 +324,7 @@ int amdgpu_gem_create_ioctl(struct drm_device *dev, void *data,
 
 	r = drm_gem_handle_create(filp, gobj, &handle);
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	if (r)
 		return r;
 
@@ -407,11 +407,11 @@ static int amdgpu_gem_userptr_peermem(struct amdgpu_device *adev,
 	int r;
 
 	/* get VMA first */
-	down_read(&mm->mmap_sem);
+	mmap_read_lock(mm);
 	vma = find_vma(mm, args->addr);
 	/* we only support user virual mapped with a vm_file backing */
 	if (!vma || !vma->vm_file || vma->vm_end < end) {
-		up_read(&mm->mmap_sem);
+		mmap_read_unlock(mm);
 		DRM_DEV_ERROR(adev->dev,
 			"invalid vma: vma=%p, vma->vm_file=%p, vma->vm_end=%lp, end=%lp\n",
 			vma, (vma) ? vma->vm_file : NULL, (vma) ? vma->vm_end : 0l, end);
@@ -419,7 +419,7 @@ static int amdgpu_gem_userptr_peermem(struct amdgpu_device *adev,
 	}
 
 	dma_addr = amdgpu_gem_peer_dma_addr(adev->dev, mm, vma);
-	up_read(&mm->mmap_sem);
+	mmap_read_unlock(mm);
 
 	if (!dma_addr) {
 		DRM_DEV_ERROR(adev->dev,
@@ -442,7 +442,7 @@ static int amdgpu_gem_userptr_peermem(struct amdgpu_device *adev,
 	abo->tbo.mem.bus.addr = (void *)dma_addr;
 
 	r = drm_gem_handle_create(filp, gobj, &handle);
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	if (r) {
 		DRM_DEV_ERROR(adev->dev,
 			"drm_gem_handle_create failed: %d\n", r);
@@ -526,7 +526,7 @@ int amdgpu_gem_userptr_ioctl(struct drm_device *dev, void *data,
 
 	r = drm_gem_handle_create(filp, gobj, &handle);
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	if (r)
 		return r;
 
@@ -537,7 +537,7 @@ free_pages:
 	release_pages(bo->tbo.ttm->pages, bo->tbo.ttm->num_pages);
 
 release_object:
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 
 	return r;
 }
@@ -595,7 +595,7 @@ int amdgpu_gem_dgma_ioctl(struct drm_device *dev, void *data,
 	}
 
 release_object:
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -613,11 +613,11 @@ int amdgpu_mode_dumb_mmap(struct drm_file *filp,
 	robj = gem_to_amdgpu_bo(gobj);
 	if (amdgpu_ttm_tt_get_usermm(robj->tbo.ttm) ||
 	    (robj->flags & AMDGPU_GEM_CREATE_NO_CPU_ACCESS)) {
-		drm_gem_object_put_unlocked(gobj);
+		drm_gem_object_put(gobj);
 		return -EPERM;
 	}
 	*offset_p = amdgpu_bo_mmap_offset(robj);
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return 0;
 }
 
@@ -687,7 +687,7 @@ int amdgpu_gem_wait_idle_ioctl(struct drm_device *dev, void *data,
 	} else
 		r = ret;
 
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -730,7 +730,7 @@ int amdgpu_gem_metadata_ioctl(struct drm_device *dev, void *data,
 unreserve:
 	amdgpu_bo_unreserve(robj);
 out:
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -929,7 +929,7 @@ error_backoff:
 	ttm_eu_backoff_reservation(&ticket, &list);
 
 error_unref:
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -1005,7 +1005,7 @@ int amdgpu_gem_op_ioctl(struct drm_device *dev, void *data,
 	}
 
 out:
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	return r;
 }
 
@@ -1042,7 +1042,7 @@ int amdgpu_mode_dumb_create(struct drm_file *file_priv,
 
 	r = drm_gem_handle_create(file_priv, gobj, &handle);
 	/* drop reference from allocate - handle holds it now */
-	drm_gem_object_put_unlocked(gobj);
+	drm_gem_object_put(gobj);
 	if (r) {
 		return r;
 	}

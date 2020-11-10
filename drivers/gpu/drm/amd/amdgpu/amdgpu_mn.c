@@ -552,9 +552,9 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 
 	mutex_lock(&adev->mn_lock);
 #ifndef HAVE_DOWN_WRITE_KILLABLE
-	down_write(&mm->mmap_sem);
+	mmap_write_lock(mm);
 #else
-	if (down_write_killable(&mm->mmap_sem)) {
+	if (mmap_write_lock_killable(mm)) {
 		mutex_unlock(&adev->mn_lock);
 		return ERR_PTR(-EINTR);
 	}
@@ -590,13 +590,13 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev,
 	hash_add(adev->mn_hash, &amn->node, AMDGPU_MN_KEY(mm, type));
 
 release_locks:
-	up_write(&mm->mmap_sem);
+	mmap_write_unlock(mm);
 	mutex_unlock(&adev->mn_lock);
 
 	return amn;
 
 free_amn:
-	up_write(&mm->mmap_sem);
+	mmap_write_unlock(mm);
 	mutex_unlock(&adev->mn_lock);
 	kfree(amn);
 

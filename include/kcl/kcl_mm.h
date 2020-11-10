@@ -114,6 +114,10 @@ static inline int kcl_get_user_pages(struct task_struct *tsk, struct mm_struct *
 		write = ((!!write) & FOLL_WRITE) | ((!!force) & FOLL_FORCE);
 		return get_user_pages_remote(tsk, mm, start, nr_pages,
 				write, pages, vmas, locked);
+#elif defined(HAVE_7ARGS_1ARG_MM_GET_USER_PAGES_REMOTE)
+		write = ((!!write) & FOLL_WRITE) | ((!!force) & FOLL_FORCE);
+		return get_user_pages_remote(mm, start, nr_pages,
+				write, pages, vmas, locked);
 #elif defined(HAVE_7ARGS_GET_USER_PAGES_REMOTE)
 		write = ((!!write) & FOLL_WRITE) | ((!!force) & FOLL_FORCE);
 		return get_user_pages_remote(tsk, mm, start, nr_pages,

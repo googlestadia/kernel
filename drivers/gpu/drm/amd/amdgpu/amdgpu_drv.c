@@ -1541,8 +1541,6 @@ static struct drm_driver kms_driver = {
 	.get_vblank_counter = kcl_amdgpu_get_vblank_counter_kms,
 	.enable_vblank = kcl_amdgpu_enable_vblank_kms,
 	.disable_vblank = kcl_amdgpu_disable_vblank_kms,
-	.get_vblank_timestamp = kcl_amdgpu_get_vblank_timestamp_kms,
-	.get_scanout_position = kcl_amdgpu_get_crtc_scanout_position,
 #if defined(CONFIG_DEBUG_FS)
 #if defined(AMDKCL_AMDGPU_DEBUGFS_CLEANUP)
 	.debugfs_cleanup = amdgpu_debugfs_cleanup,

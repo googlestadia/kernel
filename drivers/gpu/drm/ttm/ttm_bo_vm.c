@@ -75,7 +75,7 @@ static vm_fault_t ttm_bo_vm_fault_idle(struct ttm_buffer_object *bo,
 #endif
 
 		ttm_bo_get(bo);
-		up_read(&vma->vm_mm->mmap_sem);
+		mmap_read_unlock(vma->vm_mm);
 		(void) dma_fence_wait(bo->moving, true);
 		dma_resv_unlock(amdkcl_ttm_resvp(bo));
 		ttm_bo_put(bo);
@@ -148,12 +148,12 @@ vm_fault_t ttm_bo_vm_reserve(struct ttm_buffer_object *bo,
 #ifdef FAULT_FLAG_RETRY_NOWAIT
 			if (!(vmf->flags & FAULT_FLAG_RETRY_NOWAIT)) {
 				ttm_bo_get(bo);
-				up_read(&vma->vm_mm->mmap_sem);
+				mmap_read_unlock(vma->vm_mm);
 				(void) ttm_bo_wait_unreserved(bo);
 				ttm_bo_put(bo);
 			}
 #else
-			up_read(&vma->vm_mm->mmap_sem);
+			mmap_read_unlock(vma->vm_mm);
 #endif
 
 			return VM_FAULT_RETRY;

@@ -1847,11 +1847,11 @@ static int kfd_create_sg_table_from_userptr_bo(struct kfd_bo *bo,
 	if (cma_write)
 		flags = FOLL_WRITE;
 	locked = 1;
-	down_read(&mm->mmap_sem);
+	mmap_read_lock(mm);
 	n = kcl_get_user_pages(task, mm, pa, nents, flags, 0, process_pages,
 				  NULL, &locked);
 	if (locked)
-		up_read(&mm->mmap_sem);
+		mmap_read_unlock(mm);
 	if (n <= 0) {
 		pr_err("CMA: Invalid virtual address 0x%lx\n", pa);
 		ret = -EFAULT;
@@ -2184,12 +2184,12 @@ static int kfd_copy_userptr_bos(struct cma_iter *si, struct cma_iter *di,
 	while (nents && to_copy) {
 		nl = min_t(unsigned int, MAX_PP_KMALLOC_COUNT, nents);
 		locked = 1;
-		down_read(&ri->mm->mmap_sem);
+		mmap_read_lock(ri->mm);
 		nl = kcl_get_user_pages(ri->task, ri->mm, rva, nl,
 					   flags, 0, process_pages, NULL,
 					   &locked);
 		if (locked)
-			up_read(&ri->mm->mmap_sem);
+			mmap_read_unlock(ri->mm);
 		if (nl <= 0) {
 			pr_err("CMA: Invalid virtual address 0x%lx\n", rva);
 			ret = -EFAULT;

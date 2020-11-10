@@ -1084,7 +1084,7 @@ static int start_nocpsch(struct device_queue_manager *dqm)
 {
 	pr_info("SW scheduler is used");
 	init_interrupts(dqm);
-	
+
 	if (dqm->dev->device_info->asic_family == CHIP_HAWAII)
 		return pm_init(&dqm->packets, dqm);
 	dqm->sched_running = true;
@@ -2208,7 +2208,7 @@ void copy_context_work_handler (struct work_struct *work)
 
 	p = workarea->p;
 	mm = get_task_mm(p->lead_thread);
-	use_mm(mm);
+	kthread_use_mm(mm);
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list) {
 		struct device_queue_manager *dqm = pdd->dev->dqm;
 		struct qcm_process_device *qpd = &pdd->qpd;
@@ -2234,7 +2234,7 @@ void copy_context_work_handler (struct work_struct *work)
 
 		dqm_unlock(dqm);
 	}
-	unuse_mm(mm);
+	kthread_unuse_mm(mm);
 	mmput(mm);
 }
 

@@ -25,6 +25,7 @@
 #define CREATE_TRACE_POINTS
 #include <kcl/kcl_trace.h>
 
+#ifdef AMDKCL_FENCE_WAIT_ANY_TIMEOUT
 static bool
 dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
 			    uint32_t *idx)
@@ -41,13 +42,12 @@ dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
 	}
 	return false;
 }
+#endif
 
 struct default_wait_cb {
 	struct dma_fence_cb base;
 	struct task_struct *task;
 };
-
-static void (*_kcl_fence_default_wait_cb)(struct dma_fence *fence, struct dma_fence_cb *cb);
 
 #ifdef AMDKCL_FENCE_DEFAULT_WAIT_TIMEOUT
 signed long
@@ -92,7 +92,7 @@ _kcl_fence_default_wait(struct dma_fence *fence, bool intr, signed long timeout)
 		goto out;
 	}
 
-	cb.base.func = _kcl_fence_default_wait_cb;
+	cb.base.func = dma_fence_default_wait_cb;
 	cb.task = current;
 	list_add(&cb.base.node, &fence->cb_list);
 
@@ -161,7 +161,7 @@ _kcl_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 
 		cb[i].task = current;
 		if (dma_fence_add_callback(fence, &cb[i].base,
-					   _kcl_fence_default_wait_cb)) {
+					   dma_fence_default_wait_cb)) {
 			/* This fence is already signaled */
 			if (idx)
 				*idx = i;
@@ -235,11 +235,6 @@ EXPORT_SYMBOL(_kcl_fence_enable_signaling);
  */
 void amdkcl_fence_init(void)
 {
-#if defined(HAVE_LINUX_DMA_FENCE_H)
-	_kcl_fence_default_wait_cb = amdkcl_fp_setup("dma_fence_default_wait_cb", NULL);
-#else
-	_kcl_fence_default_wait_cb = amdkcl_fp_setup("fence_default_wait_cb", NULL);
-#endif
 }
 
 #if !defined(HAVE_DMA_FENCE_GET_STUB)

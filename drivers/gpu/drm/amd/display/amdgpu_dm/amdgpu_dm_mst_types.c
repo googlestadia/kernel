@@ -511,74 +511,8 @@ dm_dp_add_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	return connector;
 }
 
-static void dm_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
-					struct drm_connector *connector)
-{
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 7, 0)
-	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
-	struct drm_device *dev = master->base.dev;
-	struct amdgpu_device *adev = dev->dev_private;
-#endif
-	struct amdgpu_dm_connector *aconnector = to_amdgpu_dm_connector(connector);
-
-	DRM_INFO("DM_MST: Disabling connector: %p [id: %d] [master: %p]\n",
-		 aconnector, connector->base.id, aconnector->mst_port);
-
-	if (aconnector->dc_sink) {
-		amdgpu_dm_update_freesync_caps(connector, NULL);
-		dc_link_remove_remote_sink(aconnector->dc_link,
-					   aconnector->dc_sink);
-		dc_sink_release(aconnector->dc_sink);
-		aconnector->dc_sink = NULL;
-		aconnector->dc_link->cur_link_settings.lane_count = 0;
-	}
-#if defined(HAVE_DRM_CONNECTOR_PUT) || defined(HAVE_FREE_CB_IN_STRUCT_DRM_MODE_OBJECT)
-	drm_connector_unregister(connector);
-	if (adev->mode_info.rfbdev)
-		drm_fb_helper_remove_one_connector(&adev->mode_info.rfbdev->helper, connector);
-	drm_connector_put(connector);
-#endif
-}
-
-#if defined(HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG)
-static void dm_dp_mst_hotplug(struct drm_dp_mst_topology_mgr *mgr)
-{
-	struct amdgpu_dm_connector *master = container_of(mgr, struct amdgpu_dm_connector, mst_mgr);
-	struct drm_device *dev = master->base.dev;
-
-	drm_kms_helper_hotplug_event(dev);
-}
-#endif
-
-static void dm_dp_mst_register_connector(struct drm_connector *connector)
-{
-	struct drm_device *dev = connector->dev;
-	struct amdgpu_device *adev = dev->dev_private;
-
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
-	drm_modeset_lock_all(dev);
-#endif
-	if (adev->mode_info.rfbdev)
-		drm_fb_helper_add_one_connector(&adev->mode_info.rfbdev->helper, connector);
-	else
-		DRM_ERROR("adev->mode_info.rfbdev is NULL\n");
-
-#if DRM_VERSION_CODE < DRM_VERSION(4, 14, 0)
-	drm_modeset_unlock_all(dev);
-#endif
-
-	drm_connector_register(connector);
-}
-
 static const struct drm_dp_mst_topology_cbs dm_mst_cbs = {
 	.add_connector = dm_dp_add_mst_connector,
-	.destroy_connector = dm_dp_destroy_mst_connector,
-#if defined(HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG)
-	.hotplug = dm_dp_mst_hotplug,
-#endif
-#if DRM_VERSION_CODE >= DRM_VERSION(4, 3, 0)
-	.register_connector = dm_dp_mst_register_connector
-#endif
 };
 
 void amdgpu_dm_initialize_dp_connector(struct amdgpu_display_manager *dm,

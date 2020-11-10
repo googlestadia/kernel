@@ -209,14 +209,6 @@ _kcl_drm_fb_helper_remove_conflicting_pci_framebuffers(struct pci_dev *pdev,
 }
 #endif
 
-#if !defined(HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED)
-static inline void
-drm_gem_object_put_unlocked(struct drm_gem_object *obj)
-{
-	return drm_gem_object_unreference_unlocked(obj);
-}
-#endif
-
 #if !defined(HAVE_DRM_IS_CURRENT_MASTER)
 bool drm_is_current_master(struct drm_file *fpriv);
 #endif

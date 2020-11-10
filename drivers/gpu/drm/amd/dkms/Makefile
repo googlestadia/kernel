@@ -1,6 +1,6 @@
 subdir-ccflags-y += \
 	-DDRM_VER=5 \
-	-DDRM_PATCH=4 \
+	-DDRM_PATCH=10 \
 	-DDRM_SUB="0"
 
 subdir-ccflags-y += -include $(src)/config/config.h

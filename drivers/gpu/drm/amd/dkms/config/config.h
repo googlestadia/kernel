@@ -19,11 +19,14 @@
 /* get_user_pages_remote() wants 7 args */
 /* #undef HAVE_7ARGS_GET_USER_PAGES_REMOTE */
 
+/* get_user_pages_remote() wants 7 args and first arg is mm */
+#define HAVE_7ARGS_1ARG_MM_GET_USER_PAGES_REMOTE 1
+
 /* get_user_pages() wants 8 args */
 /* #undef HAVE_8ARGS_GET_USER_PAGES */
 
 /* get_user_pages_remote() wants 8 args */
-#define HAVE_8ARGS_GET_USER_PAGES_REMOTE 1
+/* #undef HAVE_8ARGS_GET_USER_PAGES_REMOTE */
 
 /* whether access_ok(x, x) is available */
 #define HAVE_ACCESS_OK_WITH_TWO_ARGUMENTS 1
@@ -59,7 +62,7 @@
 #define HAVE_CHUNK_ID_SYNOBJ_IN_OUT 1
 
 /* devcgroup_check_permission() is available */
-/* #undef HAVE_DEVCGROUP_CHECK_PERMISSION */
+#define HAVE_DEVCGROUP_CHECK_PERMISSION 1
 
 /* devm_memremap_pages() wants struct dev_pagemap */
 #define HAVE_DEVM_MEMREMAP_PAGES_DEV_PAGEMAP 1
@@ -71,7 +74,7 @@
 #define HAVE_DEV_PM_SET_DRIVER_FLAGS 1
 
 /* dma_buf dynamic_mapping is available */
-/* #undef HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING */
+#define HAVE_DMA_BUF_OPS_DYNAMIC_MAPPING 1
 
 /* whether dma_fence_get_stub exits */
 #define HAVE_DMA_FENCE_GET_STUB 1
@@ -177,7 +180,7 @@
 #define HAVE_DRM_CONNECTOR_ATTACH_ENCODER 1
 
 /* drm_connector_for_each_possible_encoder() wants 2 arguments */
-/* #undef HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS */
+#define HAVE_DRM_CONNECTOR_FOR_EACH_POSSIBLE_ENCODER_2ARGS 1
 
 /* struct drm_connector_funcs has register members */
 #define HAVE_DRM_CONNECTOR_FUNCS_REGISTER 1
@@ -244,19 +247,19 @@
 #define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS 1
 
 /* drm_dp_atomic_find_vcpi_slots() wants 5args */
-/* #undef HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS */
+#define HAVE_DRM_DP_ATOMIC_FIND_VCPI_SLOTS_5ARGS 1
 
 /* drm_dp_calc_pbn_mode() wants 3args */
-/* #undef HAVE_DRM_DP_CALC_PBN_MODE_3ARGS */
+#define HAVE_DRM_DP_CALC_PBN_MODE_3ARGS 1
 
 /* drm_dp_cec* correlation functions are available */
 #define HAVE_DRM_DP_CEC_CORRELATION_FUNCTIONS 1
 
 /* drm_dp_cec_register_connector() wants p,p interface */
-/* #undef HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP */
+#define HAVE_DRM_DP_CEC_REGISTER_CONNECTOR_PP 1
 
 /* drm_dp_mst_add_affected_dsc_crtcs() is available */
-/* #undef HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS */
+#define HAVE_DRM_DP_MST_ADD_AFFECTED_DSC_CRTCS 1
 
 /* drm_dp_mst_allocate_vcpi() has p,p,i,i interface */
 #define HAVE_DRM_DP_MST_ALLOCATE_VCPI_P_P_I_I 1
@@ -265,13 +268,13 @@
 #define HAVE_DRM_DP_MST_ATOMIC_CHECK 1
 
 /* drm_dp_mst_atomic_enable_dsc() is available */
-/* #undef HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC */
+#define HAVE_DRM_DP_MST_ATOMIC_ENABLE_DSC 1
 
 /* drm_dp_mst_detect_port() wants p,p,p,p args */
-/* #undef HAVE_DRM_DP_MST_DETECT_PORT_PPPP */
+#define HAVE_DRM_DP_MST_DETECT_PORT_PPPP 1
 
 /* drm_dp_mst_dsc_aux_for_port() is available */
-/* #undef HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT */
+#define HAVE_DRM_DP_MST_DSC_AUX_FOR_PORT 1
 
 /* drm_dp_mst_{get,put}_port_malloc() is available */
 #define HAVE_DRM_DP_MST_GET_PUT_PORT_MALLOC 1
@@ -280,13 +283,13 @@
 /* #undef HAVE_DRM_DP_MST_TOPOLOGY_CBS_HOTPLUG */
 
 /* drm_dp_mst_topology_mgr_resume() wants 2 args */
-/* #undef HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS */
+#define HAVE_DRM_DP_MST_TOPOLOGY_MGR_RESUME_2ARGS 1
 
 /* drm_driver->gem_prime_res_obj() is available */
 /* #undef HAVE_DRM_DRIVER_GEM_PRIME_RES_OBJ */
 
 /* Define to 1 if you have the <drm/drmP.h> header file. */
-#define HAVE_DRM_DRMP_H 1
+/* #undef HAVE_DRM_DRMP_H */
 
 /* Define to 1 if you have the <drm/drm_drv.h> header file. */
 #define HAVE_DRM_DRM_DRV_H 1
@@ -331,10 +334,10 @@
 #define HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS 1
 
 /* drm_fb_helper_remove_conflicting_pci_framebuffers() wants p,i,p args */
-#define HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PIP 1
+/* #undef HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PIP */
 
 /* drm_fb_helper_remove_conflicting_pci_framebuffers() wants p,p args */
-/* #undef HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP */
+#define HAVE_DRM_FB_HELPER_REMOVE_CONFLICTING_PCI_FRAMEBUFFERS_PP 1
 
 /* drm_fb_helper_set_suspend_unlocked() is available */
 #define HAVE_DRM_FB_HELPER_SET_SUSPEND_UNLOCKED 1
@@ -356,9 +359,6 @@
 
 /* drm_gem_object_lookup() wants 2 args */
 #define HAVE_DRM_GEM_OBJECT_LOOKUP_2ARGS 1
-
-/* drm_gem_object_put_unlocked() is available */
-#define HAVE_DRM_GEM_OBJECT_PUT_UNLOCKED 1
 
 /* ttm_buffer_object->base is available */
 #define HAVE_DRM_GEM_OBJECT_RESV 1
@@ -595,7 +595,7 @@
 #define HAVE_MMU_NOTIFIER_SYNCHRONIZE 1
 
 /* mm_access() is available */
-/* #undef HAVE_MM_ACCESS */
+#define HAVE_MM_ACCESS 1
 
 /* linux/sched/mm.h is available */
 #define HAVE_MM_H 1

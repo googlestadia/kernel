@@ -854,7 +854,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 	if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
 		flags |= FOLL_WRITE;
 
-	down_read(&mm->mmap_sem);
+	mmap_read_lock(mm);
 
 	if (gtt->userflags & AMDGPU_GEM_USERPTR_ANONONLY) {
 		/*
@@ -866,7 +866,7 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 		vma = find_vma(mm, gtt->userptr);
 		if (!vma || vma->vm_file || vma->vm_end < end) {
-			up_read(&mm->mmap_sem);
+			mmap_read_unlock(mm);
 			return -EPERM;
 		}
 	}
@@ -897,12 +897,12 @@ int amdgpu_ttm_tt_get_user_pages(struct ttm_tt *ttm, struct page **pages)
 
 	} while (pinned < ttm->num_pages);
 
-	up_read(&mm->mmap_sem);
+	mmap_read_unlock(mm);
 	return 0;
 
 release_pages:
 	release_pages(pages, pinned);
-	up_read(&mm->mmap_sem);
+	mmap_read_unlock(mm);
 	return r;
 }
 
@@ -1977,9 +1977,10 @@ static int amdgpu_ssg_init(struct amdgpu_device *adev)
 		return rc;
 
 #if defined(HAVE_DEVM_MEMREMAP_PAGES_DEV_PAGEMAP)
-	adev->ssg.pgmap.res.start = res.start;
-	adev->ssg.pgmap.res.end = res.end;
-	adev->ssg.pgmap.res.name = res.name;
+	adev->ssg.pgmap.type = MEMORY_DEVICE_PCI_P2PDMA;
+	adev->ssg.pgmap.nr_range = 1;
+	adev->ssg.pgmap.range.start = res.start;
+	adev->ssg.pgmap.range.end = res.end;
 	adev->ssg.pgmap.ref = &adev->ssg.ref;
 	addr = devm_memremap_pages(adev->dev, &adev->ssg.pgmap);
 #else
