@@ -1,4 +1,0 @@
-[submodule "external/amd-cloudgpu"]
-	path = external/amd-cloudgpu
-	url = ./
-	branch = stadia-cloudgpu/amd-mainline-dkms-5.4
