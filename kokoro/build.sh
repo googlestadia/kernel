@@ -188,7 +188,7 @@ function build_amdgpu_external_module() {
   popd
 
   pushd "${ext_kbuild}"
-  ./pre-build.sh 5.4
+  ./pre-build.sh 5.10
   popd
 
   pushd "${SRC_DIR}"
