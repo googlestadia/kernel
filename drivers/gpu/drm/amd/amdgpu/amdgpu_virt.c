@@ -185,7 +185,7 @@ static const struct file_operations autodump_query_fops = {
        .llseek = default_llseek,
 };
 
-int amdgpu_virt_create_debugs(struct amdgpu_device *adev)
+void amdgpu_virt_create_debugs(struct amdgpu_device *adev)
 {
        struct dentry *entry;
        struct amdgpu_virt *virt = &adev->virt;
@@ -205,8 +205,6 @@ int amdgpu_virt_create_debugs(struct amdgpu_device *adev)
                        adev, &autodump_query_fops);
 
        virt->dump_dentries[2] = entry;
-err:
-       return -EFAULT;
 }
 
 int amdgpu_virt_notify_booked(struct amdgpu_device *adev, struct amdgpu_job *job)
