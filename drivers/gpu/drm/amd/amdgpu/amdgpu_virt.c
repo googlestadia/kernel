@@ -155,7 +155,6 @@ static ssize_t autodump_query_write(struct file *f, const char __user *buf,
        int i;
        ssize_t ret;
        char tmp[16] = {0};
-       unsigned long done;
        struct amdgpu_device *adev = f->private_data;
 
        ret = simple_write_to_buffer(tmp, sizeof(tmp), pos, buf, size);
