@@ -413,8 +413,8 @@ static int amdgpu_gem_userptr_peermem(struct amdgpu_device *adev,
 	if (!vma || !vma->vm_file || vma->vm_end < end) {
 		mmap_read_unlock(mm);
 		DRM_DEV_ERROR(adev->dev,
-			"invalid vma: vma=%p, vma->vm_file=%p, vma->vm_end=%lp, end=%lp\n",
-			vma, (vma) ? vma->vm_file : NULL, (vma) ? vma->vm_end : 0l, end);
+			"invalid vma: vma=%p, vma->vm_file=%p, vma->vm_end=%lu, end=%lu\n",
+			vma, (vma) ? vma->vm_file : NULL, (vma) ? vma->vm_end : 0ul, end);
 		return -EINVAL;
 	}
 
