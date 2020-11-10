@@ -18,6 +18,7 @@ RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyri
 # https://g3doc.corp.google.com/chrome/cloudcast/g3doc/eng/kernel.md#setup
 RUN apt-get update && apt-get install -y \
   bc \
+  binutils-dev \
   bison \
   build-essential \
   cpio \
@@ -35,9 +36,18 @@ RUN apt-get update && apt-get install -y \
   kernel-wedge \
   kmod \
   kpartx \
+  libbabeltrace-ctf-dev \
+  libbabeltrace-dev \
+  libcap-dev \
+  libdw-dev \
   libelf-dev \
+  libiberty-dev \
   liblzma-dev \
+  libnuma-dev \
+  libslang2-dev \
   libssl-dev \
+  libunwind-dev \
+  libzstd-dev \
   parted \
   pigz \
   python3 \
@@ -46,6 +56,8 @@ RUN apt-get update && apt-get install -y \
   strace \
   syslinux-common \
   syslinux-efi \
+  systemtap-sdt-dev \
   util-linux \
   wget \
+  zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
