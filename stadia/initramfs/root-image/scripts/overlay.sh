@@ -72,6 +72,9 @@ mount_root_overlayfs() {
 			;;
 	esac
 
+	# Print detected block devices to help diagnose issues.
+	echo "$(lsblk -P -o NAME,FSTYPE,LABEL,UUID,RO)"
+
 	# Iterate over `lsblk` lines to resolve boot, root, rw, and ggproot fs.
 	# A sample line with lsblk -P:
 	#    NAME="sda3" FSTYPE="ext2" LABEL="" UUID="" RO="0"
@@ -139,6 +142,7 @@ EOT
 		# (leftmost is top).
 		if [ "${FSTYPE}" = "squashfs" ] && [ "${blk_dev}" != "${rootfs_dev}" ]; then
 			local squash_mnt="${ofs_dir}/s${squashfs_layer_index}"
+			echo "Mounting ${blk_dev} on ${squash_mnt}"
 			mkdir "${squash_mnt}"
 			mount -t squashfs -r "${blk_dev}" "${squash_mnt}" \
 				|| return 1
@@ -156,6 +160,7 @@ EOT
 	# do not override or mask the contents of the kernel rootfs.
 	# NOTE: By design, the kernel rootfs is stacked "above" the boot fs.
 	if [ -f "${krootfsdev}" ]; then
+		echo "Mounting krootfs ${krootfsdev} on ${krootfs_mnt}"
 		mkdir "${krootfs_mnt}"
 		mount -t squashfs -r "${krootfsdev}" "${krootfs_mnt}" \
 			|| return 1
@@ -167,6 +172,7 @@ EOT
 	# (leftmost is top). If `lowerdir` is not empty, it will contain a
 	# suffix ':'.
 	if [ -n "${rootfs_dev}" ]; then
+		echo "Mounting rootfs ${rootfs_dev} on ${root_mnt}"
 		mkdir "${root_mnt}"
 		mount -t "${rootfstype}" "${rootro}" -o "${rootflags}" \
 			"${rootfs_dev}" "${root_mnt}" || return 1
@@ -179,6 +185,7 @@ EOT
 	# If a overlayfs read-write filesystem was found, mount it and place the
 	# overlayfs upperdir and workdir on it.
 	if [ -n "${rwfs_dev}" ]; then
+		echo "Mounting rwfs ${rwfs_dev} on ${rwfs_mnt}"
 		mkdir "${rwfs_mnt}"
 		mount -t "${rwfs_fstype}" "${rwfs_dev}" "${rwfs_mnt}" \
 			|| return 1
@@ -187,6 +194,7 @@ EOT
 	fi
 
 	# Mount the overlayfs.
+	echo "Mounting root overlayfs: lowerdir=${lowerdir},upperdir=${upperdir}"
 	mkdir "${upperdir}" "${workdir}"
 	mount -t overlay overlay -o \
 		"lowerdir=${lowerdir},upperdir=${upperdir},workdir=${workdir}" \
@@ -198,11 +206,8 @@ EOT
 	# NOTE: By design, stacked squashfs filesystems and the root fs (if any)
 	# do not override or mask the contents of the boot fs.
 	if [ -n "${bootfs_dev}" ]; then
+		echo "Mounting bootfs ${bootfs_dev} on /root/boot"
 		mkdir /root/boot
 		mount -t "${bootfs_fstype}" -r "${bootfs_dev}" /root/boot || return 1
 	fi
-
-	# WORKAROUND: Create /mnt/package in the root overlayfs.
-	# TODO(b/139151730): ESC asset mounting broken
-	mkdir -p /root/mnt/package
 }
