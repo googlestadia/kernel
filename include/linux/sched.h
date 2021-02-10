@@ -1757,6 +1757,12 @@ extern int wake_up_state(struct task_struct *tsk, unsigned int state);
 extern int wake_up_process(struct task_struct *tsk);
 extern void wake_up_new_task(struct task_struct *tsk);
 
+/*
+ * Wake up tsk and try to swap it into the current tasks place, which
+ * initially means just trying to migrate it to the current CPU.
+ */
+extern int wake_up_swap(struct task_struct *tsk);
+
 #ifdef CONFIG_SMP
 extern void kick_process(struct task_struct *tsk);
 #else

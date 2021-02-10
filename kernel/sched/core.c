@@ -3050,6 +3050,11 @@ int wake_up_process(struct task_struct *p)
 }
 EXPORT_SYMBOL(wake_up_process);
 
+int wake_up_swap(struct task_struct *tsk)
+{
+	return try_to_wake_up(tsk, TASK_NORMAL, WF_CURRENT_CPU);
+}
+
 int wake_up_state(struct task_struct *p, unsigned int state)
 {
 	return try_to_wake_up(p, state, 0);
