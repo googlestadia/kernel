@@ -31,7 +31,28 @@ ${SCRIPT_DIR}/docker/kokoro_launcher.sh
 export ARTIFACTS_DIR=guitar_artifacts
 mkdir -p ${ARTIFACTS_DIR}
 cp -av ${KOKORO_ARTIFACTS_DIR}/mpm/chrome/cloudcast/kernel/gamelet_disk/disk.raw "${ARTIFACTS_DIR}"/kernel_disk.raw
+
+cat << EOF > /tmp/pkgdef
+pkgdef mpm = {
+  package_name = 'test/chrome/cloudcast/kernel/gamelet_disk'
+  relative_path_anchor = 'PKGDEF_DIR'
+  source = [
+    {
+      package_path = "disk.raw"
+      source_file = "${KOKORO_ARTIFACTS_DIR}/mpm/chrome/cloudcast/kernel/gamelet_disk/disk.raw"
+    },
+  ]
+}
+EOF
+
+label="presubmit_${KOKORO_GERRIT_REVISION}"
+
+"${PRESUBMIT_ARTIFACTS}/mpm/tools/mpm_build" \
+  --pkgdef_file=/tmp/pkgdef \
+  --label="${label}" \
+  --service_key="${PRESUBMIT_ARTIFACTS}/71274_kokoro_service_key_json"
+
 ${PRESUBMIT_ARTIFACTS}/mpm/tools/guitar_presubmit \
   --service_key="${PRESUBMIT_ARTIFACTS}/71274_kokoro_service_key_json" \
-  --artifacts="${ARTIFACTS_DIR}"/kernel_disk.raw \
+  --env_params=version_kernel="${label}" \
   --test_type=LIBDRM --wait
