@@ -26,14 +26,6 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-cleanup() {
-  umount /dev/mapper/loop0p1 || true
-  kpartx -vd "${BOOT_DISK}" || true
-  dmsetup remove loop0p1 || true
-  losetup -d /dev/loop0 || true
-}
-trap 'cleanup' ERR
-
 rm -f "${BOOT_DISK}"
 touch "${BOOT_DISK}"
 fallocate --zero-range --length 36M "${BOOT_DISK}"
@@ -46,11 +38,22 @@ sgdisk \
 
 kpartx -va "${BOOT_DISK}"
 dmsetup --noudevsync mknodes
+readonly LO_NODE="$(losetup --associated "${BOOT_DISK}" | cut -d: -f1)"
+readonly LO_DEV="$(basename "${LO_NODE}p1")"
+readonly DM_NODE="/dev/mapper/${LO_DEV}"
 
-/sbin/mkfs.vfat -s 1 -F 32 -n GGPBOOTFS /dev/mapper/loop0p1
+cleanup() {
+  umount "${DM_NODE}" || true
+  kpartx -vd "${BOOT_DISK}" || true
+  dmsetup remove "${LO_DEV}" || true
+  losetup -d "${LO_NODE}" || true
+}
+trap 'cleanup' ERR
+
+/sbin/mkfs.vfat -s 1 -F 32 -n GGPBOOTFS "${DM_NODE}"
 readonly EFI_MOUNT_DIR="${MOUNTS_DIR}"/efi
 mkdir -p "${EFI_MOUNT_DIR}"
-mount /dev/mapper/loop0p1 "${EFI_MOUNT_DIR}"
+mount "${DM_NODE}" "${EFI_MOUNT_DIR}"
 
 rsync -a "${TAR_INSTALL_DIR}"/boot/ "${EFI_MOUNT_DIR}"/
 
@@ -73,10 +76,10 @@ cp /usr/lib/syslinux/modules/efi64/ldlinux.e64 \
   "${EFI_MOUNT_DIR}"/EFI/BOOT/
 
 # Copy the "boot sector" to its backup for fsck.fat, after unmounting.
-umount /dev/mapper/loop0p1
-dd if=/dev/mapper/loop0p1 of=/dev/mapper/loop0p1 bs=512 count=1 seek=6
+umount "${DM_NODE}"
+dd if="${DM_NODE}" of="${DM_NODE}" bs=512 count=1 seek=6
 
 # Install syslinux's GPT bootloader code in the image's protective MBR.
-dd if=/usr/lib/syslinux/mbr/gptmbr.bin of=/dev/loop0
+dd if=/usr/lib/syslinux/mbr/gptmbr.bin of="${LO_NODE}"
 
 cleanup
