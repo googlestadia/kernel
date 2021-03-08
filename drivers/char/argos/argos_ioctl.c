@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_ioctl.c"
 #include <linux/fs.h>
@@ -403,9 +403,6 @@ int argos_check_gasket_ioctl_permissions(
 # 421 "./drivers/char/argos/argos_ioctl.c"
   if (is_master)
    return 1;
-  else if (interrupt_data.interrupt ==
-   device_data->device_desc->failed_codec_interrupt)
-   return 0;
   else if (queue_ctxs[interrupt_data.interrupt].owner ==
    current->tgid)
    return 1;

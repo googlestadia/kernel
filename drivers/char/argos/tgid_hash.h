@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 2 "./drivers/char/argos/tgid_hash.h"
 #ifndef __TGID_HASH_H__

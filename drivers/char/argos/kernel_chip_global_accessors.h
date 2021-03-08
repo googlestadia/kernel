@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 3 "./drivers/char/argos/kernel_chip_global_accessors.h"
 #ifndef _DRIVERS_CHAR_ARGOS_KERNEL_CHIP_GLOBAL_ACCESSORS_H_
@@ -625,26 +625,6 @@ static inline int set_kernel_chip_global_chip_reset_value(
 
  (*reg_value) = ((*reg_value) & ~((0x1ULL) << 0)) |
          (((value >> 0) & (0x1ULL)) << 0);
-
- return 0;
-}
-
-static inline uint16
-kernel_chip_global_failed_codec_interrupt_number_interrupt_number(
- const uint64 reg_value)
-{
- return (uint16)((((reg_value >> 0) & 0xffffULL) << 0));
-}
-
-static inline int
-set_kernel_chip_global_failed_codec_interrupt_number_interrupt_number(
- uint64 *reg_value, uint16 value)
-{
- if (value & ~(0xffffULL))
-  return 1;
-
- (*reg_value) = ((*reg_value) & ~((0xffffULL) << 0)) |
-         (((value >> 0) & (0xffffULL)) << 0);
 
  return 0;
 }

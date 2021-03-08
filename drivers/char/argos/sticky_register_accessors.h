@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 3 "./drivers/char/argos/sticky_register_accessors.h"
 #ifndef _DRIVERS_CHAR_ARGOS_STICKY_REGISTER_ACCESSORS_H_

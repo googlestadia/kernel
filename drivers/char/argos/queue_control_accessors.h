@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 3 "./drivers/char/argos/queue_control_accessors.h"
 #ifndef _DRIVERS_CHAR_ARGOS_QUEUE_CONTROL_ACCESSORS_H_

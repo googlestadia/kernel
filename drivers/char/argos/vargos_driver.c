@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 2 "./drivers/char/argos/vargos_driver.c"
 #include <linux/google/argos.h>
@@ -45,8 +45,6 @@
  (VARGOS_DRAM_BYTES / ARGOS_DRAM_CHUNK_BYTES)
 #define VARGOS_MAX_DRAM_CHUNKS_PER_CTX 1024
 #define VARGOS_PAGE_TABLE_MAX_ENTRIES 256
-#define VARGOS_INTERRUPT_COUNT (VARGOS_QUEUE_CTX_COUNT + 1)
-#define VARGOS_INTERRUPT_FAILED_CODEC VARGOS_QUEUE_CTX_COUNT
 
 #define VARGOS_FIRMWARE_BAR 0
 #define VARGOS_FIRMWARE_BAR_OFFSET 0x0
@@ -55,10 +53,6 @@
 #define VARGOS_DRAM_BAR 2
 #define VARGOS_DRAM_BAR_OFFSET 0x100000000ull
 #define VARGOS_DRAM_BAR_SIZE (16ull << 30)
-
-#define FAILED_CODEC_INTERRUPT_REGISTER 0x02010018
-#define FAILED_CODEC_INTERRUPT_CONTROL_CONTROL 0x02020008
-#define FAILED_CODEC_INTERRUPT_CONTROL_STATUS 0x02020010
 
 #define DEFAULT_TIMEOUT_SCALING 1ul
 
@@ -102,7 +96,7 @@
 
 #define VARGOS_FAKE_STICKY_START 0x02106000
 #define VARGOS_FAKE_STICKY_SIZE PAGE_SIZE
-# 110 "./drivers/char/argos/vargos_driver.c"
+# 104 "./drivers/char/argos/vargos_driver.c"
 #define VARGOS_MAILBOX_TIMEOUT (msecs_to_jiffies(500))
 
 
@@ -161,7 +155,6 @@ static int vargos_add_dev(struct gasket_dev *gasket_dev);
 static int vargos_remove_dev(struct gasket_dev *gasket_dev);
 static int vargos_enable_dev(struct gasket_dev *gasket_dev);
 static int vargos_disable_dev(struct gasket_dev *gasket_dev);
-static int vargos_close(struct gasket_dev *gasket_dev);
 
 static int vargos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
@@ -246,7 +239,7 @@ static struct gasket_page_table_config
  page_table_configs[VARGOS_QUEUE_CTX_COUNT];
 
 static struct legacy_gasket_interrupt_desc
- interrupt_descs[VARGOS_INTERRUPT_COUNT];
+ interrupt_descs[VARGOS_QUEUE_CTX_COUNT];
 
 static struct gasket_driver_desc driver_desc = {
  .chip_model = "vargos",
@@ -271,7 +264,7 @@ static struct gasket_driver_desc driver_desc = {
  },
 
  .legacy_interrupt_bar_index = VARGOS_FIRMWARE_BAR,
- .num_interrupts = VARGOS_INTERRUPT_COUNT,
+ .num_interrupts = VARGOS_QUEUE_CTX_COUNT,
  .legacy_interrupts = interrupt_descs,
 
  .add_dev_cb = vargos_add_dev,
@@ -285,7 +278,7 @@ static struct gasket_driver_desc driver_desc = {
 
  .device_open_cb = argos_device_open,
  .device_release_cb = argos_device_release,
- .device_close_cb = vargos_close,
+ .device_close_cb = argos_device_close,
 
  .get_mappable_regions_cb = vargos_get_mappable_regions_cb,
  .ioctl_permissions_cb = argos_check_gasket_ioctl_permissions,
@@ -298,7 +291,6 @@ static struct gasket_driver_desc driver_desc = {
 
 static struct argos_device_desc vargos_device_desc = {
  .queue_ctx_count = VARGOS_QUEUE_CTX_COUNT,
- .failed_codec_interrupt = VARGOS_INTERRUPT_FAILED_CODEC,
  .overseer_supported = false,
 
  .sysfs_attrs = vargos_sysfs_attrs,
@@ -342,7 +334,7 @@ static int __init vargos_init(void)
 {
  int i;
 
- gasket_nodev_info("Loading VArgos driver: ffbdb006109d.");
+ gasket_nodev_info("Loading VArgos driver: e797a6f25c72.");
 
  i = vargos_wormhole_setup();
  if (i)
@@ -365,16 +357,9 @@ static int __init vargos_init(void)
   interrupt_descs[i].packing = UNPACKED;
  }
 
-
- interrupt_descs[VARGOS_INTERRUPT_FAILED_CODEC].index =
-  VARGOS_INTERRUPT_FAILED_CODEC;
- interrupt_descs[VARGOS_INTERRUPT_FAILED_CODEC].reg =
-  FAILED_CODEC_INTERRUPT_REGISTER;
- interrupt_descs[VARGOS_INTERRUPT_FAILED_CODEC].packing = UNPACKED;
-
  return gasket_register_device(&device_desc);
 }
-# 390 "./drivers/char/argos/vargos_driver.c"
+# 375 "./drivers/char/argos/vargos_driver.c"
 static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 {
  const int reg = PCI_BASE_ADDRESS_0 + 4 * bar;
@@ -406,7 +391,7 @@ static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 
  return ret;
 }
-# 434 "./drivers/char/argos/vargos_driver.c"
+# 419 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_move_bar(
  struct pci_dev *pdev, int bar, struct resource *wormhole_res,
  u64 wormhole_bar_base)
@@ -417,7 +402,7 @@ int vargos_wormhole_move_bar(
 
  if (!wormhole_bar_base)
   return 0;
-# 452 "./drivers/char/argos/vargos_driver.c"
+# 437 "./drivers/char/argos/vargos_driver.c"
  ret = -EINVAL;
  pci_bus_for_each_resource(pdev->bus, r, i) {
   if (!r || !resource_contains(r, bar_res))
@@ -489,7 +474,7 @@ int vargos_wormhole_move_bar(
 
  return 0;
 }
-# 531 "./drivers/char/argos/vargos_driver.c"
+# 516 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_setup(void)
 {
  struct pci_dev *pdev = NULL;
@@ -522,15 +507,15 @@ int vargos_wormhole_setup(void)
     continue;
    }
 
-  virt_base = ioremap(
-   pci_resource_start(pdev, VARGOS_FIRMWARE_BAR),
-   VARGOS_FIRMWARE_BAR_SIZE);
-  if (!virt_base) {
-   dev_warn(&pdev->dev,
-    "Failed to map firmware BAR (%d) of size %#x",
-    VARGOS_FIRMWARE_BAR, VARGOS_FIRMWARE_BAR_SIZE);
-   goto release_device;
-  }
+   virt_base = ioremap(
+    pci_resource_start(pdev, VARGOS_FIRMWARE_BAR),
+    VARGOS_FIRMWARE_BAR_SIZE);
+   if (!virt_base) {
+    dev_warn(&pdev->dev,
+     "Failed to map firmware BAR (%d) of size %#x",
+     VARGOS_FIRMWARE_BAR, VARGOS_FIRMWARE_BAR_SIZE);
+    goto release_device;
+   }
 
    wormhole_base = readq(virt_base + VARGOS_WORMHOLE_BASE);
    wormhole_size = readq(virt_base + VARGOS_WORMHOLE_SIZE);
@@ -830,34 +815,6 @@ static int vargos_disable_dev(struct gasket_dev *gasket_dev)
 }
 
 
-
-
-
-static int vargos_close(struct gasket_dev *gasket_dev)
-{
- struct argos_common_device_data *device_data;
-
- if (gasket_dev->cb_data == NULL) {
-  gasket_log_error(gasket_dev, "Callback data is NULL!");
-  return -EINVAL;
- }
- device_data = gasket_dev->cb_data;
-
-
- gasket_dev_write_64(
-  gasket_dev, 0, VARGOS_FIRMWARE_BAR,
-  FAILED_CODEC_INTERRUPT_CONTROL_CONTROL);
- gasket_dev_write_64(
-  gasket_dev, 0, VARGOS_FIRMWARE_BAR,
-  FAILED_CODEC_INTERRUPT_CONTROL_STATUS);
-
-
- argos_disable_and_deallocate_all_queues(device_data);
-
- return 0;
-}
-
-
 static void populate_queue_mappable_region(
  int queue_idx, struct gasket_mappable_region *mappable_region)
 {
@@ -901,7 +858,7 @@ static unsigned long get_page_table_entry_offset(
  return VARGOS_PAGE_TABLE_BASE + reg_index * VARGOS_PAGE_TABLE_SIZE +
   entry_index * sizeof(u64);
 }
-# 951 "./drivers/char/argos/vargos_driver.c"
+# 908 "./drivers/char/argos/vargos_driver.c"
 static int vargos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -989,11 +946,6 @@ static int vargos_get_mappable_regions_cb(
    VARGOS_FAKE_STICKY_SIZE;
   (*mappable_regions)[output_index].flags = VM_READ | VM_WRITE;
   output_index++;
-
-
-
-
-
  } else if (bar_index == VARGOS_DRAM_BAR) {
 
 
@@ -1106,7 +1058,7 @@ static int vargos_disable_queue_ctx(
 
  command.type = VARGOS_MAILBOX_COMMAND_DISABLE;
  command.virtual_queue_index = queue_ctx->index;
-# 1164 "./drivers/char/argos/vargos_driver.c"
+# 1116 "./drivers/char/argos/vargos_driver.c"
  ret = mailbox_submit_and_wait_one(mailbox, &command);
  if (ret)
   gasket_log_warn(gasket_dev,
@@ -1115,7 +1067,7 @@ static int vargos_disable_queue_ctx(
 
  return 0;
 }
-# 1188 "./drivers/char/argos/vargos_driver.c"
+# 1140 "./drivers/char/argos/vargos_driver.c"
 static int vargos_map_buffer(
  struct gasket_dev *gasket_dev, int queue_idx, ulong dma_addr,
  ulong dev_addr, uint num_pages)
@@ -1147,7 +1099,7 @@ static int vargos_map_buffer(
 
  return ret;
 }
-# 1234 "./drivers/char/argos/vargos_driver.c"
+# 1186 "./drivers/char/argos/vargos_driver.c"
 static int vargos_unmap_buffer(
  struct gasket_dev *gasket_dev, int queue_idx, ulong dev_addr,
  uint num_pages)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 3 "./drivers/char/argos/kernel_queue_accessors.h"
 #ifndef _DRIVERS_CHAR_ARGOS_KERNEL_QUEUE_ACCESSORS_H_
@@ -28,7 +28,8 @@ enum kernel_queue_ddr_status_value_value {
  kKernelQueueDdrStatusValueValueInvalidRequestType = 5,
  kKernelQueueDdrStatusValueValueChunkAlreadyReserved = 6,
  kKernelQueueDdrStatusValueValueNoChunkBitmap = 7,
- kKernelQueueDdrStatusValueValueUnknownError = 8
+ kKernelQueueDdrStatusValueValueUnknownError = 8,
+ kKernelQueueDdrStatusValueValueBitmapNotSupported = 9
 };
 typedef enum kernel_queue_ddr_status_value_value
  kernel_queue_ddr_status_value_value;
@@ -183,6 +184,9 @@ static inline bool kernel_queue_ddr_status_value_value_is_valid(int value)
  if (value == 8) {
   return true;
  }
+ if (value == 9) {
+  return true;
+ }
  return false;
 }
 
@@ -215,6 +219,9 @@ static inline const char *kernel_queue_ddr_status_value_value_name(
  }
  if (value == 8) {
   return "UNKNOWN_ERROR";
+ }
+ if (value == 9) {
+  return "BITMAP_NOT_SUPPORTED";
  }
  return "UNKNOWN VALUE";
 }
