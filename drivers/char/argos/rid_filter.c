@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 5 "./drivers/char/argos/rid_filter.c"
 #if defined(CONFIG_ACCEL_P2P) || defined(CONFIG_ACCEL_P2P_MODULE)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 7 "./drivers/gasket/gasket_core.h"
 #ifndef __GASKET_CORE_H__
@@ -137,17 +137,11 @@ struct gasket_mappable_region {
  u64 start;
  u64 length_bytes;
  vm_flags_t flags;
-
-
-
-
-
- ulong legacy_mmap_address_offset;
 };
 
 
 struct gasket_bar_desc {
-# 223 "./drivers/gasket/gasket_core.h"
+# 217 "./drivers/gasket/gasket_core.h"
  u64 size;
 
 
@@ -170,7 +164,7 @@ enum gasket_mapping_options { GASKET_NOMAP = 0 };
  { \
   0, GASKET_NOMAP, 0, 0, NULL \
  }
-# 257 "./drivers/gasket/gasket_core.h"
+# 251 "./drivers/gasket/gasket_core.h"
 enum gasket_iommu_mappings {
 
  GASKET_IOMMU_ANY = 0,
@@ -325,7 +319,7 @@ struct gasket_driver_desc {
 
 
  const struct legacy_gasket_interrupt_desc *legacy_interrupts;
-# 421 "./drivers/gasket/gasket_core.h"
+# 415 "./drivers/gasket/gasket_core.h"
  int legacy_interrupt_pack_width;
 
 
@@ -334,46 +328,46 @@ struct gasket_driver_desc {
 
 
  enum gasket_iommu_mappings iommu_mappings;
-# 441 "./drivers/gasket/gasket_core.h"
+# 435 "./drivers/gasket/gasket_core.h"
  int (*add_dev_cb)(struct gasket_dev *dev);
-# 452 "./drivers/gasket/gasket_core.h"
+# 446 "./drivers/gasket/gasket_core.h"
  int (*remove_dev_cb)(struct gasket_dev *dev);
-# 462 "./drivers/gasket/gasket_core.h"
+# 456 "./drivers/gasket/gasket_core.h"
  int (*device_open_cb)(struct gasket_dev *dev, struct file *file);
-# 473 "./drivers/gasket/gasket_core.h"
+# 467 "./drivers/gasket/gasket_core.h"
  int (*device_release_cb)(
   struct gasket_dev *gasket_dev, struct file *file);
-# 487 "./drivers/gasket/gasket_core.h"
+# 481 "./drivers/gasket/gasket_core.h"
  int (*device_close_cb)(struct gasket_dev *dev);
-# 501 "./drivers/gasket/gasket_core.h"
+# 495 "./drivers/gasket/gasket_core.h"
  int (*enable_dev_cb)(struct gasket_dev *dev);
-# 510 "./drivers/gasket/gasket_core.h"
+# 504 "./drivers/gasket/gasket_core.h"
  int (*disable_dev_cb)(struct gasket_dev *dev);
-# 519 "./drivers/gasket/gasket_core.h"
+# 513 "./drivers/gasket/gasket_core.h"
  int (*sysfs_setup_cb)(struct gasket_dev *dev);
-# 528 "./drivers/gasket/gasket_core.h"
+# 522 "./drivers/gasket/gasket_core.h"
  int (*sysfs_cleanup_cb)(struct gasket_dev *dev);
-# 543 "./drivers/gasket/gasket_core.h"
+# 537 "./drivers/gasket/gasket_core.h"
  int (*get_mappable_regions_cb)(
   struct gasket_dev *gasket_dev, int bar_index,
   struct gasket_mappable_region **mappable_regions,
   int *num_mappable_regions);
-# 559 "./drivers/gasket/gasket_core.h"
+# 553 "./drivers/gasket/gasket_core.h"
  gasket_ioctl_permissions_cb_t ioctl_permissions_cb;
-# 572 "./drivers/gasket/gasket_core.h"
+# 566 "./drivers/gasket/gasket_core.h"
  long (*ioctl_handler_cb)(struct file *filp, uint cmd, ulong arg);
-# 582 "./drivers/gasket/gasket_core.h"
+# 576 "./drivers/gasket/gasket_core.h"
  enum gasket_status (*device_status_cb)(struct gasket_dev *dev);
-# 591 "./drivers/gasket/gasket_core.h"
+# 585 "./drivers/gasket/gasket_core.h"
  int (*hardware_revision_cb)(struct gasket_dev *dev);
-# 604 "./drivers/gasket/gasket_core.h"
+# 598 "./drivers/gasket/gasket_core.h"
  int (*firmware_version_cb)(struct gasket_dev *dev,
        unsigned int *major, unsigned int *minor,
        unsigned int *point, unsigned int *subpoint);
-# 621 "./drivers/gasket/gasket_core.h"
+# 615 "./drivers/gasket/gasket_core.h"
  int (*device_reset_cb)(struct gasket_dev *dev, uint reset_type);
 };
-# 633 "./drivers/gasket/gasket_core.h"
+# 627 "./drivers/gasket/gasket_core.h"
 struct gasket_device_desc {
 
  const char *name;
@@ -405,7 +399,7 @@ struct gasket_device_desc {
 
  int legacy_major, legacy_minor;
 };
-# 676 "./drivers/gasket/gasket_core.h"
+# 670 "./drivers/gasket/gasket_core.h"
 int __gasket_register_device(const struct gasket_device_desc *device_desc,
         const char *device_name);
 
@@ -417,9 +411,9 @@ int __gasket_register_device(const struct gasket_device_desc *device_desc,
 
 #define gasket_register_device(device_desc) \
  __gasket_register_device(device_desc, KBUILD_MODNAME)
-# 695 "./drivers/gasket/gasket_core.h"
+# 689 "./drivers/gasket/gasket_core.h"
 void gasket_unregister_device(const struct gasket_device_desc *device_desc);
-# 715 "./drivers/gasket/gasket_core.h"
+# 709 "./drivers/gasket/gasket_core.h"
 int gasket_clone_create(struct gasket_dev *parent, struct gasket_dev *clone);
 
 
@@ -427,7 +421,7 @@ int gasket_clone_create(struct gasket_dev *parent, struct gasket_dev *clone);
 
 
 int gasket_clone_cleanup(struct gasket_dev *clone);
-# 733 "./drivers/gasket/gasket_core.h"
+# 727 "./drivers/gasket/gasket_core.h"
 int gasket_reset(struct gasket_dev *gasket_dev, uint reset_type);
 int gasket_reset_nolock(struct gasket_dev *gasket_dev, uint reset_type);
 

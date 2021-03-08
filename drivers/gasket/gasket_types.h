@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 3 "./drivers/gasket/gasket_types.h"
 #ifndef PLATFORMS_ASIC_SW_KERNEL_COMMON_GASKET_GASKET_TYPES_H_

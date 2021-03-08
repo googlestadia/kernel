@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 3 "./drivers/char/argos/chip_global_accessors.h"
 #ifndef _DRIVERS_CHAR_ARGOS_CHIP_GLOBAL_ACCESSORS_H_

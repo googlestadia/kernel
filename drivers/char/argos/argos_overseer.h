@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 2 "./drivers/char/argos/argos_overseer.h"
 #ifndef __ARGOS_OVERSEER_H__
@@ -18,11 +18,7 @@ int argos_overseer_ioctl_dispatch(
 
 int argos_overseer_gasket_ioctl_has_permission(
  struct argos_common_device_data *device_data, uint cmd, ulong arg);
-
-
-
-
-
+# 40 "./drivers/char/argos/argos_overseer.h"
 int argos_subcontainer_gasket_ioctl_has_permission(
  struct argos_common_device_data *device_data, uint cmd, ulong arg);
 
@@ -40,5 +36,15 @@ int argos_overseer_argos_ioctl_has_permission(
 
 int argos_subcontainer_argos_ioctl_has_permission(
  struct argos_common_device_data *device_data, uint cmd, ulong arg);
+
+
+
+
+
+
+
+bool argos_overseer_subcontainer_owns_all_parent_resources(
+ struct argos_common_device_data *subcontainer,
+ struct argos_common_device_data *parent);
 
 #endif

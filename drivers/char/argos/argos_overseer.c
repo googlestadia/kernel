@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 2 "./drivers/char/argos/argos_overseer.c"
 #include <linux/accel.h>
@@ -407,7 +407,6 @@ int argos_subcontainer_gasket_ioctl_has_permission(
  switch (cmd) {
  case GASKET_IOCTL_CLEAR_INTERRUPT_COUNTS:
  case GASKET_IOCTL_PARTITION_PAGE_TABLE:
- case GASKET_IOCTL_RESET:
 
   return 0;
  case GASKET_IOCTL_NUMBER_PAGE_TABLES:
@@ -415,6 +414,17 @@ int argos_subcontainer_gasket_ioctl_has_permission(
  case GASKET_IOCTL_SIMPLE_PAGE_TABLE_SIZE:
 
   return 1;
+ case GASKET_IOCTL_RESET:
+
+
+
+  if (gasket_dev->parent->cb_data == NULL) {
+   gasket_log_error(gasket_dev,
+    "Callback data cannot be NULL for the subcontainer parent!");
+   return -EINVAL;
+  }
+  return argos_overseer_subcontainer_owns_all_parent_resources(
+   device_data, gasket_dev->parent->cb_data);
  case GASKET_IOCTL_SET_EVENTFD:
 
 
@@ -537,7 +547,42 @@ int argos_subcontainer_argos_ioctl_has_permission(
  }
 }
 EXPORT_SYMBOL(argos_subcontainer_argos_ioctl_has_permission);
-# 585 "./drivers/char/argos/argos_overseer.c"
+
+bool argos_overseer_subcontainer_owns_all_parent_resources(
+ struct argos_common_device_data *subcontainer,
+ struct argos_common_device_data *parent)
+{
+ int i;
+ bool ret = true;
+
+ mutex_lock(&parent->mutex);
+ mutex_lock(&subcontainer->mutex);
+
+ if (subcontainer->reserved_chunks != parent->total_chunks) {
+  gasket_log_warn(subcontainer->gasket_dev,
+   "All memory chunks are not reserved (reserved %d of total %d chunks).",
+   subcontainer->reserved_chunks, parent->total_chunks);
+  ret = false;
+  goto done;
+ }
+
+ for (i = 0; i < subcontainer->device_desc->queue_ctx_count; i++) {
+  if (!subcontainer->queue_ctxs[i].reserved) {
+   gasket_log_warn(subcontainer->gasket_dev,
+    "Queue %d is not reserved by the subcontainer device.",
+    i);
+   ret = false;
+   goto done;
+  }
+ }
+
+done:
+ mutex_unlock(&subcontainer->mutex);
+ mutex_unlock(&parent->mutex);
+ return ret;
+}
+EXPORT_SYMBOL(argos_overseer_subcontainer_owns_all_parent_resources);
+# 630 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_subcontainers(
  struct argos_common_device_data *device_data, char *buf)
 {
@@ -599,7 +644,7 @@ static ssize_t sysfs_show_subcontainers(
 
  return bytes_written;
 }
-# 656 "./drivers/char/argos/argos_overseer.c"
+# 701 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_mem_alloc(
   struct argos_common_device_data *device_data, int mem_alloc,
   char *buf)

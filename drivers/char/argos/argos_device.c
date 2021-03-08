@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Google LLC.
+ * Copyright (C) 2021 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_device.c"
 #include <linux/fs.h>
@@ -241,6 +241,27 @@ EXPORT_SYMBOL(argos_device_release);
 
 
 
+int argos_device_close(struct gasket_dev *gasket_dev)
+{
+ struct argos_common_device_data *device_data;
+
+ if (gasket_dev->cb_data == NULL) {
+  gasket_log_error(gasket_dev, "Callback data is NULL!");
+  return -EINVAL;
+ }
+ device_data = gasket_dev->cb_data;
+
+
+ argos_disable_and_deallocate_all_queues(device_data);
+
+ return 0;
+}
+EXPORT_SYMBOL(argos_device_close);
+
+
+
+
+
 
 static int ioctl_set_priority_algorithm(
  struct argos_common_device_data *device_data, ulong arg)
@@ -350,6 +371,7 @@ EXPORT_SYMBOL(argos_device_ioctl);
 int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
 {
  struct argos_common_device_data *device_data;
+ struct argos_common_device_data *parent_device_data = NULL;
  const struct argos_device_desc *device_desc;
  int i, fw_bar;
  u64 value;
@@ -367,6 +389,15 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
    "Invalid reset type specified: %u; only reinit reset is supported in the kernel.",
    reset_type);
   return -EINVAL;
+ }
+
+ if (gasket_dev->parent) {
+  if (gasket_dev->parent->cb_data == NULL) {
+   gasket_log_error(gasket_dev,
+    "Callback data cannot be NULL for parent!");
+   return -EINVAL;
+  }
+  parent_device_data = gasket_dev->parent->cb_data;
  }
 
 
@@ -401,10 +432,21 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
   device_data->queue_ctxs[i].id[0] = '\0';
   device_data->queue_ctxs[i].owner = 0;
  }
+
+ if (parent_device_data) {
+  const struct argos_device_desc *parent_device_desc =
+   parent_device_data->device_desc;
+  for (i = 0; i < parent_device_desc->queue_ctx_count; i++) {
+   parent_device_data->queue_ctxs[i].index = i;
+   parent_device_data->queue_ctxs[i].id[0] = '\0';
+   parent_device_data->queue_ctxs[i].owner = 0;
+  }
+ }
+
  return 0;
 }
 EXPORT_SYMBOL(argos_device_reset);
-# 413 "./drivers/char/argos/argos_device.c"
+# 455 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_count_based(
   struct argos_common_device_data *device_data,
   const struct queue_ctx *queue_ctx,
@@ -441,7 +483,7 @@ static int argos_dram_request_send_count_based(
 
  return 0;
 }
-# 459 "./drivers/char/argos/argos_device.c"
+# 501 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_bitmap_based(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx, int original_chunks,
@@ -491,7 +533,7 @@ static int argos_dram_request_send_bitmap_based(
 
  return 0;
 }
-# 516 "./drivers/char/argos/argos_device.c"
+# 558 "./drivers/char/argos/argos_device.c"
 static int get_dram_configuration_response(
  struct argos_common_device_data *device_data,
  int queue_index)
@@ -631,7 +673,7 @@ void argos_populate_queue_mappable_region(
  mappable_region->flags = VM_READ | VM_WRITE;
 }
 EXPORT_SYMBOL(argos_populate_queue_mappable_region);
-# 663 "./drivers/char/argos/argos_device.c"
+# 705 "./drivers/char/argos/argos_device.c"
 int argos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -683,8 +725,6 @@ int argos_get_mappable_regions_cb(
    security_level == ARGOS_SECURITY_LEVEL_ROOT) &&
    !gasket_dev->parent) {
    return_all = true;
-
-   (*num_mappable_regions)++;
   }
 
   for (i = 0; i < device_desc->queue_ctx_count; i++)
@@ -727,12 +767,6 @@ int argos_get_mappable_regions_cb(
   (*mappable_regions)[output_index] =
    device_desc->mappable_regions.global_region;
   output_index++;
-
-  if (return_all) {
-   (*mappable_regions)[output_index] =
-    device_desc->mappable_regions.master_region;
-   output_index++;
-  }
  } else if (bar_index == device_desc->dram_bar) {
 
 
@@ -764,11 +798,20 @@ int argos_get_mappable_regions_cb(
     *num_mappable_regions);
 
  } else if (bar_index == device_desc->debug_bar) {
-
-  if ((gasket_dev->ownership.owner != current->tgid &&
-   security_level != ARGOS_SECURITY_LEVEL_ROOT) ||
-   gasket_dev->parent) {
+# 847 "./drivers/char/argos/argos_device.c"
+  if (gasket_dev->ownership.owner != current->tgid &&
+   security_level != ARGOS_SECURITY_LEVEL_ROOT) {
    return 0;
+  }
+  if (gasket_dev->parent) {
+   if (gasket_dev->parent->cb_data == NULL) {
+    gasket_log_error(gasket_dev,
+     "Callback data cannot be NULL for the subcontainer parent!");
+    return -EINVAL;
+   }
+   if (!argos_overseer_subcontainer_owns_all_parent_resources(
+    device_data, gasket_dev->parent->cb_data))
+    return 0;
   }
 
   *num_mappable_regions = device_desc->get_bar_region_count(
