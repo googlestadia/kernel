@@ -152,6 +152,38 @@ struct argos_direct_mapping_request {
 };
 
 
+
+
+struct argos_direct_mapping_dma_buf_request {
+
+
+
+
+
+
+ struct argos_direct_mapping_request direct_mapping;
+
+
+
+
+
+
+ __u64 offset;
+
+
+
+
+
+ __u64 size;
+
+
+
+
+
+ int flags;
+};
+
+
 #define ARGOS_IOCTL_BASE 0xDE
 
 
@@ -193,7 +225,7 @@ struct argos_direct_mapping_request {
 
 #define ARGOS_IOCTL_SET_PRIORITY_ALGORITHM \
  _IOW(ARGOS_IOCTL_BASE, 5, struct argos_priority_algorithm_config)
-# 219 "./include/linux/google/argos.h"
+# 251 "./include/linux/google/argos.h"
 #define ARGOS_IOCTL_OVERSEER_RESERVE_RESOURCES \
  _IOW(ARGOS_IOCTL_BASE, 6, struct argos_overseer_reservation_request)
 
@@ -206,7 +238,7 @@ struct argos_direct_mapping_request {
 #define ARGOS_MODE_OVERSEER 1
 #define ARGOS_IOCTL_OVERSEER_SET_MODE \
  _IOW(ARGOS_IOCTL_BASE, 7, int)
-# 239 "./include/linux/google/argos.h"
+# 271 "./include/linux/google/argos.h"
 #define ARGOS_IOCTL_SUBCONTAINER_ALLOCATE_QUEUE_CTX \
  _IOW(ARGOS_IOCTL_BASE, 8, struct argos_subcontainer_queue_ctx_config)
 
@@ -219,5 +251,13 @@ struct argos_direct_mapping_request {
  _IOWR(ARGOS_IOCTL_BASE, 9, struct argos_direct_mapping_request)
 #define ARGOS_IOCTL_DEALLOCATE_DIRECT_MAPPING \
  _IOW(ARGOS_IOCTL_BASE, 10, struct argos_direct_mapping_request)
+
+
+
+
+
+
+#define ARGOS_IOCTL_CREATE_DIRECT_MAPPING_DMABUF \
+ _IOW(ARGOS_IOCTL_BASE, 11, struct argos_direct_mapping_dma_buf_request)
 
 #endif

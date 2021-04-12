@@ -434,6 +434,15 @@ bool gasket_dev_is_overseer(struct gasket_dev *gasket_dev);
 
 
 
+int gasket_get_mmap_bar_index(
+ const struct gasket_dev *gasket_dev, ulong mmap_addr);
+
+
+
+
+
+
+
 int gasket_mm_unmap_region(
  const struct gasket_dev *gasket_dev, struct vm_area_struct *vma,
  int map_bar_index,

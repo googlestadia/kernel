@@ -403,6 +403,7 @@ int argos_subcontainer_gasket_ioctl_has_permission(
  int is_master = (gasket_dev->ownership.is_owned &&
     gasket_dev->ownership.owner == current->tgid) ||
    capable(CAP_SYS_ADMIN);
+ int ret;
 
  switch (cmd) {
  case GASKET_IOCTL_CLEAR_INTERRUPT_COUNTS:
@@ -423,8 +424,16 @@ int argos_subcontainer_gasket_ioctl_has_permission(
     "Callback data cannot be NULL for the subcontainer parent!");
    return -EINVAL;
   }
-  return argos_overseer_subcontainer_owns_all_parent_resources(
+
+
+
+
+
+  mutex_lock(&gasket_dev->parent->mutex);
+  ret = argos_overseer_subcontainer_owns_all_parent_resources(
    device_data, gasket_dev->parent->cb_data);
+  mutex_unlock(&gasket_dev->parent->mutex);
+  return ret;
  case GASKET_IOCTL_SET_EVENTFD:
 
 
@@ -500,6 +509,7 @@ int argos_overseer_argos_ioctl_has_permission(
  case ARGOS_IOCTL_SUBCONTAINER_ALLOCATE_QUEUE_CTX:
  case ARGOS_IOCTL_ALLOCATE_DIRECT_MAPPING:
  case ARGOS_IOCTL_DEALLOCATE_DIRECT_MAPPING:
+ case ARGOS_IOCTL_CREATE_DIRECT_MAPPING_DMABUF:
 
   return 0;
  case ARGOS_IOCTL_PROCESS_IS_MASTER:
@@ -539,6 +549,7 @@ int argos_subcontainer_argos_ioctl_has_permission(
  case ARGOS_IOCTL_SUBCONTAINER_ALLOCATE_QUEUE_CTX:
  case ARGOS_IOCTL_ALLOCATE_DIRECT_MAPPING:
  case ARGOS_IOCTL_DEALLOCATE_DIRECT_MAPPING:
+ case ARGOS_IOCTL_CREATE_DIRECT_MAPPING_DMABUF:
 
   return 1;
  default:
@@ -553,17 +564,12 @@ bool argos_overseer_subcontainer_owns_all_parent_resources(
  struct argos_common_device_data *parent)
 {
  int i;
- bool ret = true;
-
- mutex_lock(&parent->mutex);
- mutex_lock(&subcontainer->mutex);
 
  if (subcontainer->reserved_chunks != parent->total_chunks) {
   gasket_log_warn(subcontainer->gasket_dev,
    "All memory chunks are not reserved (reserved %d of total %d chunks).",
    subcontainer->reserved_chunks, parent->total_chunks);
-  ret = false;
-  goto done;
+  return false;
  }
 
  for (i = 0; i < subcontainer->device_desc->queue_ctx_count; i++) {
@@ -571,18 +577,13 @@ bool argos_overseer_subcontainer_owns_all_parent_resources(
    gasket_log_warn(subcontainer->gasket_dev,
     "Queue %d is not reserved by the subcontainer device.",
     i);
-   ret = false;
-   goto done;
+   return false;
   }
  }
-
-done:
- mutex_unlock(&subcontainer->mutex);
- mutex_unlock(&parent->mutex);
- return ret;
+ return true;
 }
 EXPORT_SYMBOL(argos_overseer_subcontainer_owns_all_parent_resources);
-# 630 "./drivers/char/argos/argos_overseer.c"
+# 631 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_subcontainers(
  struct argos_common_device_data *device_data, char *buf)
 {
@@ -644,7 +645,7 @@ static ssize_t sysfs_show_subcontainers(
 
  return bytes_written;
 }
-# 701 "./drivers/char/argos/argos_overseer.c"
+# 702 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_mem_alloc(
   struct argos_common_device_data *device_data, int mem_alloc,
   char *buf)
