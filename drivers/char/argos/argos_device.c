@@ -54,7 +54,8 @@ int argos_wait_for_expected_value(
  ulong expected_value)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
- ulong value, deadline;
+ u64 value;
+ ulong deadline;
 
  deadline = jiffies + timeout * device_data->timeout_scaling * HZ;
  do {
@@ -443,10 +444,13 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
   }
  }
 
+
+ gasket_dev->reset_count++;
+
  return 0;
 }
 EXPORT_SYMBOL(argos_device_reset);
-# 455 "./drivers/char/argos/argos_device.c"
+# 459 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_count_based(
   struct argos_common_device_data *device_data,
   const struct queue_ctx *queue_ctx,
@@ -483,7 +487,7 @@ static int argos_dram_request_send_count_based(
 
  return 0;
 }
-# 501 "./drivers/char/argos/argos_device.c"
+# 505 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_bitmap_based(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx, int original_chunks,
@@ -533,7 +537,7 @@ static int argos_dram_request_send_bitmap_based(
 
  return 0;
 }
-# 558 "./drivers/char/argos/argos_device.c"
+# 562 "./drivers/char/argos/argos_device.c"
 static int get_dram_configuration_response(
  struct argos_common_device_data *device_data,
  int queue_index)
@@ -673,7 +677,7 @@ void argos_populate_queue_mappable_region(
  mappable_region->flags = VM_READ | VM_WRITE;
 }
 EXPORT_SYMBOL(argos_populate_queue_mappable_region);
-# 705 "./drivers/char/argos/argos_device.c"
+# 709 "./drivers/char/argos/argos_device.c"
 int argos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -798,19 +802,31 @@ int argos_get_mappable_regions_cb(
     *num_mappable_regions);
 
  } else if (bar_index == device_desc->debug_bar) {
-# 847 "./drivers/char/argos/argos_device.c"
+# 851 "./drivers/char/argos/argos_device.c"
   if (gasket_dev->ownership.owner != current->tgid &&
    security_level != ARGOS_SECURITY_LEVEL_ROOT) {
    return 0;
   }
   if (gasket_dev->parent) {
+   struct argos_common_device_data *parent;
    if (gasket_dev->parent->cb_data == NULL) {
     gasket_log_error(gasket_dev,
      "Callback data cannot be NULL for the subcontainer parent!");
     return -EINVAL;
    }
+
+
+
+
+
+
+
+   parent = gasket_dev->parent->cb_data;
+   if (mutex_is_locked(&parent->mutex))
+    gasket_log_warn(gasket_dev,
+     "The parent's argos_common_device_data::mutex is locked, hence subcontainer resource allocations might be changed while mmap'ing the debug bar.");
    if (!argos_overseer_subcontainer_owns_all_parent_resources(
-    device_data, gasket_dev->parent->cb_data))
+    device_data, parent))
     return 0;
   }
 

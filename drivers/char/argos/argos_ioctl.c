@@ -2,12 +2,14 @@
  * Copyright (C) 2021 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_ioctl.c"
+#include <linux/dma-buf.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 
 #include "../../gasket/gasket_core.h"
 #include "../../gasket/gasket_logging.h"
 #include "argos_device.h"
+#include "argos_dmabuf.h"
 #include "argos_ioctl.h"
 #include "argos_overseer.h"
 #include "argos_queue.h"
@@ -28,7 +30,7 @@ static int argos_ioctl_check_is_master(struct gasket_dev *gasket_dev, ulong arg)
 
  return 0;
 }
-# 35 "./drivers/char/argos/argos_ioctl.c"
+# 37 "./drivers/char/argos/argos_ioctl.c"
 static int argos_ioctl_allocate_queue_ctx(
  struct argos_common_device_data *device_data, ulong arg)
 {
@@ -50,7 +52,7 @@ static int argos_ioctl_allocate_queue_ctx(
  return argos_allocate_queue_ctx(
   device_data, &subcontainer_alloc_cfg);
 }
-# 64 "./drivers/char/argos/argos_ioctl.c"
+# 66 "./drivers/char/argos/argos_ioctl.c"
 static int argos_ioctl_subcontainer_allocate_queue_ctx(
  struct argos_common_device_data *device_data, ulong arg)
 {
@@ -262,6 +264,30 @@ early_exit:
  mutex_unlock(&queue_ctx->mutex);
  return ret;
 }
+# 285 "./drivers/char/argos/argos_ioctl.c"
+static int argos_ioctl_create_dma_buf(
+ struct argos_common_device_data *device_data, ulong arg)
+{
+ struct argos_direct_mapping_dma_buf_request request;
+ struct dma_buf *dbuf;
+ int ret;
+
+ if (copy_from_user(&request, (void __user *)arg, sizeof(request))) {
+  gasket_log_error(device_data->gasket_dev,
+   "Unable to copy data from user pointer.");
+  return -EFAULT;
+ }
+
+ dbuf = argos_create_dma_buf(device_data, &request);
+ if (IS_ERR(dbuf))
+  return PTR_ERR(dbuf);
+
+ ret = dma_buf_fd(dbuf, O_CLOEXEC);
+ if (ret < 0)
+  dma_buf_put(dbuf);
+
+ return ret;
+}
 
 
 
@@ -352,6 +378,10 @@ int argos_queue_ioctl_dispatch(
   gasket_log_debug(gasket_dev,
    "Recvd ioctl ARGOS_IOCTL_DEALLOCATE_DIRECT_MAPPING");
   return argos_ioctl_deallocate_direct_mapping(device_data, arg);
+ case ARGOS_IOCTL_CREATE_DIRECT_MAPPING_DMABUF:
+  gasket_log_debug(gasket_dev,
+   "Recvd ioctl ARGOS_IOCTL_CREATE_DIRECT_MAPPING_DMABUF");
+  return argos_ioctl_create_dma_buf(device_data, arg);
  default:
   return -EOPNOTSUPP;
  }
@@ -400,7 +430,7 @@ int argos_check_gasket_ioctl_permissions(
   if (interrupt_data.interrupt >=
    device_data->gasket_driver_desc->num_interrupts)
    return -EINVAL;
-# 421 "./drivers/char/argos/argos_ioctl.c"
+# 458 "./drivers/char/argos/argos_ioctl.c"
   if (is_master)
    return 1;
   else if (queue_ctxs[interrupt_data.interrupt].owner ==

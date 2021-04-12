@@ -11,7 +11,7 @@
 #include <linux/pci_regs.h>
 #include <linux/uaccess.h>
 
-#define CREATE_TRACE_POINTS
+#define CREATE_TRACE_POINTS 
 #include <trace/events/vargos_driver.h>
 
 #include "../../pci/pci.h"
@@ -334,7 +334,7 @@ static int __init vargos_init(void)
 {
  int i;
 
- gasket_nodev_info("Loading VArgos driver: e797a6f25c72.");
+ gasket_nodev_info("Loading VArgos driver: 47fe718f508a.");
 
  i = vargos_wormhole_setup();
  if (i)
@@ -516,6 +516,7 @@ int vargos_wormhole_setup(void)
      VARGOS_FIRMWARE_BAR, VARGOS_FIRMWARE_BAR_SIZE);
     goto release_device;
    }
+
 
    wormhole_base = readq(virt_base + VARGOS_WORMHOLE_BASE);
    wormhole_size = readq(virt_base + VARGOS_WORMHOLE_SIZE);

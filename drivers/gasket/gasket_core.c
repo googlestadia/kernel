@@ -16,7 +16,7 @@
 #include <linux/iommu.h>
 #include <linux/sched.h>
 
-#define CREATE_TRACE_POINTS
+#define CREATE_TRACE_POINTS 
 #include <trace/events/gasket_mmap.h>
 # 33 "./drivers/gasket/gasket_core.c"
 struct gasket_unforkable_mapping {
@@ -1596,7 +1596,7 @@ static int gasket_mmap_has_permissions(
 
 
 
-static int gasket_get_mmap_bar_index(
+int gasket_get_mmap_bar_index(
  const struct gasket_dev *gasket_dev, ulong mmap_addr)
 {
  int i;
@@ -1617,6 +1617,7 @@ static int gasket_get_mmap_bar_index(
 
  return -EINVAL;
 }
+EXPORT_SYMBOL(gasket_get_mmap_bar_index);
 
 
 
@@ -1640,7 +1641,7 @@ static int gasket_get_phys_bar_index(
 
  return -EINVAL;
 }
-# 1803 "./drivers/gasket/gasket_core.c"
+# 1804 "./drivers/gasket/gasket_core.c"
 static bool gasket_mm_get_mapping_addrs(
  const struct gasket_mappable_region *region, ulong bar_offset,
  ulong requested_length, struct gasket_mappable_region *mappable_region,
@@ -1658,7 +1659,7 @@ static bool gasket_mm_get_mapping_addrs(
 
   return false;
  } else if (bar_offset <= range_start) {
-# 1834 "./drivers/gasket/gasket_core.c"
+# 1835 "./drivers/gasket/gasket_core.c"
   mappable_region->start = range_start;
   *virt_offset = range_start - bar_offset;
   mappable_region->length_bytes =
@@ -1666,7 +1667,7 @@ static bool gasket_mm_get_mapping_addrs(
   return (mappable_region->length_bytes != 0);
  } else if (bar_offset > range_start &&
      bar_offset < range_end) {
-# 1852 "./drivers/gasket/gasket_core.c"
+# 1853 "./drivers/gasket/gasket_core.c"
   mappable_region->start = bar_offset;
   *virt_offset = 0;
   mappable_region->length_bytes = min(
@@ -1785,7 +1786,7 @@ static enum do_map_region_status do_map_region(
 
  return DO_MAP_REGION_SUCCESS;
 }
-# 1981 "./drivers/gasket/gasket_core.c"
+# 1982 "./drivers/gasket/gasket_core.c"
 static int gasket_mmap(struct file *filp, struct vm_area_struct *vma)
 {
  int i, ret;
@@ -1948,7 +1949,6 @@ exit:
  trace_gasket_mmap_exit(ret);
  return ret;
 }
-
 
 void gasket_mapped_unforkable_page(struct gasket_dev *gasket_dev)
 {

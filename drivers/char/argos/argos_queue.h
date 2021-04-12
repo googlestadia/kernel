@@ -51,24 +51,34 @@ int argos_allocate_direct_mapping(
 int argos_deallocate_direct_mapping(
  struct argos_common_device_data *device_data,
  const struct argos_direct_mapping_request *request);
-# 175 "./drivers/char/argos/argos_queue.h"
+# 171 "./drivers/char/argos/argos_queue.h"
+int argos_get_direct_mapping_mmap_offset(
+ struct argos_common_device_data *device_data,
+ struct argos_direct_mapping_request *request);
+# 184 "./drivers/char/argos/argos_queue.h"
+int argos_add_dma_buf_to_direct_mapping(
+ struct argos_dma_buf_object *argos_dbuf);
+# 194 "./drivers/char/argos/argos_queue.h"
+void argos_remove_dma_buf_from_direct_mapping(
+ struct argos_dma_buf_object *argos_dbuf);
+# 215 "./drivers/char/argos/argos_queue.h"
 int argos_get_direct_mappings_for_bar(
  struct argos_common_device_data *device_data,
  int bar_index, int *num_mappings,
  struct gasket_mappable_region *mappable_regions);
-# 195 "./drivers/char/argos/argos_queue.h"
+# 235 "./drivers/char/argos/argos_queue.h"
 int argos_get_direct_mappable_regions(
  struct argos_common_device_data *device_data,
  int bar_index, struct gasket_mappable_region **mappable_regions,
  int *num_mappable_regions);
-# 208 "./drivers/char/argos/argos_queue.h"
+# 248 "./drivers/char/argos/argos_queue.h"
 int argos_common_deallocate_queue_ctx_callback(
  struct argos_common_device_data *device_data,
  struct queue_ctx *queue_ctx);
-# 220 "./drivers/char/argos/argos_queue.h"
+# 260 "./drivers/char/argos/argos_queue.h"
 bool argos_should_map_queue(
  struct argos_common_device_data *device_data, int queue_idx);
-# 230 "./drivers/char/argos/argos_queue.h"
+# 270 "./drivers/char/argos/argos_queue.h"
 int argos_disable_and_deallocate_all_queues(
  struct argos_common_device_data *device_data);
 
