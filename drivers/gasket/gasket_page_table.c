@@ -323,8 +323,6 @@ int gasket_page_table_map(struct gasket_page_table *pg_tbl, ulong host_addr,
  int ret = 0;
  uint num_pages;
 
- if (current->mm)
-  mmap_read_lock(current->mm);
  mutex_lock(&pg_tbl->mutex);
 
 
@@ -350,8 +348,6 @@ int gasket_page_table_map(struct gasket_page_table *pg_tbl, ulong host_addr,
  }
 
  mutex_unlock(&pg_tbl->mutex);
- if (current->mm)
-  mmap_read_unlock(current->mm);
  return ret;
 }
 EXPORT_SYMBOL(gasket_page_table_map);
