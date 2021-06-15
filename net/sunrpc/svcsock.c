@@ -1113,14 +1113,15 @@ static int svc_tcp_sendmsg(struct socket *sock, struct msghdr *msg,
 		unsigned int offset, len, remaining;
 		struct bio_vec *bvec;
 
-		bvec = xdr->bvec;
-		offset = xdr->page_base;
+		bvec = xdr->bvec + (xdr->page_base >> PAGE_SHIFT);
+		offset = offset_in_page(xdr->page_base);
 		remaining = xdr->page_len;
 		flags = MSG_MORE | MSG_SENDPAGE_NOTLAST;
 		while (remaining > 0) {
 			if (remaining <= PAGE_SIZE && tail->iov_len == 0)
 				flags = 0;
-			len = min(remaining, bvec->bv_len);
+
+			len = min(remaining, bvec->bv_len - offset);
 			ret = kernel_sendpage(sock, bvec->bv_page,
 					      bvec->bv_offset + offset,
 					      len, flags);
@@ -1175,7 +1176,7 @@ static int svc_tcp_sendto(struct svc_rqst *rqstp)
 		goto out_notconn;
 	err = svc_tcp_sendmsg(svsk->sk_sock, &msg, xdr, marker, &sent);
 	xdr_free_bvec(xdr);
-	trace_svcsock_tcp_send(xprt, err < 0 ? err : sent);
+	trace_svcsock_tcp_send(xprt, err < 0 ? (long)err : sent);
 	if (err < 0 || sent != (xdr->len + sizeof(marker)))
 		goto out_close;
 	mutex_unlock(&xprt->xpt_mutex);
