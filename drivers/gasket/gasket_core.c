@@ -1401,10 +1401,11 @@ EXPORT_SYMBOL(gasket_num_name_lookup);
 # 1519 "./drivers/gasket/gasket_core.c"
 static int gasket_open(struct inode *inode, struct file *filp)
 {
- int ret;
+ int ret = 0;
  struct gasket_dev *gasket_dev;
  const struct gasket_driver_desc *driver_desc;
  struct gasket_ownership *ownership;
+ struct gasket_filp_data *filp_data;
  char task_name[TASK_COMM_LEN];
 
  gasket_dev = gasket_dev_from_devt(inode->i_cdev->dev);
@@ -1423,8 +1424,16 @@ static int gasket_open(struct inode *inode, struct file *filp)
   return -ENXIO;
  }
 
+ filp->private_data = filp_data =
+  kzalloc(sizeof(*filp_data), GFP_KERNEL);
+ if (!filp_data) {
+  gasket_log_error(gasket_dev,
+   "Failed to allocate per-fd private data!");
+  return -ENOMEM;
+ }
+ filp_data->gasket_dev = gasket_dev;
+
  get_task_comm(task_name, current);
- filp->private_data = gasket_dev;
  inode->i_size = 0;
 
  gasket_log_debug(gasket_dev,
@@ -1444,13 +1453,14 @@ static int gasket_open(struct inode *inode, struct file *filp)
   gasket_dev, "Current owner open count (owning tgid %u): %d.",
   ownership->owner, ownership->write_open_count);
 
- if (driver_desc->device_open_cb != NULL) {
+ if (driver_desc->device_open_cb) {
   ret = driver_desc->device_open_cb(gasket_dev, filp);
   if (ret) {
    gasket_log_error(
     gasket_dev, "Error in device open cb: %d", ret);
-   mutex_unlock(&gasket_dev->mutex);
-   return ret;
+   filp->private_data = NULL;
+   kfree(filp_data);
+   goto out;
   }
  }
 
@@ -1468,11 +1478,12 @@ static int gasket_open(struct inode *inode, struct file *filp)
  gasket_log_debug(gasket_dev, "New open count (owning tgid %u): %d",
   ownership->owner, ownership->write_open_count);
 
- mutex_unlock(&gasket_dev->mutex);
  gasket_log_debug(
   gasket_dev, "Open of %s by tgid %u succeeded.",
   filp->f_path.dentry->d_iname, current->tgid);
- return 0;
+out:
+ mutex_unlock(&gasket_dev->mutex);
+ return ret;
 }
 
 
@@ -1488,7 +1499,7 @@ static void gasket_close(struct gasket_dev *gasket_dev)
 
  check_and_invoke_callback_nolock(
   gasket_dev, driver_desc->device_close_cb);
-# 1616 "./drivers/gasket/gasket_core.c"
+# 1627 "./drivers/gasket/gasket_core.c"
  if (gasket_dev_is_overseer(gasket_dev))
   return;
 
@@ -1508,7 +1519,7 @@ static void gasket_close(struct gasket_dev *gasket_dev)
   }
  }
 }
-# 1648 "./drivers/gasket/gasket_core.c"
+# 1659 "./drivers/gasket/gasket_core.c"
 static int gasket_release(struct inode *inode, struct file *file)
 {
  struct gasket_dev *gasket_dev;
@@ -1544,12 +1555,14 @@ static int gasket_release(struct inode *inode, struct file *file)
   ownership->write_open_count--;
  }
 
+ kfree(file->private_data);
+
  gasket_log_debug(gasket_dev, "New open count (owning tgid %u): %d",
   ownership->owner, ownership->write_open_count);
  mutex_unlock(&gasket_dev->mutex);
  return 0;
 }
-# 1698 "./drivers/gasket/gasket_core.c"
+# 1711 "./drivers/gasket/gasket_core.c"
 static int gasket_mmap_has_permissions(
  struct gasket_dev *gasket_dev, struct vm_area_struct *vma,
  int bar_permissions)
@@ -1641,7 +1654,7 @@ static int gasket_get_phys_bar_index(
 
  return -EINVAL;
 }
-# 1804 "./drivers/gasket/gasket_core.c"
+# 1817 "./drivers/gasket/gasket_core.c"
 static bool gasket_mm_get_mapping_addrs(
  const struct gasket_mappable_region *region, ulong bar_offset,
  ulong requested_length, struct gasket_mappable_region *mappable_region,
@@ -1659,7 +1672,7 @@ static bool gasket_mm_get_mapping_addrs(
 
   return false;
  } else if (bar_offset <= range_start) {
-# 1835 "./drivers/gasket/gasket_core.c"
+# 1848 "./drivers/gasket/gasket_core.c"
   mappable_region->start = range_start;
   *virt_offset = range_start - bar_offset;
   mappable_region->length_bytes =
@@ -1667,7 +1680,7 @@ static bool gasket_mm_get_mapping_addrs(
   return (mappable_region->length_bytes != 0);
  } else if (bar_offset > range_start &&
      bar_offset < range_end) {
-# 1853 "./drivers/gasket/gasket_core.c"
+# 1866 "./drivers/gasket/gasket_core.c"
   mappable_region->start = bar_offset;
   *virt_offset = 0;
   mappable_region->length_bytes = min(
@@ -1786,7 +1799,7 @@ static enum do_map_region_status do_map_region(
 
  return DO_MAP_REGION_SUCCESS;
 }
-# 1982 "./drivers/gasket/gasket_core.c"
+# 1995 "./drivers/gasket/gasket_core.c"
 static int gasket_mmap(struct file *filp, struct vm_area_struct *vma)
 {
  int i, ret;
@@ -1797,7 +1810,9 @@ static int gasket_mmap(struct file *filp, struct vm_area_struct *vma)
  ulong raw_offset, vma_size;
 
  const struct gasket_driver_desc *driver_desc;
- struct gasket_dev *gasket_dev = (struct gasket_dev *)filp->private_data;
+ struct gasket_filp_data *filp_data =
+  (struct gasket_filp_data *)filp->private_data;
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  const struct gasket_bar_desc *bar_desc;
  struct gasket_mappable_region *map_regions = NULL;
  int num_map_regions = 0;
@@ -1966,7 +1981,7 @@ void gasket_mapped_unforkable_page(struct gasket_dev *gasket_dev)
 
 }
 EXPORT_SYMBOL(gasket_mapped_unforkable_page);
-# 2170 "./drivers/gasket/gasket_core.c"
+# 2185 "./drivers/gasket/gasket_core.c"
 static int gasket_get_hw_status(struct gasket_dev *gasket_dev)
 {
  int i;
@@ -2005,9 +2020,10 @@ static int gasket_get_hw_status(struct gasket_dev *gasket_dev)
 
  return GASKET_STATUS_ALIVE;
 }
-# 2220 "./drivers/gasket/gasket_core.c"
+# 2235 "./drivers/gasket/gasket_core.c"
 static long gasket_ioctl(struct file *filp, uint cmd, ulong arg)
 {
+ struct gasket_filp_data *filp_data;
  struct gasket_dev *gasket_dev;
  const struct gasket_driver_desc *driver_desc;
  char path[256];
@@ -2015,13 +2031,14 @@ static long gasket_ioctl(struct file *filp, uint cmd, ulong arg)
  if (filp == NULL)
   return -ENODEV;
 
- gasket_dev = (struct gasket_dev *)filp->private_data;
- if (gasket_dev == NULL) {
+ filp_data = (struct gasket_filp_data *)filp->private_data;
+ if (filp_data == NULL || filp_data->gasket_dev == NULL) {
   gasket_nodev_error(
    "Unable to find Gasket structure for file %s",
    d_path(&filp->f_path, path, 256));
   return -ENODEV;
  }
+ gasket_dev = filp_data->gasket_dev;
 
  driver_desc = gasket_dev->driver_desc;
  if (driver_desc == NULL) {
@@ -2106,13 +2123,6 @@ int gasket_reset_nolock(struct gasket_dev *gasket_dev, uint reset_type)
  return 0;
 }
 EXPORT_SYMBOL(gasket_reset_nolock);
-
-gasket_ioctl_permissions_cb_t gasket_get_ioctl_permissions_cb(
- struct gasket_dev *gasket_dev)
-{
- return gasket_dev->driver_desc->ioctl_permissions_cb;
-}
-EXPORT_SYMBOL(gasket_get_ioctl_permissions_cb);
 
 static ssize_t gasket_write_mappable_regions(
  char *buf, const struct gasket_driver_desc *driver_desc, int bar_index)

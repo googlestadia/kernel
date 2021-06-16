@@ -92,6 +92,7 @@ static struct sg_table *gasket_dma_buf_ops_map(
  phys_addr = gasket_dbuf->mmap_offset -
       gasket_dev->driver_desc->bar_descriptions[bar_index].base +
       gasket_dev->bar_data[bar_index].phys_base;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0)
 
 
 
@@ -102,11 +103,19 @@ static struct sg_table *gasket_dma_buf_ops_map(
  if (ret) {
   gasket_log_error(gasket_dev,
    "failed to dma_map the backing storage: %d", ret);
-  goto error_dma_mapping;
+  sg_free_table(sgt);
+  goto error_alloc_table;
  }
+#else
+
+
+
+
+
+ addr = phys_addr;
+#endif
 
  sg_set_page(sgt->sgl, NULL, dbuf->size, 0);
-
 
 
 
@@ -114,9 +123,6 @@ static struct sg_table *gasket_dma_buf_ops_map(
  sg_dma_address(sgt->sgl) = addr;
  sg_dma_len(sgt->sgl) = dbuf->size;
  return sgt;
-
-error_dma_mapping:
- sg_free_table(sgt);
 
 error_alloc_table:
  kfree(sgt);
@@ -132,6 +138,7 @@ error_alloc_table:
 static void gasket_dma_buf_ops_unmap(struct dma_buf_attachment *attachment,
  struct sg_table *sgt, enum dma_data_direction direction)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0)
  struct scatterlist *sg;
  int i;
 
@@ -145,6 +152,7 @@ static void gasket_dma_buf_ops_unmap(struct dma_buf_attachment *attachment,
   dma_unmap_resource(attachment->dev, sg_dma_address(sg),
    sg_dma_len(sg), direction, DMA_ATTR_SKIP_CPU_SYNC);
  }
+#endif
  sg_free_table(sgt);
  kfree(sgt);
 }
@@ -180,7 +188,7 @@ static const struct dma_buf_ops gasket_dma_buf_ops = {
  .mmap = gasket_dma_buf_ops_mmap,
 #endif
 };
-# 208 "./drivers/gasket/gasket_dmabuf.c"
+# 216 "./drivers/gasket/gasket_dmabuf.c"
 struct dma_buf *gasket_create_mmap_dma_buf(struct gasket_dev *gasket_dev,
  u64 mmap_offset, size_t buf_size, int flags,
  struct gasket_dma_buf_device_data *device_data)

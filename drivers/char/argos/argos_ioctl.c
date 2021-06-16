@@ -388,16 +388,14 @@ int argos_queue_ioctl_dispatch(
 }
 EXPORT_SYMBOL(argos_queue_ioctl_dispatch);
 
-int argos_check_gasket_ioctl_permissions(
- struct file *filp, uint cmd, ulong arg)
+int argos_check_gasket_ioctl_permissions(struct file *filp, uint cmd)
 {
 
  struct argos_common_device_data *device_data;
- struct gasket_dev *gasket_dev = filp->private_data;
- struct gasket_interrupt_eventfd interrupt_data;
- struct gasket_page_table_ioctl page_table_data;
- int is_master =
-  argos_check_ownership(gasket_dev) || capable(CAP_SYS_ADMIN);
+ struct gasket_filp_data *filp_data =
+  (struct gasket_filp_data *)filp->private_data;
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
+ int is_master = argos_check_ownership(gasket_dev);
  struct queue_ctx *queue_ctxs;
 
  if (gasket_dev->cb_data == NULL) {
@@ -409,60 +407,38 @@ int argos_check_gasket_ioctl_permissions(
 
  if (gasket_dev->parent)
   return argos_subcontainer_gasket_ioctl_has_permission(
-   device_data, cmd, arg);
+   device_data, cmd);
  else if (device_data->mode == ARGOS_MODE_OVERSEER)
   return argos_overseer_gasket_ioctl_has_permission(
-   device_data, cmd, arg);
+   device_data, cmd);
 
  queue_ctxs = device_data->queue_ctxs;
 
  switch (cmd) {
  case GASKET_IOCTL_RESET:
  case GASKET_IOCTL_CLEAR_INTERRUPT_COUNTS:
-  return is_master;
+  if (is_master)
+   return 0;
+  return -EPERM;
 
  case GASKET_IOCTL_SET_EVENTFD:
  case GASKET_IOCTL_CLEAR_EVENTFD:
-  if (copy_from_user(&interrupt_data, (void __user *)arg,
-   sizeof(struct gasket_interrupt_eventfd)))
-   return -EFAULT;
-
-  if (interrupt_data.interrupt >=
-   device_data->gasket_driver_desc->num_interrupts)
-   return -EINVAL;
-# 458 "./drivers/char/argos/argos_ioctl.c"
-  if (is_master)
-   return 1;
-  else if (queue_ctxs[interrupt_data.interrupt].owner ==
-   current->tgid)
-   return 1;
-
-  return 0;
-
  case GASKET_IOCTL_MAP_BUFFER:
  case GASKET_IOCTL_UNMAP_BUFFER:
-  if (copy_from_user(&page_table_data, (void __user *)arg,
-   sizeof(struct gasket_page_table_ioctl)))
-   return -EFAULT;
+  case GASKET_IOCTL_MAP_DMA_BUF:
 
-  if (page_table_data.page_table_index >=
-      device_data->gasket_driver_desc->num_page_tables)
-   return -EINVAL;
 
-  if (is_master ||
-   queue_ctxs[page_table_data.page_table_index].owner ==
-   current->tgid)
-   return 1;
+
 
   return 0;
 
  case GASKET_IOCTL_NUMBER_PAGE_TABLES:
  case GASKET_IOCTL_PAGE_TABLE_SIZE:
  case GASKET_IOCTL_SIMPLE_PAGE_TABLE_SIZE:
-  return 1;
+  return 0;
 
  case GASKET_IOCTL_PARTITION_PAGE_TABLE:
-  return 0;
+  return -EPERM;
 
  default:
   gasket_log_error(

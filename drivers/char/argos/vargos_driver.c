@@ -39,7 +39,7 @@
 
 
 
-#define VARGOS_QUEUE_CTX_COUNT 128
+#define VARGOS_QUEUE_CTX_COUNT 64
 #define VARGOS_DRAM_BYTES (8ull << 30)
 #define VARGOS_DRAM_CHUNK_COUNT \
  (VARGOS_DRAM_BYTES / ARGOS_DRAM_CHUNK_BYTES)
@@ -96,7 +96,10 @@
 
 #define VARGOS_FAKE_STICKY_START 0x02106000
 #define VARGOS_FAKE_STICKY_SIZE PAGE_SIZE
-# 104 "./drivers/char/argos/vargos_driver.c"
+
+#define VARGOS_SNAPDUMP_REGISTER_BASE 0x10000
+#define VARGOS_SNAPDUMP_REGISTER_SIZE 0x8
+# 107 "./drivers/char/argos/vargos_driver.c"
 #define VARGOS_MAILBOX_TIMEOUT (msecs_to_jiffies(500))
 
 
@@ -282,6 +285,8 @@ static struct gasket_driver_desc driver_desc = {
 
  .get_mappable_regions_cb = vargos_get_mappable_regions_cb,
  .ioctl_permissions_cb = argos_check_gasket_ioctl_permissions,
+ .interrupt_permissions_cb = argos_interrupt_permissions,
+ .page_table_permissions_cb = argos_page_table_permissions,
  .ioctl_handler_cb = argos_device_ioctl,
 
  .device_status_cb = vargos_status,
@@ -334,7 +339,7 @@ static int __init vargos_init(void)
 {
  int i;
 
- gasket_nodev_info("Loading VArgos driver: 47fe718f508a.");
+ gasket_nodev_info("Loading VArgos driver: 5ee3146de61b.");
 
  i = vargos_wormhole_setup();
  if (i)
@@ -359,7 +364,7 @@ static int __init vargos_init(void)
 
  return gasket_register_device(&device_desc);
 }
-# 375 "./drivers/char/argos/vargos_driver.c"
+# 380 "./drivers/char/argos/vargos_driver.c"
 static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 {
  const int reg = PCI_BASE_ADDRESS_0 + 4 * bar;
@@ -391,7 +396,7 @@ static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 
  return ret;
 }
-# 419 "./drivers/char/argos/vargos_driver.c"
+# 424 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_move_bar(
  struct pci_dev *pdev, int bar, struct resource *wormhole_res,
  u64 wormhole_bar_base)
@@ -402,7 +407,7 @@ int vargos_wormhole_move_bar(
 
  if (!wormhole_bar_base)
   return 0;
-# 437 "./drivers/char/argos/vargos_driver.c"
+# 442 "./drivers/char/argos/vargos_driver.c"
  ret = -EINVAL;
  pci_bus_for_each_resource(pdev->bus, r, i) {
   if (!r || !resource_contains(r, bar_res))
@@ -474,7 +479,7 @@ int vargos_wormhole_move_bar(
 
  return 0;
 }
-# 516 "./drivers/char/argos/vargos_driver.c"
+# 521 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_setup(void)
 {
  struct pci_dev *pdev = NULL;
@@ -859,7 +864,7 @@ static unsigned long get_page_table_entry_offset(
  return VARGOS_PAGE_TABLE_BASE + reg_index * VARGOS_PAGE_TABLE_SIZE +
   entry_index * sizeof(u64);
 }
-# 908 "./drivers/char/argos/vargos_driver.c"
+# 913 "./drivers/char/argos/vargos_driver.c"
 static int vargos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -869,7 +874,7 @@ static int vargos_get_mappable_regions_cb(
  struct queue_ctx *queue_ctxs;
  bool return_all = false;
  int i, output_index = 0;
- int ret;
+ bool non_subcontainer_master = false;
 
  if (gasket_dev->cb_data == NULL) {
   gasket_log_error(gasket_dev, "Callback data is NULL!");
@@ -892,9 +897,16 @@ static int vargos_get_mappable_regions_cb(
   *num_mappable_regions = 1;
 
 
-  if ((gasket_dev->ownership.owner == current->tgid ||
-       capable(CAP_SYS_ADMIN)) && !gasket_dev->parent) {
+  non_subcontainer_master =
+   gasket_dev->ownership.owner == current->tgid &&
+   !gasket_dev->parent;
+  if (non_subcontainer_master) {
    return_all = true;
+
+
+
+
+   (*num_mappable_regions)++;
   }
 
   for (i = 0; i < VARGOS_QUEUE_CTX_COUNT; i++)
@@ -929,6 +941,17 @@ static int vargos_get_mappable_regions_cb(
    }
 
 
+  if (non_subcontainer_master) {
+   (*mappable_regions)[output_index].start =
+    VARGOS_SNAPDUMP_REGISTER_BASE;
+   (*mappable_regions)[output_index].length_bytes =
+    VARGOS_SNAPDUMP_REGISTER_SIZE;
+   (*mappable_regions)[output_index].flags =
+    VM_READ | VM_WRITE;
+   output_index++;
+  }
+
+
 
 
 
@@ -948,28 +971,9 @@ static int vargos_get_mappable_regions_cb(
   (*mappable_regions)[output_index].flags = VM_READ | VM_WRITE;
   output_index++;
  } else if (bar_index == VARGOS_DRAM_BAR) {
-
-
-
-
-  ret = argos_get_direct_mappable_regions(
+  return argos_get_direct_mappable_regions(
    device_data, bar_index, mappable_regions,
    num_mappable_regions);
-  if (ret || *num_mappable_regions > 0)
-   return ret;
-
-
-  if (!capable(CAP_SYS_ADMIN))
-   return 0;
-
-  *num_mappable_regions = ARRAY_SIZE(dram_bar_regions);
-  *mappable_regions = kzalloc(
-   sizeof(struct gasket_mappable_region) *
-   *num_mappable_regions,
-   GFP_KERNEL);
-  memcpy(*mappable_regions, dram_bar_regions,
-   sizeof(struct gasket_mappable_region) *
-   *num_mappable_regions);
  } else {
   gasket_log_error(
    gasket_dev, "Invalid BAR specified: %d", bar_index);
@@ -1059,7 +1063,7 @@ static int vargos_disable_queue_ctx(
 
  command.type = VARGOS_MAILBOX_COMMAND_DISABLE;
  command.virtual_queue_index = queue_ctx->index;
-# 1116 "./drivers/char/argos/vargos_driver.c"
+# 1120 "./drivers/char/argos/vargos_driver.c"
  ret = mailbox_submit_and_wait_one(mailbox, &command);
  if (ret)
   gasket_log_warn(gasket_dev,
@@ -1068,7 +1072,7 @@ static int vargos_disable_queue_ctx(
 
  return 0;
 }
-# 1140 "./drivers/char/argos/vargos_driver.c"
+# 1144 "./drivers/char/argos/vargos_driver.c"
 static int vargos_map_buffer(
  struct gasket_dev *gasket_dev, int queue_idx, ulong dma_addr,
  ulong dev_addr, uint num_pages)
@@ -1100,7 +1104,7 @@ static int vargos_map_buffer(
 
  return ret;
 }
-# 1186 "./drivers/char/argos/vargos_driver.c"
+# 1190 "./drivers/char/argos/vargos_driver.c"
 static int vargos_unmap_buffer(
  struct gasket_dev *gasket_dev, int queue_idx, ulong dev_addr,
  uint num_pages)

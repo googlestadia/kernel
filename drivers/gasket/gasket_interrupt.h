@@ -40,19 +40,18 @@ int gasket_interrupt_reinit(struct gasket_dev *gasket_dev);
 
 
 int gasket_interrupt_reset_counts(struct gasket_dev *gasket_dev);
-# 122 "./drivers/gasket/gasket_interrupt.h"
+# 121 "./drivers/gasket/gasket_interrupt.h"
 int legacy_gasket_interrupt_set_eventfd(
- struct gasket_interrupt_data *interrupt_data, int interrupt,
- int event_fd);
-# 136 "./drivers/gasket/gasket_interrupt.h"
+ struct gasket_dev *gasket_dev, int interrupt, int event_fd);
+# 133 "./drivers/gasket/gasket_interrupt.h"
 int legacy_gasket_interrupt_clear_eventfd(
- struct gasket_interrupt_data *interrupt_data, int interrupt);
-# 147 "./drivers/gasket/gasket_interrupt.h"
+ struct gasket_dev *gasket_dev, int interrupt);
+# 144 "./drivers/gasket/gasket_interrupt.h"
 int gasket_interrupt_system_status(struct gasket_dev *gasket_dev);
-# 158 "./drivers/gasket/gasket_interrupt.h"
+# 155 "./drivers/gasket/gasket_interrupt.h"
 struct eventfd_ctx **gasket_interrupt_get_eventfd_ctxs(
  struct gasket_interrupt_data *interrupt_data);
-# 174 "./drivers/gasket/gasket_interrupt.h"
+# 171 "./drivers/gasket/gasket_interrupt.h"
 int gasket_interrupt_register_mapping(struct gasket_dev *gasket_dev,
  int interrupt, int event_fd, int bar_index, u64 reg);
 

@@ -17,10 +17,10 @@ int argos_overseer_ioctl_dispatch(
 
 
 int argos_overseer_gasket_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd, ulong arg);
+ struct argos_common_device_data *device_data, uint cmd);
 # 40 "./drivers/char/argos/argos_overseer.h"
 int argos_subcontainer_gasket_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd, ulong arg);
+ struct argos_common_device_data *device_data, uint cmd);
 
 
 
@@ -28,14 +28,14 @@ int argos_subcontainer_gasket_ioctl_has_permission(
 
 
 int argos_overseer_argos_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd, ulong arg);
+ struct argos_common_device_data *device_data, uint cmd);
 
 
 
 
 
 int argos_subcontainer_argos_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd, ulong arg);
+ struct argos_common_device_data *device_data, uint cmd);
 # 66 "./drivers/char/argos/argos_overseer.h"
 bool argos_overseer_subcontainer_owns_all_parent_resources(
  struct argos_common_device_data *subcontainer,

@@ -49,6 +49,18 @@ struct gasket_page_table_ioctl {
 };
 
 
+
+
+struct gasket_page_table_dmabuf_ioctl {
+
+ uint64_t page_table_index;
+
+ uint64_t device_address;
+
+ int dma_buf_fd;
+};
+
+
 #define GASKET_IOCTL_BASE 0xDC
 
 
@@ -103,6 +115,7 @@ struct gasket_page_table_ioctl {
 
 
 
+
 #define GASKET_IOCTL_UNMAP_BUFFER \
  _IOW(GASKET_IOCTL_BASE, 9, struct gasket_page_table_ioctl)
 
@@ -123,5 +136,8 @@ struct gasket_page_table_ioctl {
 
 #define GASKET_IOCTL_UNREGISTER_INTERRUPT \
  _IOW(GASKET_IOCTL_BASE, 12, unsigned long)
+# 155 "./include/linux/google/gasket.h"
+#define GASKET_IOCTL_MAP_DMA_BUF \
+ _IOW(GASKET_IOCTL_BASE, 13, struct gasket_page_table_dmabuf_ioctl)
 
 #endif

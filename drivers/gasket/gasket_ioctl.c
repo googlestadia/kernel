@@ -15,7 +15,8 @@
 #define CREATE_TRACE_POINTS 
 #include <trace/events/gasket_ioctl.h>
 
-static uint gasket_ioctl_check_permissions(struct file *filp, uint cmd);
+static uint gasket_ioctl_check_permissions(
+ struct gasket_dev *gasket_dev, struct file *filp, uint cmd);
 static int gasket_set_event_fd(struct gasket_dev *dev, ulong arg);
 static int gasket_read_page_table_size(
  struct gasket_dev *gasket_dev, ulong arg);
@@ -25,29 +26,28 @@ static int gasket_partition_page_table(
  struct gasket_dev *gasket_dev, ulong arg);
 static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg);
 static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg);
+static int gasket_map_dma_buf(struct gasket_dev *gasket_dev, ulong arg);
 static int gasket_register_interrupt(struct gasket_dev *gasket_dev, ulong arg);
 static int gasket_unregister_interrupt(struct gasket_dev *gasket_dev,
  int interrupt);
-# 36 "./drivers/gasket/gasket_ioctl.c"
+# 38 "./drivers/gasket/gasket_ioctl.c"
 long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
 {
- struct gasket_dev *gasket_dev;
+ struct gasket_filp_data *filp_data =
+  (struct gasket_filp_data *)filp->private_data;
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  int retval;
 
- gasket_dev = (struct gasket_dev *)filp->private_data;
  trace_gasket_ioctl_entry(accel_dev_name(&gasket_dev->accel_dev), cmd);
 
- if (gasket_get_ioctl_permissions_cb(gasket_dev)) {
-  retval = gasket_get_ioctl_permissions_cb(gasket_dev)(
-   filp, cmd, arg);
+ if (gasket_dev->driver_desc->ioctl_permissions_cb) {
+  retval = gasket_dev->driver_desc->ioctl_permissions_cb(
+   filp, cmd);
   if (retval < 0) {
-   trace_gasket_ioctl_exit(-EPERM);
+   trace_gasket_ioctl_exit(retval);
    return retval;
-  } else if (retval == 0) {
-   trace_gasket_ioctl_exit(-EPERM);
-   return -EPERM;
   }
- } else if (!gasket_ioctl_check_permissions(filp, cmd)) {
+ } else if (!gasket_ioctl_check_permissions(gasket_dev, filp, cmd)) {
   trace_gasket_ioctl_exit(-EPERM);
   return -EPERM;
  }
@@ -68,7 +68,7 @@ long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
  case GASKET_IOCTL_CLEAR_EVENTFD:
   trace_gasket_ioctl_integer_data(arg);
   retval = legacy_gasket_interrupt_clear_eventfd(
-   gasket_dev->interrupt_data, (int)arg);
+   gasket_dev, (int)arg);
   break;
  case GASKET_IOCTL_PARTITION_PAGE_TABLE:
   trace_gasket_ioctl_integer_data(arg);
@@ -93,6 +93,9 @@ long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
   break;
  case GASKET_IOCTL_UNMAP_BUFFER:
   retval = gasket_unmap_buffers(gasket_dev, arg);
+  break;
+ case GASKET_IOCTL_MAP_DMA_BUF:
+  retval = gasket_map_dma_buf(gasket_dev, arg);
   break;
  case GASKET_IOCTL_CLEAR_INTERRUPT_COUNTS:
 
@@ -133,6 +136,7 @@ long gasket_is_supported_ioctl(uint cmd)
  case GASKET_IOCTL_SIMPLE_PAGE_TABLE_SIZE:
  case GASKET_IOCTL_MAP_BUFFER:
  case GASKET_IOCTL_UNMAP_BUFFER:
+ case GASKET_IOCTL_MAP_DMA_BUF:
  case GASKET_IOCTL_CLEAR_INTERRUPT_COUNTS:
  case GASKET_IOCTL_REGISTER_INTERRUPT:
  case GASKET_IOCTL_UNREGISTER_INTERRUPT:
@@ -141,12 +145,12 @@ long gasket_is_supported_ioctl(uint cmd)
   return 0;
  }
 }
-# 156 "./drivers/gasket/gasket_ioctl.c"
-static uint gasket_ioctl_check_permissions(struct file *filp, uint cmd)
+# 160 "./drivers/gasket/gasket_ioctl.c"
+static uint gasket_ioctl_check_permissions(
+ struct gasket_dev *gasket_dev, struct file *filp, uint cmd)
 {
  uint alive, root, device_owner;
  fmode_t read, write;
- struct gasket_dev *gasket_dev = (struct gasket_dev *)filp->private_data;
 
  alive = (gasket_dev->status == GASKET_STATUS_ALIVE);
  root = capable(CAP_SYS_ADMIN);
@@ -170,6 +174,7 @@ static uint gasket_ioctl_check_permissions(struct file *filp, uint cmd)
 
  case GASKET_IOCTL_MAP_BUFFER:
  case GASKET_IOCTL_UNMAP_BUFFER:
+ case GASKET_IOCTL_MAP_DMA_BUF:
   return alive && (root || (write && device_owner));
 
  case GASKET_IOCTL_CLEAR_EVENTFD:
@@ -226,7 +231,6 @@ static int gasket_unregister_interrupt(struct gasket_dev *gasket_dev,
  ret = gasket_interrupt_unregister_mapping(gasket_dev, interrupt);
  mutex_unlock(&gasket_dev->mutex);
  return ret;
-
 }
 
 
@@ -246,7 +250,7 @@ static int gasket_set_event_fd(struct gasket_dev *gasket_dev, ulong arg)
  trace_gasket_ioctl_eventfd_data(die.interrupt, die.event_fd);
 
  return legacy_gasket_interrupt_set_eventfd(
-  gasket_dev->interrupt_data, die.interrupt, die.event_fd);
+  gasket_dev, die.interrupt, die.event_fd);
 }
 
 
@@ -366,6 +370,13 @@ static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg)
  if (ibuf.page_table_index >= gasket_dev->num_page_tables)
   return -EFAULT;
 
+ if (gasket_dev->driver_desc->page_table_permissions_cb) {
+  int retval = gasket_dev->driver_desc->page_table_permissions_cb(
+   gasket_dev, ibuf.page_table_index);
+  if (retval < 0)
+   return retval;
+ }
+
  return gasket_page_table_map(
   gasket_dev->page_table[ibuf.page_table_index],
   ibuf.host_address, ibuf.device_address, ibuf.size);
@@ -390,7 +401,37 @@ static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg)
  if (ibuf.page_table_index >= gasket_dev->num_page_tables)
   return -EFAULT;
 
+ if (gasket_dev->driver_desc->page_table_permissions_cb) {
+  int retval = gasket_dev->driver_desc->page_table_permissions_cb(
+   gasket_dev, ibuf.page_table_index);
+  if (retval < 0)
+   return retval;
+ }
+
  return gasket_page_table_unmap(
   gasket_dev->page_table[ibuf.page_table_index],
   ibuf.device_address, ibuf.size);
+}
+# 434 "./drivers/gasket/gasket_ioctl.c"
+static int gasket_map_dma_buf(struct gasket_dev *gasket_dev, ulong arg)
+{
+ struct gasket_page_table_dmabuf_ioctl ibuf;
+
+ if (copy_from_user(&ibuf, (void __user *)arg,
+      sizeof(struct gasket_page_table_dmabuf_ioctl)))
+  return -EFAULT;
+
+ if (ibuf.page_table_index >= gasket_dev->num_page_tables)
+  return -EFAULT;
+
+ if (gasket_dev->driver_desc->page_table_permissions_cb) {
+  int retval = gasket_dev->driver_desc->page_table_permissions_cb(
+   gasket_dev, ibuf.page_table_index);
+  if (retval < 0)
+   return retval;
+ }
+
+ return gasket_page_table_dma_buf_map(
+  gasket_dev->page_table[ibuf.page_table_index], ibuf.dma_buf_fd,
+  ibuf.device_address);
 }
