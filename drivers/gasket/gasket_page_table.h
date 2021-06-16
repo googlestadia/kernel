@@ -33,6 +33,9 @@ int gasket_page_table_map(struct gasket_page_table *page_table, ulong host_addr,
 int gasket_page_table_unmap(
  struct gasket_page_table *page_table, ulong dev_addr,
  ulong bytes);
+# 112 "./drivers/gasket/gasket_page_table.h"
+int gasket_page_table_dma_buf_map(
+ struct gasket_page_table *page_table, int dma_buf_fd, ulong dev_addr);
 
 
 
@@ -46,12 +49,12 @@ void gasket_page_table_unmap_all(struct gasket_page_table *page_table);
 
 
 void gasket_page_table_reset(struct gasket_page_table *page_table);
-# 124 "./drivers/gasket/gasket_page_table.h"
+# 135 "./drivers/gasket/gasket_page_table.h"
 void gasket_page_table_garbage_collect(struct gasket_page_table *page_table);
-# 139 "./drivers/gasket/gasket_page_table.h"
+# 150 "./drivers/gasket/gasket_page_table.h"
 int gasket_page_table_are_addrs_bad(struct gasket_page_table *page_table,
  ulong host_addr, ulong dev_addr, ulong bytes);
-# 154 "./drivers/gasket/gasket_page_table.h"
+# 165 "./drivers/gasket/gasket_page_table.h"
 int gasket_page_table_is_dev_addr_bad(
  struct gasket_page_table *page_table, ulong dev_addr, ulong bytes);
 

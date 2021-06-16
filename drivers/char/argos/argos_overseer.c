@@ -363,7 +363,7 @@ exit:
 }
 
 int argos_overseer_gasket_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd, ulong arg)
+ struct argos_common_device_data *device_data, uint cmd)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
 
@@ -373,48 +373,40 @@ int argos_overseer_gasket_ioctl_has_permission(
  case GASKET_IOCTL_SET_EVENTFD:
  case GASKET_IOCTL_MAP_BUFFER:
  case GASKET_IOCTL_UNMAP_BUFFER:
+ case GASKET_IOCTL_MAP_DMA_BUF:
 
-  return 0;
+  return -EPERM;
  case GASKET_IOCTL_CLEAR_INTERRUPT_COUNTS:
  case GASKET_IOCTL_RESET:
  case GASKET_IOCTL_NUMBER_PAGE_TABLES:
  case GASKET_IOCTL_PAGE_TABLE_SIZE:
  case GASKET_IOCTL_SIMPLE_PAGE_TABLE_SIZE:
 
-  return 1;
+  return 0;
  default:
   gasket_log_warn(gasket_dev, "Unknown ioctl: 0x%x", cmd);
-  return 0;
+  return -EINVAL;
  }
 }
 EXPORT_SYMBOL(argos_overseer_gasket_ioctl_has_permission);
 
 int argos_subcontainer_gasket_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd, ulong arg)
+ struct argos_common_device_data *device_data, uint cmd)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
- struct gasket_interrupt_eventfd interrupt_data;
- struct gasket_page_table_ioctl page_table_data;
- struct queue_ctx *queue_ctx;
-
-
-
-
- int is_master = (gasket_dev->ownership.is_owned &&
-    gasket_dev->ownership.owner == current->tgid) ||
-   capable(CAP_SYS_ADMIN);
- int ret;
+ struct argos_common_device_data *parent_device_data;
+ bool owns_all;
 
  switch (cmd) {
  case GASKET_IOCTL_CLEAR_INTERRUPT_COUNTS:
  case GASKET_IOCTL_PARTITION_PAGE_TABLE:
 
-  return 0;
+  return -EPERM;
  case GASKET_IOCTL_NUMBER_PAGE_TABLES:
  case GASKET_IOCTL_PAGE_TABLE_SIZE:
  case GASKET_IOCTL_SIMPLE_PAGE_TABLE_SIZE:
 
-  return 1;
+  return 0;
  case GASKET_IOCTL_RESET:
 
 
@@ -429,75 +421,36 @@ int argos_subcontainer_gasket_ioctl_has_permission(
 
 
 
-  mutex_lock(&gasket_dev->parent->mutex);
-  ret = argos_overseer_subcontainer_owns_all_parent_resources(
-   device_data, gasket_dev->parent->cb_data);
-  mutex_unlock(&gasket_dev->parent->mutex);
-  return ret;
+  parent_device_data = gasket_dev->parent->cb_data;
+  mutex_lock(&parent_device_data->mutex);
+  owns_all =
+   argos_overseer_subcontainer_owns_all_parent_resources(
+    device_data, parent_device_data);
+  mutex_unlock(&parent_device_data->mutex);
+  if (!owns_all)
+   return -EPERM;
+  return 0;
+
  case GASKET_IOCTL_SET_EVENTFD:
-
-
-
-
-  if (copy_from_user(&interrupt_data, (void __user *)arg,
-   sizeof(interrupt_data)))
-   return -EFAULT;
-
-  if (interrupt_data.interrupt >=
-   device_data->gasket_driver_desc->num_interrupts)
-   return -EINVAL;
-
-  if (interrupt_data.interrupt <
-      device_data->device_desc->queue_ctx_count) {
-   queue_ctx = &device_data->queue_ctxs[
-     interrupt_data.interrupt];
-   if (!queue_ctx->reserved)
-    return 0;
-   return is_master || queue_ctx->owner == current->tgid;
-  }
-
-
-
-
-
-  return -EPERM;
-
  case GASKET_IOCTL_CLEAR_EVENTFD:
-  if (arg >= device_data->gasket_driver_desc->num_interrupts)
-   return -EINVAL;
-
-  queue_ctx = &device_data->queue_ctxs[arg];
-  if (!queue_ctx->reserved)
-   return 0;
-
-  return is_master || queue_ctx->owner == current->tgid;
  case GASKET_IOCTL_MAP_BUFFER:
  case GASKET_IOCTL_UNMAP_BUFFER:
+ case GASKET_IOCTL_MAP_DMA_BUF:
 
-  if (copy_from_user(&page_table_data, (void __user *)arg,
-   sizeof(page_table_data)))
-   return -EFAULT;
 
-  if (page_table_data.page_table_index >=
-   device_data->device_desc->queue_ctx_count)
-   return -EINVAL;
 
-  queue_ctx = &device_data->queue_ctxs[
-   page_table_data.page_table_index];
 
-  if (!queue_ctx->reserved)
-   return 0;
-  return is_master || queue_ctx->owner == current->tgid;
+  return 0;
 
  default:
   gasket_log_warn(gasket_dev, "Unknown ioctl: 0x%x", cmd);
-  return 0;
+  return -EINVAL;
  }
 }
 EXPORT_SYMBOL(argos_subcontainer_gasket_ioctl_has_permission);
 
 int argos_overseer_argos_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd, ulong arg)
+ struct argos_common_device_data *device_data, uint cmd)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
 
@@ -511,22 +464,22 @@ int argos_overseer_argos_ioctl_has_permission(
  case ARGOS_IOCTL_DEALLOCATE_DIRECT_MAPPING:
  case ARGOS_IOCTL_CREATE_DIRECT_MAPPING_DMABUF:
 
-  return 0;
+  return -EPERM;
  case ARGOS_IOCTL_PROCESS_IS_MASTER:
  case ARGOS_IOCTL_SET_PRIORITY_ALGORITHM:
  case ARGOS_IOCTL_OVERSEER_RESERVE_RESOURCES:
  case ARGOS_IOCTL_OVERSEER_SET_MODE:
 
-  return 1;
+  return 0;
  default:
   gasket_log_warn(gasket_dev, "Unknown ioctl: 0x%x", cmd);
-  return 0;
+  return -EINVAL;
  }
 }
 EXPORT_SYMBOL(argos_overseer_argos_ioctl_has_permission);
 
 int argos_subcontainer_argos_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd, ulong arg)
+ struct argos_common_device_data *device_data, uint cmd)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
 
@@ -534,14 +487,14 @@ int argos_subcontainer_argos_ioctl_has_permission(
  case ARGOS_IOCTL_ALLOCATE_QUEUE_CTX:
 
   if (!device_data->device_desc->bitmap_allocation_allowed)
-   return 1;
+   return 0;
   gasket_log_warn(gasket_dev,
    "ARGOS_IOCTL_SUBCONTAINER_ALLOCATE_QUEUE_CTX must be used when in a subcontainer.");
  case ARGOS_IOCTL_SET_PRIORITY_ALGORITHM:
  case ARGOS_IOCTL_OVERSEER_RESERVE_RESOURCES:
  case ARGOS_IOCTL_OVERSEER_SET_MODE:
 
-  return 0;
+  return -EPERM;
  case ARGOS_IOCTL_PROCESS_IS_MASTER:
  case ARGOS_IOCTL_DEALLOCATE_QUEUE_CTX:
  case ARGOS_IOCTL_ENABLE_QUEUE_CTX:
@@ -551,10 +504,10 @@ int argos_subcontainer_argos_ioctl_has_permission(
  case ARGOS_IOCTL_DEALLOCATE_DIRECT_MAPPING:
  case ARGOS_IOCTL_CREATE_DIRECT_MAPPING_DMABUF:
 
-  return 1;
+  return 0;
  default:
   gasket_log_warn(gasket_dev, "Unknown ioctl: 0x%x", cmd);
-  return 0;
+  return -EINVAL;
  }
 }
 EXPORT_SYMBOL(argos_subcontainer_argos_ioctl_has_permission);
@@ -583,7 +536,7 @@ bool argos_overseer_subcontainer_owns_all_parent_resources(
  return true;
 }
 EXPORT_SYMBOL(argos_overseer_subcontainer_owns_all_parent_resources);
-# 631 "./drivers/char/argos/argos_overseer.c"
+# 584 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_subcontainers(
  struct argos_common_device_data *device_data, char *buf)
 {
@@ -645,7 +598,7 @@ static ssize_t sysfs_show_subcontainers(
 
  return bytes_written;
 }
-# 702 "./drivers/char/argos/argos_overseer.c"
+# 655 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_mem_alloc(
   struct argos_common_device_data *device_data, int mem_alloc,
   char *buf)

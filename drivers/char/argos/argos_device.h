@@ -101,11 +101,15 @@ int argos_device_release(struct gasket_dev *gasket_dev, struct file *filp);
 
 
 int argos_device_close(struct gasket_dev *gasket_dev);
-# 154 "./drivers/char/argos/argos_device.h"
+# 152 "./drivers/char/argos/argos_device.h"
+int argos_interrupt_permissions(struct gasket_dev *gasket_dev, int interrupt);
+# 161 "./drivers/char/argos/argos_device.h"
+int argos_page_table_permissions(struct gasket_dev *gasket_dev, int page_table);
+# 172 "./drivers/char/argos/argos_device.h"
 long argos_device_ioctl(struct file *filp, uint cmd, ulong arg);
-# 166 "./drivers/char/argos/argos_device.h"
+# 184 "./drivers/char/argos/argos_device.h"
 int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type);
-# 179 "./drivers/char/argos/argos_device.h"
+# 197 "./drivers/char/argos/argos_device.h"
 int argos_configure_queue_ctx_dram(
  struct argos_common_device_data *device_data,
  struct queue_ctx *queue_ctx, uint *bitmap, int bitmap_elems);
@@ -119,7 +123,7 @@ int argos_configure_queue_ctx_dram(
 void argos_populate_queue_mappable_region(
  struct argos_common_device_data *device_data,
  int queue_idx, struct gasket_mappable_region *mappable_region);
-# 200 "./drivers/char/argos/argos_device.h"
+# 218 "./drivers/char/argos/argos_device.h"
 int argos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -131,7 +135,7 @@ int argos_get_mappable_regions_cb(
 
 
 bool argos_owns_page_table(struct gasket_dev *gasket_dev, int page_table_id);
-# 221 "./drivers/char/argos/argos_device.h"
+# 239 "./drivers/char/argos/argos_device.h"
 int argos_device_firmware_version_cb(
  struct gasket_dev *gasket_dev, unsigned int *major, unsigned int *minor,
  unsigned int *point, unsigned int *subpoint);

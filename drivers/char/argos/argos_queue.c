@@ -429,8 +429,7 @@ int argos_disable_queue_ctx(
  if (current->mm) {
   mmap_read_lock(current->mm);
   if (queue_ctx->owner == current->tgid &&
-   gasket_dev->ownership.owner != current->tgid &&
-   !capable(CAP_SYS_ADMIN))
+      gasket_dev->ownership.owner != current->tgid)
    remove_all_mmaps(
     device_data,
     device_data->device_desc->firmware_register_bar,
@@ -666,7 +665,7 @@ int argos_dram_request_evaluate_response(
  }
 }
 EXPORT_SYMBOL(argos_dram_request_evaluate_response);
-# 696 "./drivers/char/argos/argos_queue.c"
+# 695 "./drivers/char/argos/argos_queue.c"
 static int disable_firmware_queue_context(
  struct argos_common_device_data *device_data, int queue_idx,
  ulong control_offset, ulong status_offset)
@@ -761,7 +760,7 @@ int argos_common_allocate_queue_ctx_callback(
  ret = argos_configure_queue_ctx_dram(
    device_data, queue_ctx,
    bitmap_ints, bitmap_num_ints);
-# 799 "./drivers/char/argos/argos_queue.c"
+# 798 "./drivers/char/argos/argos_queue.c"
  if (ret)
   return ret;
 
@@ -854,7 +853,7 @@ static int lookup_queue_ctx_by_index(
 
  return 0;
 }
-# 901 "./drivers/char/argos/argos_queue.c"
+# 900 "./drivers/char/argos/argos_queue.c"
 static struct direct_mapping *find_direct_mapping_in_queue(
  const struct queue_ctx *queue_ctx,
  const struct argos_direct_mapping_request *request)
@@ -1243,7 +1242,7 @@ void argos_remove_dma_buf_from_direct_mapping(
  mutex_lock(&queue_ctx->direct_mappings_mutex);
 
  direct_mapping = find_direct_mapping_in_queue(queue_ctx, dm_request);
-# 1297 "./drivers/char/argos/argos_queue.c"
+# 1296 "./drivers/char/argos/argos_queue.c"
  if (!direct_mapping)
   goto remove_dma_buf_exit;
 

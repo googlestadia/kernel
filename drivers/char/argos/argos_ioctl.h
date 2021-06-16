@@ -9,9 +9,8 @@
 # 26 "./drivers/char/argos/argos_ioctl.h"
 int argos_queue_ioctl_dispatch(
  struct argos_common_device_data *device_data, uint cmd, ulong arg);
-# 38 "./drivers/char/argos/argos_ioctl.h"
-int argos_check_gasket_ioctl_permissions(
- struct file *filp, uint cmd, ulong arg);
+# 37 "./drivers/char/argos/argos_ioctl.h"
+int argos_check_gasket_ioctl_permissions(struct file *filp, uint cmd);
 
 
 #endif

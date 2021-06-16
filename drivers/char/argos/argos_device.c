@@ -259,6 +259,48 @@ int argos_device_close(struct gasket_dev *gasket_dev)
 }
 EXPORT_SYMBOL(argos_device_close);
 
+int argos_interrupt_permissions(struct gasket_dev *gasket_dev, int interrupt)
+{
+ struct argos_common_device_data *device_data;
+ struct queue_ctx *queue_ctx;
+ int is_master = argos_check_ownership(gasket_dev);
+
+ if (gasket_dev->cb_data == NULL) {
+  gasket_log_error(gasket_dev, "Callback data is NULL!");
+  return -EINVAL;
+ }
+ device_data = gasket_dev->cb_data;
+
+ if (interrupt >= device_data->device_desc->queue_ctx_count)
+  return -EINVAL;
+
+ queue_ctx = &device_data->queue_ctxs[interrupt];
+
+
+
+ if (gasket_dev->parent && !queue_ctx->reserved)
+  return -EPERM;
+
+
+
+
+ if (is_master || queue_ctx->owner == current->tgid)
+  return 0;
+
+ return -EPERM;
+}
+EXPORT_SYMBOL(argos_interrupt_permissions);
+
+int argos_page_table_permissions(struct gasket_dev *gasket_dev, int page_table)
+{
+
+
+
+
+ return argos_interrupt_permissions(gasket_dev, page_table);
+}
+EXPORT_SYMBOL(argos_page_table_permissions);
+
 
 
 
@@ -321,7 +363,9 @@ static int ioctl_set_priority_algorithm(
 
 long argos_device_ioctl(struct file *filp, uint cmd, ulong arg)
 {
- struct gasket_dev *gasket_dev = filp->private_data;
+ struct gasket_filp_data *filp_data =
+  (struct gasket_filp_data *)filp->private_data;
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct argos_common_device_data *device_data;
  int ret;
 
@@ -340,14 +384,17 @@ long argos_device_ioctl(struct file *filp, uint cmd, ulong arg)
  }
  device_data = gasket_dev->cb_data;
 
- if (gasket_dev->parent &&
-  !argos_subcontainer_argos_ioctl_has_permission(
-   device_data, cmd, arg))
-  return -EPERM;
- else if (device_data->mode == ARGOS_MODE_OVERSEER &&
-  !argos_overseer_argos_ioctl_has_permission(
-   device_data, cmd, arg))
-  return -EPERM;
+ if (gasket_dev->parent) {
+  ret = argos_subcontainer_argos_ioctl_has_permission(
+   device_data, cmd);
+  if (ret)
+   return ret;
+ } else if (device_data->mode == ARGOS_MODE_OVERSEER) {
+  ret = argos_overseer_argos_ioctl_has_permission(
+   device_data, cmd);
+  if (ret)
+   return ret;
+ }
 
  ret = argos_queue_ioctl_dispatch(device_data, cmd, arg);
  if (ret != -EOPNOTSUPP)
@@ -450,7 +497,7 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
  return 0;
 }
 EXPORT_SYMBOL(argos_device_reset);
-# 459 "./drivers/char/argos/argos_device.c"
+# 506 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_count_based(
   struct argos_common_device_data *device_data,
   const struct queue_ctx *queue_ctx,
@@ -487,7 +534,7 @@ static int argos_dram_request_send_count_based(
 
  return 0;
 }
-# 505 "./drivers/char/argos/argos_device.c"
+# 552 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_bitmap_based(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx, int original_chunks,
@@ -537,7 +584,7 @@ static int argos_dram_request_send_bitmap_based(
 
  return 0;
 }
-# 562 "./drivers/char/argos/argos_device.c"
+# 609 "./drivers/char/argos/argos_device.c"
 static int get_dram_configuration_response(
  struct argos_common_device_data *device_data,
  int queue_index)
@@ -677,7 +724,7 @@ void argos_populate_queue_mappable_region(
  mappable_region->flags = VM_READ | VM_WRITE;
 }
 EXPORT_SYMBOL(argos_populate_queue_mappable_region);
-# 709 "./drivers/char/argos/argos_device.c"
+# 756 "./drivers/char/argos/argos_device.c"
 int argos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -689,7 +736,6 @@ int argos_get_mappable_regions_cb(
  const struct gasket_bar_desc *bar_desc;
  const struct argos_mappable_regions *desc_map_regions;
  const struct gasket_mappable_region *mappable_bar_region;
- enum argos_security_level security_level;
  struct queue_ctx *queue_ctxs;
  bool return_all = false;
  int i, output_index = 0;
@@ -714,22 +760,14 @@ int argos_get_mappable_regions_cb(
   return -EFAULT;
  }
 
- if (capable(CAP_SYS_ADMIN)) {
-  security_level = ARGOS_SECURITY_LEVEL_ROOT;
- } else {
-  security_level = ARGOS_SECURITY_LEVEL_USER;
- }
-
  if (bar_index == device_desc->firmware_register_bar) {
 
   *num_mappable_regions = 1;
 
 
-  if ((gasket_dev->ownership.owner == current->tgid ||
-   security_level == ARGOS_SECURITY_LEVEL_ROOT) &&
-   !gasket_dev->parent) {
+  if (gasket_dev->ownership.owner == current->tgid &&
+      !gasket_dev->parent)
    return_all = true;
-  }
 
   for (i = 0; i < device_desc->queue_ctx_count; i++)
    if (argos_should_map_queue(device_data, i) ||
@@ -772,10 +810,6 @@ int argos_get_mappable_regions_cb(
    device_desc->mappable_regions.global_region;
   output_index++;
  } else if (bar_index == device_desc->dram_bar) {
-
-
-
-
   ret = argos_get_direct_mappable_regions(
    device_data, bar_index, mappable_regions,
    num_mappable_regions);
@@ -785,9 +819,7 @@ int argos_get_mappable_regions_cb(
 
 
 #ifndef STADIA_KERNEL
-
-  if (security_level != ARGOS_SECURITY_LEVEL_ROOT)
-   return 0;
+  return 0;
 #endif
 
   *num_mappable_regions =
@@ -802,11 +834,10 @@ int argos_get_mappable_regions_cb(
     *num_mappable_regions);
 
  } else if (bar_index == device_desc->debug_bar) {
-# 851 "./drivers/char/argos/argos_device.c"
-  if (gasket_dev->ownership.owner != current->tgid &&
-   security_level != ARGOS_SECURITY_LEVEL_ROOT) {
+# 878 "./drivers/char/argos/argos_device.c"
+  if (gasket_dev->ownership.owner != current->tgid)
    return 0;
-  }
+
   if (gasket_dev->parent) {
    struct argos_common_device_data *parent;
    if (gasket_dev->parent->cb_data == NULL) {
@@ -831,12 +862,11 @@ int argos_get_mappable_regions_cb(
   }
 
   *num_mappable_regions = device_desc->get_bar_region_count(
-    bar_index, security_level);
+    bar_index);
   if (*num_mappable_regions <= 0)
    return *num_mappable_regions;
 
-  mappable_bar_region = device_desc->get_bar_regions(
-    bar_index, security_level);
+  mappable_bar_region = device_desc->get_bar_regions(bar_index);
   if (mappable_bar_region == NULL) {
    gasket_log_error(gasket_dev,
     "Could not determine mappable regions for debug bar!");
