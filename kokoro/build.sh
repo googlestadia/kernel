@@ -312,6 +312,7 @@ function build_perf() {
     VF=1 \
     NO_GTK2=1 \
     NO_LIBPERL=1 \
+    NO_LIBZSTD=1 \
     NO_JVMTI=1 \
     WERROR=0 \
     "${MAKE_ARGS[@]}"
