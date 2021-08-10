@@ -3,6 +3,7 @@
  */
 # 1 "./drivers/char/argos/argos_dmabuf.c"
 #include <linux/dma-buf.h>
+#include <linux/dma-resv.h>
 #include <linux/fs.h>
 #include <linux/scatterlist.h>
 #include <linux/uaccess.h>
@@ -77,7 +78,9 @@ void argos_dma_buf_move_notify(struct list_head *dma_buf)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 5, 0)
  struct argos_dma_buf_object *argos_dbuf =
   list_entry(dma_buf, struct argos_dma_buf_object, list);
+ dma_resv_lock(argos_dbuf->dbuf->resv, NULL);
  dma_buf_move_notify(argos_dbuf->dbuf);
+ dma_resv_unlock(argos_dbuf->dbuf->resv);
 #endif
 }
 EXPORT_SYMBOL(argos_dma_buf_move_notify);

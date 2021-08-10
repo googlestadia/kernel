@@ -5,6 +5,7 @@
 #include "gasket_page_table.h"
 
 #include <linux/dma-buf.h>
+#include <linux/dma-resv.h>
 #include <linux/file.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -1330,8 +1331,17 @@ static struct gasket_sgt_mapping *gasket_page_table_import_dma_buf(
  }
 
  mapping->size = dbuf->size;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 19)
+ /*
+  * resv lock must be held when mapping a dynamic attachment.
+  */
+ dma_resv_lock(dbuf->resv, NULL);
+#endif
  mapping->sgt =
   dma_buf_map_attachment(mapping->dbuf_attach, DMA_BIDIRECTIONAL);
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 19)
+ dma_resv_unlock(dbuf->resv);
+#endif
  if (IS_ERR(mapping->sgt)) {
   ret = PTR_ERR(mapping->sgt);
   gasket_log_error(gasket_dev,
@@ -1361,8 +1371,17 @@ static void gasket_page_table_detach_sgt_mapping(
 
  if (mapping->dbuf_attach) {
   dbuf = mapping->dbuf_attach->dmabuf;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 19)
+ /*
+  * resv lock must be held when unmapping a dynamic attachment.
+  */
+ dma_resv_lock(dbuf->resv, NULL);
+#endif
   dma_buf_unmap_attachment(
    mapping->dbuf_attach, mapping->sgt, DMA_BIDIRECTIONAL);
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 19)
+ dma_resv_unlock(dbuf->resv);
+#endif
   dma_buf_detach(dbuf, mapping->dbuf_attach);
   dma_buf_put(dbuf);
  }
