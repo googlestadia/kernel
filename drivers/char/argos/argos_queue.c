@@ -336,12 +336,12 @@ static int remove_direct_mapping(
 
  list_for_each_safe(dbuf, dbuf_next, &direct_mapping->dma_buf_objects)
  {
-  list_del(dbuf);
 
 
 
 
   argos_dma_buf_move_notify(dbuf);
+  list_del(dbuf);
  }
 
  if (current->mm)
