@@ -1367,7 +1367,7 @@ static void gasket_page_table_detach_sgt_mapping(
 
  lockdep_assert_held(&pg_tbl->mutex);
  if (!list_empty(&mapping->entry))
-  list_del(&mapping->entry);
+  list_del_init(&mapping->entry);
 
  if (mapping->dbuf_attach) {
   dbuf = mapping->dbuf_attach->dmabuf;

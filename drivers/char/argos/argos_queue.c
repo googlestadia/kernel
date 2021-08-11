@@ -341,7 +341,7 @@ static int remove_direct_mapping(
 
 
   argos_dma_buf_move_notify(dbuf);
-  list_del(dbuf);
+  list_del_init(dbuf);
  }
 
  if (current->mm)
@@ -1065,6 +1065,7 @@ int argos_deallocate_direct_mapping(
    request->queue_index, request->bar, request->base,
    request->base + request->size - 1, request->prot);
   ret = -EINVAL;
+  goto exit;
  }
  ret = remove_direct_mapping(device_data, queue_ctx, direct_mapping);
 exit:
@@ -1241,12 +1242,15 @@ void argos_remove_dma_buf_from_direct_mapping(
  mutex_lock(&queue_ctx->mutex);
  mutex_lock(&queue_ctx->direct_mappings_mutex);
 
+ if (list_empty(&argos_dbuf->list))
+  goto remove_dma_buf_exit;
+
  direct_mapping = find_direct_mapping_in_queue(queue_ctx, dm_request);
 # 1296 "./drivers/char/argos/argos_queue.c"
  if (!direct_mapping)
   goto remove_dma_buf_exit;
 
- list_del(&argos_dbuf->list);
+ list_del_init(&argos_dbuf->list);
 remove_dma_buf_exit:
  mutex_unlock(&queue_ctx->direct_mappings_mutex);
  mutex_unlock(&queue_ctx->mutex);
