@@ -37,12 +37,6 @@
 #define DDR_CHUNK_CONFIG_TIMEOUT_SEC 2ul
 
 
-
-
-
-#define DEFAULT_MAX_DDR_CHUNKS_PER_CTX 1024ul
-
-
 ARGOS_FIELD_DECODER_WRAPPER(kernel_queue_ddr_control_change_requested)
 ARGOS_FIELD_DECODER_WRAPPER(kernel_queue_ddr_status_pending_config)
 ARGOS_FIELD_DECODER_WRAPPER(chip_global_state_value)
@@ -79,8 +73,11 @@ int argos_sysfs_setup_cb(struct gasket_dev *gasket_dev)
  struct argos_common_device_data *device_data;
  int ret;
 
- if (gasket_dev->cb_data == NULL)
+ if (gasket_dev->cb_data == NULL) {
+  gasket_log_error(gasket_dev, "Callback data is NULL!");
   return -EINVAL;
+ }
+
  device_data = gasket_dev->cb_data;
 
  ret = gasket_sysfs_create_entries(
@@ -95,15 +92,6 @@ int argos_sysfs_setup_cb(struct gasket_dev *gasket_dev)
 }
 EXPORT_SYMBOL(argos_sysfs_setup_cb);
 
-void argos_initialize_gasket_mappable_region(
- struct gasket_mappable_region *region, uint64 start, uint64 end)
-{
- region->start = start;
- region->length_bytes = end - start + sizeof(ulong);
- region->flags = VM_READ | VM_WRITE;
-}
-EXPORT_SYMBOL(argos_initialize_gasket_mappable_region);
-
 
 
 
@@ -117,7 +105,6 @@ int argos_device_enable_dev(struct gasket_dev *gasket_dev)
  ulong fw_api_version;
  int ret, fw_bar;
  u64 value;
- bool valid;
 
  if (gasket_dev->cb_data == NULL) {
   gasket_log_error(gasket_dev, "Callback data is NULL!");
@@ -140,11 +127,15 @@ int argos_device_enable_dev(struct gasket_dev *gasket_dev)
 
  value = gasket_dev_read_64(gasket_dev, fw_bar,
   device_desc->max_ddr_chunks_per_ctx_location);
- valid = kernel_chip_global_max_ddr_chunks_per_ctx_valid(value) ==
-   kKernelChipGlobalMaxDdrChunksPerCtxValidValueValid;
- device_data->max_chunks_per_queue_ctx = valid ?
-  kernel_chip_global_max_ddr_chunks_per_ctx_chunks(value) :
-  DEFAULT_MAX_DDR_CHUNKS_PER_CTX;
+ if (kernel_chip_global_max_ddr_chunks_per_ctx_valid(value) ==
+  kKernelChipGlobalMaxDdrChunksPerCtxValidValueValid) {
+  device_data->max_chunks_per_queue_ctx =
+   kernel_chip_global_max_ddr_chunks_per_ctx_chunks(value);
+ } else {
+  gasket_log_error(gasket_dev,
+   "The value of max_ddr_chunks_per_ctx register is invalid.");
+  return -EINVAL;
+ }
 
  if (device_desc->rid_filter.count) {
   ret = rid_filter_setup(device_data);
@@ -481,6 +472,10 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
   device_data->queue_ctxs[i].owner = 0;
  }
 
+
+ gasket_dev->reset_count++;
+
+
  if (parent_device_data) {
   const struct argos_device_desc *parent_device_desc =
    parent_device_data->device_desc;
@@ -489,15 +484,14 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
    parent_device_data->queue_ctxs[i].id[0] = '\0';
    parent_device_data->queue_ctxs[i].owner = 0;
   }
+
+  gasket_dev->parent->reset_count++;
  }
-
-
- gasket_dev->reset_count++;
 
  return 0;
 }
 EXPORT_SYMBOL(argos_device_reset);
-# 506 "./drivers/char/argos/argos_device.c"
+# 500 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_count_based(
   struct argos_common_device_data *device_data,
   const struct queue_ctx *queue_ctx,
@@ -534,7 +528,7 @@ static int argos_dram_request_send_count_based(
 
  return 0;
 }
-# 552 "./drivers/char/argos/argos_device.c"
+# 546 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_bitmap_based(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx, int original_chunks,
@@ -584,7 +578,7 @@ static int argos_dram_request_send_bitmap_based(
 
  return 0;
 }
-# 609 "./drivers/char/argos/argos_device.c"
+# 603 "./drivers/char/argos/argos_device.c"
 static int get_dram_configuration_response(
  struct argos_common_device_data *device_data,
  int queue_index)
@@ -724,7 +718,7 @@ void argos_populate_queue_mappable_region(
  mappable_region->flags = VM_READ | VM_WRITE;
 }
 EXPORT_SYMBOL(argos_populate_queue_mappable_region);
-# 756 "./drivers/char/argos/argos_device.c"
+# 750 "./drivers/char/argos/argos_device.c"
 int argos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -740,6 +734,7 @@ int argos_get_mappable_regions_cb(
  bool return_all = false;
  int i, output_index = 0;
  int ret;
+        int num_mappable_bar_regions;
 
  if (gasket_dev->cb_data == NULL) {
   gasket_log_error(gasket_dev, "Callback data is NULL!");
@@ -762,7 +757,17 @@ int argos_get_mappable_regions_cb(
 
  if (bar_index == device_desc->firmware_register_bar) {
 
-  *num_mappable_regions = 1;
+  num_mappable_bar_regions = device_desc->get_bar_region_count(
+    bar_index);
+  mappable_bar_region = device_desc->get_bar_regions(bar_index);
+  if (mappable_bar_region == NULL) {
+   gasket_log_error(gasket_dev,
+    "Could not determine common mappable regions for firmware bar!");
+   *num_mappable_regions = 0;
+   return -EINVAL;
+  }
+
+  *num_mappable_regions = num_mappable_bar_regions;
 
 
   if (gasket_dev->ownership.owner == current->tgid &&
@@ -803,12 +808,9 @@ int argos_get_mappable_regions_cb(
 
 
 
-
-
-
-  (*mappable_regions)[output_index] =
-   device_desc->mappable_regions.global_region;
-  output_index++;
+  for (i = 0; i < num_mappable_bar_regions; i++)
+   (*mappable_regions)[output_index++] =
+                            mappable_bar_region[i];
  } else if (bar_index == device_desc->dram_bar) {
   ret = argos_get_direct_mappable_regions(
    device_data, bar_index, mappable_regions,
@@ -822,19 +824,18 @@ int argos_get_mappable_regions_cb(
   return 0;
 #endif
 
-  *num_mappable_regions =
-   desc_map_regions->num_mappable_dram_regions;
+  bar_desc =
+   &driver_desc->bar_descriptions[device_desc->dram_bar];
+  *num_mappable_regions = bar_desc->num_mappable_regions;
   *mappable_regions = kmalloc(
    sizeof(struct gasket_mappable_region) *
     *num_mappable_regions, GFP_KERNEL);
-  bar_desc =
-   &driver_desc->bar_descriptions[device_desc->dram_bar];
   memcpy(*mappable_regions, bar_desc->mappable_regions,
    sizeof(struct gasket_mappable_region) *
     *num_mappable_regions);
 
  } else if (bar_index == device_desc->debug_bar) {
-# 878 "./drivers/char/argos/argos_device.c"
+# 879 "./drivers/char/argos/argos_device.c"
   if (gasket_dev->ownership.owner != current->tgid)
    return 0;
 

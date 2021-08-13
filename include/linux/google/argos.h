@@ -21,7 +21,6 @@
 
 
 #define ARGOS_RESET_HARD 0
-
 #define ARGOS_RESET_REINIT 1
 
 
@@ -95,7 +94,7 @@ struct argos_priority_algorithm_config {
 
 
 struct argos_overseer_reservation_request {
-# 103 "./include/linux/google/argos.h"
+# 102 "./include/linux/google/argos.h"
  __u32 subcontainer_index;
 
 
@@ -139,7 +138,7 @@ struct argos_direct_mapping_request {
 
 
  int prot;
-# 155 "./include/linux/google/argos.h"
+# 154 "./include/linux/google/argos.h"
  __u32 peer_rid_address;
  __u32 peer_rid_mask;
 
@@ -225,7 +224,7 @@ struct argos_direct_mapping_dma_buf_request {
 
 #define ARGOS_IOCTL_SET_PRIORITY_ALGORITHM \
  _IOW(ARGOS_IOCTL_BASE, 5, struct argos_priority_algorithm_config)
-# 251 "./include/linux/google/argos.h"
+# 250 "./include/linux/google/argos.h"
 #define ARGOS_IOCTL_OVERSEER_RESERVE_RESOURCES \
  _IOW(ARGOS_IOCTL_BASE, 6, struct argos_overseer_reservation_request)
 
@@ -238,7 +237,7 @@ struct argos_direct_mapping_dma_buf_request {
 #define ARGOS_MODE_OVERSEER 1
 #define ARGOS_IOCTL_OVERSEER_SET_MODE \
  _IOW(ARGOS_IOCTL_BASE, 7, int)
-# 271 "./include/linux/google/argos.h"
+# 270 "./include/linux/google/argos.h"
 #define ARGOS_IOCTL_SUBCONTAINER_ALLOCATE_QUEUE_CTX \
  _IOW(ARGOS_IOCTL_BASE, 8, struct argos_subcontainer_queue_ctx_config)
 
