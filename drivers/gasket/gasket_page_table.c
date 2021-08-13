@@ -5,16 +5,17 @@
 #include "gasket_page_table.h"
 
 #include <linux/dma-buf.h>
-#include <linux/dma-resv.h>
 #include <linux/file.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/pagemap.h>
 #include <linux/version.h>
 #include <linux/vmalloc.h>
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 19)
+#include <linux/dma-resv.h>
+#endif
 
 #if defined(CONFIG_ACCEL_P2P) || defined(CONFIG_ACCEL_P2P_MODULE)
 #define BUILD_WITH_ACCEL_P2P 1
@@ -72,7 +73,7 @@ enum pte_status {
  PTE_INUSE_PFN,
  PTE_INUSE_SGT,
 };
-# 103 "./drivers/gasket/gasket_page_table.c"
+# 106 "./drivers/gasket/gasket_page_table.c"
 struct gasket_sgt_mapping {
 
  struct sg_table *sgt;
@@ -91,7 +92,7 @@ struct gasket_sgt_mapping {
 
  struct list_head entry;
 };
-# 135 "./drivers/gasket/gasket_page_table.c"
+# 138 "./drivers/gasket/gasket_page_table.c"
 struct gasket_page_table_entry {
 
  enum pte_status status;
@@ -419,18 +420,16 @@ dma_buf_map_failed:
  return ret;
 }
 EXPORT_SYMBOL(gasket_page_table_dma_buf_map);
-# 471 "./drivers/gasket/gasket_page_table.c"
+# 474 "./drivers/gasket/gasket_page_table.c"
 int gasket_page_table_map(struct gasket_page_table *pg_tbl, ulong host_addr,
  ulong dev_addr, ulong bytes)
 {
  int ret = 0;
  uint num_pages;
 
+ if (current->mm)
+  mmap_read_lock(current->mm);
  mutex_lock(&pg_tbl->mutex);
-
-
-
-
 
  if (gasket_page_table_are_addrs_bad(pg_tbl, host_addr, dev_addr,
          bytes)) {
@@ -451,10 +450,12 @@ int gasket_page_table_map(struct gasket_page_table *pg_tbl, ulong host_addr,
  }
 
  mutex_unlock(&pg_tbl->mutex);
+ if (current->mm)
+  mmap_read_unlock(current->mm);
  return ret;
 }
 EXPORT_SYMBOL(gasket_page_table_map);
-# 515 "./drivers/gasket/gasket_page_table.c"
+# 518 "./drivers/gasket/gasket_page_table.c"
 int gasket_page_table_unmap(
  struct gasket_page_table *pg_tbl, ulong dev_addr, ulong bytes)
 {
@@ -536,8 +537,6 @@ int gasket_page_table_are_addrs_bad(struct gasket_page_table *pg_tbl,
   return 1;
  }
 
- down_read(&current->mm->mmap_lock);
-
 
 
 
@@ -598,12 +597,9 @@ int gasket_page_table_are_addrs_bad(struct gasket_page_table *pg_tbl,
   }
  }
 
- up_read(&current->mm->mmap_lock);
-
  return gasket_page_table_is_dev_addr_bad(pg_tbl, dev_addr, bytes);
 
 fail:
- up_read(&current->mm->mmap_lock);
  gasket_pg_tbl_error(pg_tbl,
   "Failure while checking host range [0x%lx, 0x%lx)", host_addr,
   host_addr + bytes);
@@ -713,7 +709,7 @@ int gasket_page_table_system_status(struct gasket_page_table *pg_tbl)
 
  return GASKET_STATUS_ALIVE;
 }
-# 796 "./drivers/gasket/gasket_page_table.c"
+# 794 "./drivers/gasket/gasket_page_table.c"
 static int gasket_map_simple_pages(struct gasket_page_table *pg_tbl,
  ulong host_addr, ulong dev_addr, uint num_pages)
 {
@@ -737,7 +733,7 @@ static int gasket_map_simple_pages(struct gasket_page_table *pg_tbl,
 
  return ret;
 }
-# 839 "./drivers/gasket/gasket_page_table.c"
+# 837 "./drivers/gasket/gasket_page_table.c"
 static int gasket_map_extended_pages(
  struct gasket_page_table *pg_tbl, ulong host_addr,
  ulong dev_addr, uint num_pages)
@@ -751,7 +747,7 @@ static int gasket_map_extended_pages(
 
  ret = gasket_alloc_extended_entries(pg_tbl, dev_addr, num_pages);
  if (ret) {
-  dev_addr_end = dev_addr + (num_pages * PAGE_SIZE) - 1;
+  dev_addr_end = dev_addr + (num_pages / PAGE_SIZE) - 1;
   gasket_pg_tbl_error(pg_tbl,
    "page table slots (%lu,%lu) (@ 0x%lx) to (%lu,%lu) are not available",
    gasket_extended_lvl0_page_idx(pg_tbl, dev_addr),
@@ -789,7 +785,7 @@ static int gasket_map_extended_pages(
 
  return 0;
 }
-# 902 "./drivers/gasket/gasket_page_table.c"
+# 900 "./drivers/gasket/gasket_page_table.c"
 static bool use_hpa_for_pfn_mappings(struct pci_dev *dev, ulong host_addr,
     ulong size)
 {
@@ -802,7 +798,7 @@ static bool use_hpa_for_pfn_mappings(struct pci_dev *dev, ulong host_addr,
  return false;
 #endif
 }
-# 937 "./drivers/gasket/gasket_page_table.c"
+# 935 "./drivers/gasket/gasket_page_table.c"
 static int perform_pfn_mapping(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *ptes, u64 __iomem *slots,
  ulong host_addr, ulong dev_addr, uint num_pages, int is_simple_mapping)
@@ -818,12 +814,9 @@ static int perform_pfn_mapping(struct gasket_page_table *pg_tbl,
  dma_addr_t page_dma_addr;
  dma_addr_t device_dma_addr;
 
- down_read(&current->mm->mmap_lock);
-
  vma = find_vma(current->mm, host_addr);
  if (vma == NULL) {
-  ret = -EFAULT;
-  goto error_mm;
+  return -EFAULT;
  }
 
 
@@ -831,8 +824,7 @@ static int perform_pfn_mapping(struct gasket_page_table *pg_tbl,
   gasket_pg_tbl_error(pg_tbl,
    "VMA region is not VM_PFNMAP: host_addr=%#lx, size=%#lx, vm_flags=%#lx, vm_pgoff=%#lx",
    host_addr, size, vma->vm_flags, vma->vm_pgoff);
-  ret = -EINVAL;
-  goto error_mm;
+  return -EINVAL;
  }
 
 
@@ -844,14 +836,11 @@ static int perform_pfn_mapping(struct gasket_page_table *pg_tbl,
    "VMA region does not cover the requested range: host_addr=%#lx, size=%#lx, vm_start=%#lx, vm_end=%#lx, vm_pgoff=%#lx",
    host_addr, size, vma->vm_start, vma->vm_end,
    vma->vm_pgoff);
-  ret = -EINVAL;
-  goto error_mm;
+  return -EINVAL;
  }
 
  vma_offset = host_addr - vma->vm_start;
  host_phys_addr = (vma->vm_pgoff << PAGE_SHIFT) + vma_offset;
-
- up_read(&current->mm->mmap_lock);
 
  gasket_pg_tbl_debug(pg_tbl,
   "%s: virt_addr_valid=%d, host_phys_addr=%#llx, iommu_ops=%p\n",
@@ -863,7 +852,7 @@ static int perform_pfn_mapping(struct gasket_page_table *pg_tbl,
                                                    host_phys_addr, size);
  if (gasket_pci_is_iommu_enabled(pg_tbl->gasket_dev->pci_dev) &&
             !always_use_hpa) {
-# 1019 "./drivers/gasket/gasket_page_table.c"
+# 1010 "./drivers/gasket/gasket_page_table.c"
  } else {
 #ifdef CONFIG_VIRT_TO_BUS
   ret = 0;
@@ -918,12 +907,8 @@ error:
 
 
  return ret;
-
-error_mm:
- up_read(&current->mm->mmap_lock);
- return ret;
 }
-# 1111 "./drivers/gasket/gasket_page_table.c"
+# 1098 "./drivers/gasket/gasket_page_table.c"
 static int gasket_perform_mapping(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *ptes, u64 __iomem *slots,
  ulong host_addr, ulong dev_addr, uint num_pages, int is_simple_mapping)
@@ -950,8 +935,8 @@ static int gasket_perform_mapping(struct gasket_page_table *pg_tbl,
  if (!pages)
   return -ENOMEM;
 
- ret = get_user_pages_fast(host_addr, num_pages, 1, pages);
-# 1146 "./drivers/gasket/gasket_page_table.c"
+ ret = get_user_pages(host_addr, num_pages, FOLL_WRITE, pages, NULL);
+# 1133 "./drivers/gasket/gasket_page_table.c"
  if (ret == -EFAULT) {
   ret = perform_pfn_mapping(pg_tbl, ptes, slots, host_addr,
        dev_addr, num_pages,
@@ -1038,7 +1023,7 @@ exit:
  kfree(pages);
  return ret;
 }
-# 1249 "./drivers/gasket/gasket_page_table.c"
+# 1236 "./drivers/gasket/gasket_page_table.c"
 static int gasket_alloc_simple_entries(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1049,7 +1034,7 @@ static int gasket_alloc_simple_entries(
 
  return 0;
 }
-# 1284 "./drivers/gasket/gasket_page_table.c"
+# 1271 "./drivers/gasket/gasket_page_table.c"
 static int gasket_alloc_extended_entries(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_entries)
 {
@@ -1090,7 +1075,7 @@ static int gasket_alloc_extended_entries(
 
  return 0;
 }
-# 1341 "./drivers/gasket/gasket_page_table.c"
+# 1328 "./drivers/gasket/gasket_page_table.c"
 static int gasket_alloc_extended_subtable(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *pte, u64 __iomem *slot)
 {
@@ -1137,7 +1122,7 @@ fail_subtable_allocate:
  memset(pte, 0, sizeof(struct gasket_page_table_entry));
  return -ENOMEM;
 }
-# 1398 "./drivers/gasket/gasket_page_table.c"
+# 1385 "./drivers/gasket/gasket_page_table.c"
 static int gasket_page_table_unmap_nolock(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1150,7 +1135,7 @@ static int gasket_page_table_unmap_nolock(
   return gasket_unmap_extended_pages(
    pg_tbl, dev_addr, num_pages, true);
 }
-# 1425 "./drivers/gasket/gasket_page_table.c"
+# 1412 "./drivers/gasket/gasket_page_table.c"
 static int gasket_unmap_simple_pages(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1178,7 +1163,7 @@ static int gasket_unmap_simple_pages(
  gasket_page_table_detach_sgt_mappings(pg_tbl, dev_addr, num_pages);
  return ret;
 }
-# 1467 "./drivers/gasket/gasket_page_table.c"
+# 1454 "./drivers/gasket/gasket_page_table.c"
 static void perform_sgt_dma_addr_mapping(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *ptes, u64 __iomem *slots,
  dma_addr_t dma_addr, uint num_pages, int is_simple_mapping)
@@ -1204,7 +1189,7 @@ static void perform_sgt_dma_addr_mapping(struct gasket_page_table *pg_tbl,
  }
  pg_tbl->num_active_pages += num_pages;
 }
-# 1500 "./drivers/gasket/gasket_page_table.c"
+# 1487 "./drivers/gasket/gasket_page_table.c"
 static size_t gasket_sgt_get_contiguous_size(
  struct gasket_page_table *pg_tbl, struct sg_table *sgt)
 {
@@ -1273,7 +1258,7 @@ static const struct dma_buf_attach_ops gasket_dma_buf_attach_ops = {
  .move_notify = gasket_page_table_dma_buf_move_notify,
 };
 #endif
-# 1581 "./drivers/gasket/gasket_page_table.c"
+# 1568 "./drivers/gasket/gasket_page_table.c"
 static struct gasket_sgt_mapping *gasket_page_table_import_dma_buf(
  struct gasket_page_table *pg_tbl, int dma_buf_fd)
 {
@@ -1332,9 +1317,9 @@ static struct gasket_sgt_mapping *gasket_page_table_import_dma_buf(
 
  mapping->size = dbuf->size;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 19)
- /*
-  * resv lock must be held when mapping a dynamic attachment.
-  */
+
+
+
  dma_resv_lock(dbuf->resv, NULL);
 #endif
  mapping->sgt =
@@ -1359,7 +1344,7 @@ failed_mapping_alloc:
  dma_buf_put(dbuf);
  return ERR_PTR(ret);
 }
-# 1667 "./drivers/gasket/gasket_page_table.c"
+# 1663 "./drivers/gasket/gasket_page_table.c"
 static void gasket_page_table_detach_sgt_mapping(
  struct gasket_page_table *pg_tbl, struct gasket_sgt_mapping *mapping)
 {
@@ -1372,22 +1357,22 @@ static void gasket_page_table_detach_sgt_mapping(
  if (mapping->dbuf_attach) {
   dbuf = mapping->dbuf_attach->dmabuf;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 19)
- /*
-  * resv lock must be held when unmapping a dynamic attachment.
-  */
- dma_resv_lock(dbuf->resv, NULL);
+
+
+
+  dma_resv_lock(dbuf->resv, NULL);
 #endif
   dma_buf_unmap_attachment(
    mapping->dbuf_attach, mapping->sgt, DMA_BIDIRECTIONAL);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 19)
- dma_resv_unlock(dbuf->resv);
+  dma_resv_unlock(dbuf->resv);
 #endif
   dma_buf_detach(dbuf, mapping->dbuf_attach);
   dma_buf_put(dbuf);
  }
  kfree(mapping);
 }
-# 1697 "./drivers/gasket/gasket_page_table.c"
+# 1702 "./drivers/gasket/gasket_page_table.c"
 static int gasket_map_sgt_simple_pages(
  struct gasket_page_table *pg_tbl, struct gasket_sgt_mapping *mapping)
 {
@@ -1429,7 +1414,7 @@ static int gasket_map_sgt_simple_pages(
 
  return ret;
 }
-# 1750 "./drivers/gasket/gasket_page_table.c"
+# 1755 "./drivers/gasket/gasket_page_table.c"
 static int gasket_map_sgt_extended_pages(
  struct gasket_page_table *pg_tbl, struct gasket_sgt_mapping *mapping)
 {
@@ -1496,7 +1481,7 @@ static int gasket_map_sgt_extended_pages(
 
  return ret;
 }
-# 1834 "./drivers/gasket/gasket_page_table.c"
+# 1839 "./drivers/gasket/gasket_page_table.c"
 static int gasket_unmap_extended_pages(struct gasket_page_table *pg_tbl,
  ulong dev_addr, uint num_pages, bool strict)
 {
@@ -1556,7 +1541,7 @@ static int gasket_unmap_extended_pages(struct gasket_page_table *pg_tbl,
   pg_tbl, start_dev_addr, num_pages);
  return ret;
 }
-# 1905 "./drivers/gasket/gasket_page_table.c"
+# 1910 "./drivers/gasket/gasket_page_table.c"
 static int gasket_page_table_validate_sgt_mappings(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1583,7 +1568,7 @@ static int gasket_page_table_validate_sgt_mappings(
 
  return 0;
 }
-# 1944 "./drivers/gasket/gasket_page_table.c"
+# 1949 "./drivers/gasket/gasket_page_table.c"
 static int gasket_page_table_detach_sgt_mappings(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1624,7 +1609,7 @@ static int gasket_page_table_detach_sgt_mappings(
 
  return 0;
 }
-# 1995 "./drivers/gasket/gasket_page_table.c"
+# 2000 "./drivers/gasket/gasket_page_table.c"
 static int validate_pfn_mappings(struct gasket_page_table_entry *ptes,
     uint num_pages)
 {
@@ -1656,7 +1641,7 @@ static int validate_pfn_mappings(struct gasket_page_table_entry *ptes,
  }
  return 0;
 }
-# 2060 "./drivers/gasket/gasket_page_table.c"
+# 2065 "./drivers/gasket/gasket_page_table.c"
 static int gasket_perform_unmapping(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *ptes, u64 __iomem *slots,
  ulong dev_addr, uint num_pages, int is_simple_mapping,
@@ -1763,7 +1748,7 @@ static int gasket_perform_unmapping(struct gasket_page_table *pg_tbl,
 
  return 0;
 }
-# 2182 "./drivers/gasket/gasket_page_table.c"
+# 2187 "./drivers/gasket/gasket_page_table.c"
 static void gasket_free_extended_subtable(struct gasket_page_table *pg_tbl,
  struct gasket_page_table_entry *pte, u64 __iomem *slot)
 {
@@ -1818,7 +1803,7 @@ static inline int gasket_addr_is_simple(
  else
   return !((addr) & (pg_tbl)->extended_flag);
 }
-# 2247 "./drivers/gasket/gasket_page_table.c"
+# 2252 "./drivers/gasket/gasket_page_table.c"
 static int gasket_is_simple_dev_addr_bad(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1849,7 +1834,7 @@ static int gasket_is_simple_dev_addr_bad(
 
  return 0;
 }
-# 2288 "./drivers/gasket/gasket_page_table.c"
+# 2293 "./drivers/gasket/gasket_page_table.c"
 static int gasket_is_extended_dev_addr_bad(
  struct gasket_page_table *pg_tbl, ulong dev_addr, uint num_pages)
 {
@@ -1885,7 +1870,7 @@ static int gasket_is_extended_dev_addr_bad(
 
  return 0;
 }
-# 2335 "./drivers/gasket/gasket_page_table.c"
+# 2340 "./drivers/gasket/gasket_page_table.c"
 static int gasket_is_pte_range_free(
  struct gasket_page_table_entry *ptes, uint num_entries)
 {
@@ -1898,7 +1883,7 @@ static int gasket_is_pte_range_free(
 
  return 1;
 }
-# 2355 "./drivers/gasket/gasket_page_table.c"
+# 2360 "./drivers/gasket/gasket_page_table.c"
 static void gasket_page_table_garbage_collect_nolock(
  struct gasket_page_table *pg_tbl)
 {
@@ -1920,7 +1905,7 @@ static void gasket_page_table_garbage_collect_nolock(
   }
  }
 }
-# 2396 "./drivers/gasket/gasket_page_table.c"
+# 2401 "./drivers/gasket/gasket_page_table.c"
 static ulong gasket_components_to_dev_address(struct gasket_page_table *pg_tbl,
  int is_simple, uint page_index, uint offset)
 {
@@ -1931,28 +1916,28 @@ static ulong gasket_components_to_dev_address(struct gasket_page_table *pg_tbl,
   lvl0_index = page_index & (pg_tbl->config->total_entries - 1);
   return (lvl0_index << GASKET_SIMPLE_PAGE_SHIFT) | offset;
  }
-# 2414 "./drivers/gasket/gasket_page_table.c"
+# 2419 "./drivers/gasket/gasket_page_table.c"
  lvl0_index = page_index / GASKET_PAGES_PER_SUBTABLE;
  lvl1_index = page_index & (GASKET_PAGES_PER_SUBTABLE - 1);
  return (pg_tbl)->extended_flag |
         (lvl0_index << GASKET_EXTENDED_LVL0_SHIFT) |
         (lvl1_index << GASKET_EXTENDED_LVL1_SHIFT) | offset;
 }
-# 2432 "./drivers/gasket/gasket_page_table.c"
+# 2437 "./drivers/gasket/gasket_page_table.c"
 static int gasket_simple_page_idx(
  struct gasket_page_table *pg_tbl, ulong dev_addr)
 {
  return (dev_addr >> GASKET_SIMPLE_PAGE_SHIFT) &
         (pg_tbl->config->total_entries - 1);
 }
-# 2450 "./drivers/gasket/gasket_page_table.c"
+# 2455 "./drivers/gasket/gasket_page_table.c"
 static ulong gasket_extended_lvl0_page_idx(
  struct gasket_page_table *pg_tbl, ulong dev_addr)
 {
  return (dev_addr >> GASKET_EXTENDED_LVL0_SHIFT) &
         (pg_tbl->config->total_entries - 1);
 }
-# 2468 "./drivers/gasket/gasket_page_table.c"
+# 2473 "./drivers/gasket/gasket_page_table.c"
 static ulong gasket_extended_lvl1_page_idx(
  struct gasket_page_table *pg_tbl, ulong dev_addr)
 {

@@ -210,6 +210,8 @@ fail_counts_allocate:
 fail_eventfd_allocate:
  kfree(interrupt_data->msix_entries);
 fail_name_allocate:
+
+
  for (i = 0; i < num_msix_interrupts; i++)
   kfree(interrupt_data->names[i]);
  kfree(interrupt_data->names);
@@ -381,7 +383,7 @@ fail_configure:
  gasket_interrupt_msix_teardown(gasket_dev->interrupt_data);
  return ret;
 }
-# 389 "./drivers/gasket/gasket_interrupt.c"
+# 391 "./drivers/gasket/gasket_interrupt.c"
 static int gasket_interrupt_clear_eventfd(
  struct gasket_dev *gasket_dev, int interrupt)
 {

@@ -264,10 +264,11 @@ static int argos_overseer_reserve_resources(
  if (copy_from_user(&request, (void __user *)arg, sizeof(request)))
   return -EFAULT;
 
- if (request.subcontainer_index > GASKET_MAX_CLONES) {
+ if (request.subcontainer_index >= GASKET_MAX_CLONES) {
   gasket_log_error(gasket_dev,
-     "Subcontainer index out-of-bounds: %d",
-     request.subcontainer_index);
+     "Subcontainer index out-of-bounds: %d, valid range [0-%d]",
+     request.subcontainer_index,
+     GASKET_MAX_CLONES - 1);
   return -EINVAL;
  }
 
@@ -536,7 +537,7 @@ bool argos_overseer_subcontainer_owns_all_parent_resources(
  return true;
 }
 EXPORT_SYMBOL(argos_overseer_subcontainer_owns_all_parent_resources);
-# 584 "./drivers/char/argos/argos_overseer.c"
+# 585 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_subcontainers(
  struct argos_common_device_data *device_data, char *buf)
 {
@@ -598,7 +599,7 @@ static ssize_t sysfs_show_subcontainers(
 
  return bytes_written;
 }
-# 655 "./drivers/char/argos/argos_overseer.c"
+# 656 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_mem_alloc(
   struct argos_common_device_data *device_data, int mem_alloc,
   char *buf)

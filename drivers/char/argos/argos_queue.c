@@ -3,7 +3,6 @@
  */
 # 1 "./drivers/char/argos/argos_queue.c"
 #include <linux/bitops.h>
-#include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/mmap_lock.h>
 
@@ -301,7 +300,7 @@ static void remove_all_mmaps(
  bool unmapped = false;
  struct vm_area_struct *vma = NULL, *next_vma;
 
- mmap_assert_locked(current->mm);
+ lockdep_assert_held_once(&current->mm->mmap_lock);
 
  vma = current->mm->mmap;
 
@@ -1246,7 +1245,7 @@ void argos_remove_dma_buf_from_direct_mapping(
   goto remove_dma_buf_exit;
 
  direct_mapping = find_direct_mapping_in_queue(queue_ctx, dm_request);
-# 1296 "./drivers/char/argos/argos_queue.c"
+# 1300 "./drivers/char/argos/argos_queue.c"
  if (!direct_mapping)
   goto remove_dma_buf_exit;
 

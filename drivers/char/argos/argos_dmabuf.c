@@ -3,11 +3,13 @@
  */
 # 1 "./drivers/char/argos/argos_dmabuf.c"
 #include <linux/dma-buf.h>
-#include <linux/dma-resv.h>
 #include <linux/fs.h>
 #include <linux/scatterlist.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 7, 19)
+#include <linux/dma-resv.h>
+#endif
 
 #include "../../gasket/gasket_core.h"
 #include "../../gasket/gasket_dmabuf.h"
@@ -26,7 +28,7 @@ struct dma_buf *argos_create_dma_buf(
  int ret;
  struct dma_buf *dbuf;
  struct argos_dma_buf_object *argos_dbuf;
-# 39 "./drivers/char/argos/argos_dmabuf.c"
+# 42 "./drivers/char/argos/argos_dmabuf.c"
  ret = argos_get_direct_mapping_mmap_offset(
   device_data, &request->direct_mapping);
  if (ret) {

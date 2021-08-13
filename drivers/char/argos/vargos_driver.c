@@ -23,6 +23,7 @@
 #include "argos_ioctl.h"
 #include "argos_queue.h"
 #include "argos_types.h"
+#include "kernel_chip_global_accessors.h"
 #include "vargos_mailbox_types.h"
 
 
@@ -37,14 +38,8 @@
 
 
 
-
-
 #define VARGOS_QUEUE_CTX_COUNT 64
-#define VARGOS_DRAM_BYTES (8ull << 30)
-#define VARGOS_DRAM_CHUNK_COUNT \
- (VARGOS_DRAM_BYTES / ARGOS_DRAM_CHUNK_BYTES)
-#define VARGOS_MAX_DRAM_CHUNKS_PER_CTX 1024
-#define VARGOS_PAGE_TABLE_MAX_ENTRIES 256
+#define VARGOS_MAX_DRAM_CHUNKS_PER_CTX_OFFSET 0x02010020
 
 #define VARGOS_FIRMWARE_BAR 0
 #define VARGOS_FIRMWARE_BAR_OFFSET 0x0
@@ -55,6 +50,16 @@
 #define VARGOS_DRAM_BAR_SIZE (16ull << 30)
 
 #define DEFAULT_TIMEOUT_SCALING 1ul
+
+
+
+#define VARGOS_V1_PAGE_TABLE_MAX_ENTRIES 256
+#define VARGOS_V1_DRAM_BYTES (8ull << 30)
+
+
+
+#define VARGOS_V2_PAGE_TABLE_MAX_ENTRIES 512
+#define VARGOS_V2_DRAM_BYTES (7ull << 30)
 
 
 
@@ -93,13 +98,13 @@
 #define VARGOS_CHIP_GLOBAL_START 0x02000000
 #define VARGOS_CHIP_GLOBAL_SIZE 0x20
 
+#define VARGOS_SNAPDUMP_REGISTER_BASE 0x10000
+#define VARGOS_SNAPDUMP_REGISTER_SIZE 0x8
+
 
 #define VARGOS_FAKE_STICKY_START 0x02106000
 #define VARGOS_FAKE_STICKY_SIZE PAGE_SIZE
-
-#define VARGOS_SNAPDUMP_REGISTER_BASE 0x10000
-#define VARGOS_SNAPDUMP_REGISTER_SIZE 0x8
-# 107 "./drivers/char/argos/vargos_driver.c"
+# 112 "./drivers/char/argos/vargos_driver.c"
 #define VARGOS_MAILBOX_TIMEOUT (msecs_to_jiffies(500))
 
 
@@ -137,6 +142,18 @@ struct vargos_device_data {
  struct vargos_mailbox mailbox;
 };
 
+
+struct vargos_chip_family_data {
+
+ const char *name;
+
+
+ ulong page_table_max_entries;
+
+
+ int dram_chunk_count;
+};
+
 static struct vargos_mailbox *get_mailbox(
  struct argos_common_device_data *device_data)
 {
@@ -151,6 +168,7 @@ static struct vargos_mailbox *get_mailbox(
 
 static int __init vargos_init(void);
 static int vargos_wormhole_setup(void);
+static int vargos_initialize_chip_family(void);
 static void vargos_exit(void);
 static int vargos_alloc_device_data(struct gasket_dev *gasket_dev);
 static int vargos_free_device_data(struct gasket_dev *gasket_dev);
@@ -230,6 +248,23 @@ static const struct pci_device_id pci_ids[] = {
  { 0 }
 };
 
+static const struct vargos_chip_family_data vargos_v1_chip_family_data = {
+ .name = "vargos",
+ .page_table_max_entries = VARGOS_V1_PAGE_TABLE_MAX_ENTRIES,
+ .dram_chunk_count =
+  (VARGOS_V1_DRAM_BYTES / ARGOS_DRAM_CHUNK_BYTES),
+};
+
+static const struct vargos_chip_family_data vargos_v2_chip_family_data = {
+ .name = "vargos_v2",
+ .page_table_max_entries = VARGOS_V2_PAGE_TABLE_MAX_ENTRIES,
+ .dram_chunk_count =
+  (VARGOS_V2_DRAM_BYTES / ARGOS_DRAM_CHUNK_BYTES),
+};
+
+
+static const struct vargos_chip_family_data *chip_family_data;
+
 static const struct gasket_mappable_region fw_bar_regions[] = {
  { 0x0, VARGOS_FIRMWARE_BAR_SIZE, VM_READ | VM_WRITE }
 };
@@ -245,7 +280,6 @@ static struct legacy_gasket_interrupt_desc
  interrupt_descs[VARGOS_QUEUE_CTX_COUNT];
 
 static struct gasket_driver_desc driver_desc = {
- .chip_model = "vargos",
  .chip_version = "0.0.0",
  .driver_version = ARGOS_DRIVER_VERSION,
 
@@ -338,18 +372,23 @@ module_exit(vargos_exit);
 static int __init vargos_init(void)
 {
  int i;
+ int ret;
 
- gasket_nodev_info("Loading VArgos driver: 5ee3146de61b.");
+ gasket_nodev_info("Loading VArgos driver: a1b124635dd9.");
 
- i = vargos_wormhole_setup();
- if (i)
-  return i;
+ ret = vargos_wormhole_setup();
+ if (ret)
+  return ret;
+
+ ret = vargos_initialize_chip_family();
+ if (ret)
+  return ret;
 
  for (i = 0; i < VARGOS_QUEUE_CTX_COUNT; i++) {
   page_table_configs[i].id = i;
   page_table_configs[i].mode = GASKET_PAGE_TABLE_MODE_EXTENDED;
   page_table_configs[i].total_entries =
-   VARGOS_PAGE_TABLE_MAX_ENTRIES;
+   chip_family_data->page_table_max_entries;
   page_table_configs[i].base_reg =
    get_page_table_entry_offset(i, 0);
   page_table_configs[i].extended_reg =
@@ -362,9 +401,11 @@ static int __init vargos_init(void)
   interrupt_descs[i].packing = UNPACKED;
  }
 
+ driver_desc.chip_model = chip_family_data->name;
+
  return gasket_register_device(&device_desc);
 }
-# 380 "./drivers/char/argos/vargos_driver.c"
+# 421 "./drivers/char/argos/vargos_driver.c"
 static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 {
  const int reg = PCI_BASE_ADDRESS_0 + 4 * bar;
@@ -396,7 +437,7 @@ static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 
  return ret;
 }
-# 424 "./drivers/char/argos/vargos_driver.c"
+# 465 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_move_bar(
  struct pci_dev *pdev, int bar, struct resource *wormhole_res,
  u64 wormhole_bar_base)
@@ -407,7 +448,7 @@ int vargos_wormhole_move_bar(
 
  if (!wormhole_bar_base)
   return 0;
-# 442 "./drivers/char/argos/vargos_driver.c"
+# 483 "./drivers/char/argos/vargos_driver.c"
  ret = -EINVAL;
  pci_bus_for_each_resource(pdev->bus, r, i) {
   if (!r || !resource_contains(r, bar_res))
@@ -479,7 +520,7 @@ int vargos_wormhole_move_bar(
 
  return 0;
 }
-# 521 "./drivers/char/argos/vargos_driver.c"
+# 562 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_setup(void)
 {
  struct pci_dev *pdev = NULL;
@@ -565,6 +606,63 @@ release_device:
 
  return 0;
 }
+# 657 "./drivers/char/argos/vargos_driver.c"
+static int vargos_initialize_chip_family(void)
+{
+ const struct pci_device_id *id = NULL;
+ struct pci_dev *pdev = NULL;
+ int ret = 0;
+
+ chip_family_data = NULL;
+ for (id = pci_ids; id->vendor && id->device; id++) {
+  pdev = pci_get_device(id->vendor, id->device, pdev);
+
+
+
+
+  while (pdev != NULL) {
+   if (id->device == VARGOS_V1_PCI_DEVICE_ID) {
+    if (chip_family_data && chip_family_data !=
+     &vargos_v1_chip_family_data) {
+     chip_family_data = NULL;
+     dev_warn(&pdev->dev,
+      "All devices do not belong to the same chip family.");
+     ret = -ENODEV;
+     break;
+    } else
+     chip_family_data =
+      &vargos_v1_chip_family_data;
+   } else if (id->device == VARGOS_V2_PCI_DEVICE_ID) {
+    if (chip_family_data && chip_family_data !=
+     &vargos_v2_chip_family_data) {
+     chip_family_data = NULL;
+     dev_warn(&pdev->dev,
+      "All devices do not belong to the same chip family.");
+     ret = -ENODEV;
+     break;
+    } else
+     chip_family_data =
+      &vargos_v2_chip_family_data;
+   } else {
+    ret = -ENODEV;
+    break;
+   }
+   pdev = pci_get_device(id->vendor, id->device, pdev);
+  }
+ }
+
+
+
+
+
+
+ if (chip_family_data == NULL) {
+  printk(KERN_WARNING
+   "Vargos: Could not determine the underlying VArgos device, defaulting to VArgos_V1.");
+  chip_family_data = &vargos_v1_chip_family_data;
+ }
+ return ret;
+}
 
 
 
@@ -616,11 +714,8 @@ static int vargos_alloc_device_data(struct gasket_dev *gasket_dev)
   mutex_init(&device_data->queue_ctxs[i].direct_mappings_mutex);
  }
  device_data->mode = ARGOS_MODE_NORMAL;
- device_data->total_chunks = VARGOS_DRAM_CHUNK_COUNT;
-
- device_data->max_chunks_per_queue_ctx =
-  VARGOS_MAX_DRAM_CHUNKS_PER_CTX;
- device_data->reserved_chunks = VARGOS_DRAM_CHUNK_COUNT;
+ device_data->total_chunks = chip_family_data->dram_chunk_count;
+ device_data->reserved_chunks = chip_family_data->dram_chunk_count;
  device_data->allocated_chunks = 0;
 
  gasket_dev->cb_data = device_data;
@@ -639,8 +734,10 @@ static int vargos_free_device_data(struct gasket_dev *gasket_dev)
  struct argos_common_device_data *device_data;
  struct vargos_device_data *vargos_device_data;
 
- if (gasket_dev->cb_data == NULL)
+ if (gasket_dev->cb_data == NULL) {
+  gasket_log_error(gasket_dev, "Callback data is NULL!");
   return -EINVAL;
+ }
 
  device_data = gasket_dev->cb_data;
  WARN_ON(device_data->argos_cb != &vargos_argos_callbacks);
@@ -710,6 +807,19 @@ static int vargos_enable_dev(struct gasket_dev *gasket_dev)
    "VArgos device mailbox interface is unsupported version %u (expected %u)",
    value32, VARGOS_MAILBOX_VERSION);
   return -ENODEV;
+ }
+
+ value64 = gasket_dev_read_64(gasket_dev, VARGOS_FIRMWARE_BAR,
+  VARGOS_MAX_DRAM_CHUNKS_PER_CTX_OFFSET);
+ if (kernel_chip_global_max_ddr_chunks_per_ctx_valid(value64) ==
+  kKernelChipGlobalMaxDdrChunksPerCtxValidValueValid) {
+  device_data->max_chunks_per_queue_ctx =
+   kernel_chip_global_max_ddr_chunks_per_ctx_chunks(
+    value64);
+ } else {
+  gasket_log_error(gasket_dev,
+   "The value of max_ddr_chunks_per_ctx register is invalid.");
+  return -EINVAL;
  }
 
  queue_ctxs = device_data->queue_ctxs;
@@ -864,7 +974,7 @@ static unsigned long get_page_table_entry_offset(
  return VARGOS_PAGE_TABLE_BASE + reg_index * VARGOS_PAGE_TABLE_SIZE +
   entry_index * sizeof(u64);
 }
-# 913 "./drivers/char/argos/vargos_driver.c"
+# 1032 "./drivers/char/argos/vargos_driver.c"
 static int vargos_get_mappable_regions_cb(
  struct gasket_dev *gasket_dev, int bar_index,
  struct gasket_mappable_region **mappable_regions,
@@ -970,6 +1080,11 @@ static int vargos_get_mappable_regions_cb(
    VARGOS_FAKE_STICKY_SIZE;
   (*mappable_regions)[output_index].flags = VM_READ | VM_WRITE;
   output_index++;
+
+
+
+
+
  } else if (bar_index == VARGOS_DRAM_BAR) {
   return argos_get_direct_mappable_regions(
    device_data, bar_index, mappable_regions,
@@ -1063,7 +1178,7 @@ static int vargos_disable_queue_ctx(
 
  command.type = VARGOS_MAILBOX_COMMAND_DISABLE;
  command.virtual_queue_index = queue_ctx->index;
-# 1120 "./drivers/char/argos/vargos_driver.c"
+# 1244 "./drivers/char/argos/vargos_driver.c"
  ret = mailbox_submit_and_wait_one(mailbox, &command);
  if (ret)
   gasket_log_warn(gasket_dev,
@@ -1072,7 +1187,7 @@ static int vargos_disable_queue_ctx(
 
  return 0;
 }
-# 1144 "./drivers/char/argos/vargos_driver.c"
+# 1268 "./drivers/char/argos/vargos_driver.c"
 static int vargos_map_buffer(
  struct gasket_dev *gasket_dev, int queue_idx, ulong dma_addr,
  ulong dev_addr, uint num_pages)
@@ -1104,7 +1219,7 @@ static int vargos_map_buffer(
 
  return ret;
 }
-# 1190 "./drivers/char/argos/vargos_driver.c"
+# 1314 "./drivers/char/argos/vargos_driver.c"
 static int vargos_unmap_buffer(
  struct gasket_dev *gasket_dev, int queue_idx, ulong dev_addr,
  uint num_pages)

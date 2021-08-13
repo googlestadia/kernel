@@ -74,7 +74,6 @@ static void gasket_exit(void);
 static int gasket_pci_probe(
  struct pci_dev *pci_dev, const struct pci_device_id *id);
 static void gasket_pci_remove(struct pci_dev *pci_dev);
-static int gasket_pci_sriov_configure(struct pci_dev *pci_dev, int num_vfs);
 
 static int gasket_setup_pci(struct pci_dev *pci_dev, struct gasket_dev *dev);
 static void gasket_cleanup_pci(struct gasket_dev *dev);
@@ -333,7 +332,6 @@ int __gasket_register_device(const struct gasket_device_desc *device_desc,
  internal->pci.id_table = device_desc->pci_id_table;
  internal->pci.probe = gasket_pci_probe;
  internal->pci.remove = gasket_pci_remove;
- internal->pci.sriov_configure = gasket_pci_sriov_configure;
  internal->unforkable_maps.unforkable_map_count = 0;
  internal->unforkable_maps.last_mapped_unforkable_pid = -1;
  memset(internal->unforkable_maps.last_mapped_unforkable_process_name, 0,
@@ -444,7 +442,7 @@ void gasket_unregister_device(const struct gasket_device_desc *device_desc)
  gasket_nodev_info("removed %s driver", device_desc->name);
 }
 EXPORT_SYMBOL(gasket_unregister_device);
-# 470 "./drivers/gasket/gasket_core.c"
+# 468 "./drivers/gasket/gasket_core.c"
 static int gasket_alloc_dev(
  struct gasket_internal_desc *internal_desc, struct pci_dev *pci_dev,
  struct gasket_dev **pdev, const char *kobj_name)
@@ -616,7 +614,7 @@ static int gasket_find_dev_slot(
  mutex_unlock(&internal_desc->mutex);
  return i;
 }
-# 652 "./drivers/gasket/gasket_core.c"
+# 650 "./drivers/gasket/gasket_core.c"
 static int gasket_pci_probe(
  struct pci_dev *pci_dev, const struct pci_device_id *id)
 {
@@ -675,7 +673,7 @@ fail1:
  accel_dev_put(&gasket_dev->accel_dev);
  return ret;
 }
-# 718 "./drivers/gasket/gasket_core.c"
+# 716 "./drivers/gasket/gasket_core.c"
 static void gasket_pci_remove(struct pci_dev *pci_dev)
 {
  int i;
@@ -744,18 +742,6 @@ static void gasket_pci_remove(struct pci_dev *pci_dev)
    internal_desc->legacy_class, gasket_dev->legacy_devt);
  accel_dev_put(&gasket_dev->accel_dev);
 }
-# 797 "./drivers/gasket/gasket_core.c"
-int gasket_pci_sriov_configure(struct pci_dev *pci_dev, int num_vfs)
-{
- int err = 0;
-
- if (num_vfs)
-  err = pci_enable_sriov(pci_dev, num_vfs);
- else
-  pci_disable_sriov(pci_dev);
-
- return err ? err : num_vfs;
-}
 
 bool gasket_pci_is_iommu_enabled(struct pci_dev *pdev)
 {
@@ -780,14 +766,14 @@ static void gasket_setup_pci_iommu(struct gasket_dev *gasket_dev)
 
 
 #if 0
-# 846 "./drivers/gasket/gasket_core.c"
+# 822 "./drivers/gasket/gasket_core.c"
 #else
   gasket_log_warn(gasket_dev,
    "IOMMU Mappings: Cannot enable");
 #endif
  }
 }
-# 863 "./drivers/gasket/gasket_core.c"
+# 839 "./drivers/gasket/gasket_core.c"
 static int gasket_setup_pci(
  struct pci_dev *pci_dev, struct gasket_dev *gasket_dev)
 {
@@ -832,7 +818,7 @@ static void gasket_cleanup_pci(struct gasket_dev *gasket_dev)
 
  pci_disable_device(gasket_dev->pci_dev);
 }
-# 916 "./drivers/gasket/gasket_core.c"
+# 892 "./drivers/gasket/gasket_core.c"
 static int gasket_map_pci_bar(struct gasket_dev *gasket_dev, int bar_num)
 {
  const struct gasket_driver_desc *driver_desc =
@@ -928,7 +914,7 @@ static void gasket_unmap_pci_bar(struct gasket_dev *dev, int bar_num)
  bytes = pci_resource_len(dev->pci_dev, bar_num);
  release_mem_region(base, bytes);
 }
-# 1019 "./drivers/gasket/gasket_core.c"
+# 995 "./drivers/gasket/gasket_core.c"
 static int gasket_add_cdev(struct gasket_dev *gasket_dev,
  const struct file_operations *file_ops, struct module *owner)
 {
@@ -958,7 +944,7 @@ void gasket_remove_cdev_mapping(struct gasket_dev *gasket_dev)
 {
  hash_del(&gasket_dev->hlist_node);
 }
-# 1056 "./drivers/gasket/gasket_core.c"
+# 1032 "./drivers/gasket/gasket_core.c"
 static int gasket_enable_dev(
  struct gasket_dev *gasket_dev)
 {
@@ -1383,7 +1369,7 @@ static struct gasket_internal_desc *lookup_internal_desc(
 
  return NULL;
 }
-# 1492 "./drivers/gasket/gasket_core.c"
+# 1468 "./drivers/gasket/gasket_core.c"
 const char *gasket_num_name_lookup(
  uint num, const struct gasket_num_name *table)
 {
@@ -1398,7 +1384,7 @@ const char *gasket_num_name_lookup(
  return table[i].snn_name;
 }
 EXPORT_SYMBOL(gasket_num_name_lookup);
-# 1519 "./drivers/gasket/gasket_core.c"
+# 1495 "./drivers/gasket/gasket_core.c"
 static int gasket_open(struct inode *inode, struct file *filp)
 {
  int ret = 0;
@@ -1499,7 +1485,7 @@ static void gasket_close(struct gasket_dev *gasket_dev)
 
  check_and_invoke_callback_nolock(
   gasket_dev, driver_desc->device_close_cb);
-# 1627 "./drivers/gasket/gasket_core.c"
+# 1603 "./drivers/gasket/gasket_core.c"
  if (gasket_dev_is_overseer(gasket_dev))
   return;
 
@@ -1519,7 +1505,7 @@ static void gasket_close(struct gasket_dev *gasket_dev)
   }
  }
 }
-# 1659 "./drivers/gasket/gasket_core.c"
+# 1635 "./drivers/gasket/gasket_core.c"
 static int gasket_release(struct inode *inode, struct file *file)
 {
  struct gasket_dev *gasket_dev;
@@ -1562,7 +1548,7 @@ static int gasket_release(struct inode *inode, struct file *file)
  mutex_unlock(&gasket_dev->mutex);
  return 0;
 }
-# 1711 "./drivers/gasket/gasket_core.c"
+# 1687 "./drivers/gasket/gasket_core.c"
 static int gasket_mmap_has_permissions(
  struct gasket_dev *gasket_dev, struct vm_area_struct *vma,
  int bar_permissions)
@@ -1654,7 +1640,7 @@ static int gasket_get_phys_bar_index(
 
  return -EINVAL;
 }
-# 1817 "./drivers/gasket/gasket_core.c"
+# 1793 "./drivers/gasket/gasket_core.c"
 static bool gasket_mm_get_mapping_addrs(
  const struct gasket_mappable_region *region, ulong bar_offset,
  ulong requested_length, struct gasket_mappable_region *mappable_region,
@@ -1672,7 +1658,7 @@ static bool gasket_mm_get_mapping_addrs(
 
   return false;
  } else if (bar_offset <= range_start) {
-# 1848 "./drivers/gasket/gasket_core.c"
+# 1824 "./drivers/gasket/gasket_core.c"
   mappable_region->start = range_start;
   *virt_offset = range_start - bar_offset;
   mappable_region->length_bytes =
@@ -1680,7 +1666,7 @@ static bool gasket_mm_get_mapping_addrs(
   return (mappable_region->length_bytes != 0);
  } else if (bar_offset > range_start &&
      bar_offset < range_end) {
-# 1866 "./drivers/gasket/gasket_core.c"
+# 1842 "./drivers/gasket/gasket_core.c"
   mappable_region->start = bar_offset;
   *virt_offset = 0;
   mappable_region->length_bytes = min(
@@ -1799,7 +1785,7 @@ static enum do_map_region_status do_map_region(
 
  return DO_MAP_REGION_SUCCESS;
 }
-# 1995 "./drivers/gasket/gasket_core.c"
+# 1971 "./drivers/gasket/gasket_core.c"
 static int gasket_mmap(struct file *filp, struct vm_area_struct *vma)
 {
  int i, ret;
@@ -1902,8 +1888,8 @@ static int gasket_mmap(struct file *filp, struct vm_area_struct *vma)
 
   if ((req_perms & map_regions[i].flags) != req_perms) {
    gasket_log_info(gasket_dev,
-      "Skipping mappable region %d (0x%lx); perm mismatch want: 0x%lx, have: 0x%lx",
-      i, (ulong) map_regions[i].start,
+      "Skipping mappable region 0x%lx; perm mismatch want: 0x%lx, have: 0x%lx",
+      (ulong) map_regions[i].start,
       req_perms,
       map_regions[i].flags);
    continue;
@@ -1981,7 +1967,7 @@ void gasket_mapped_unforkable_page(struct gasket_dev *gasket_dev)
 
 }
 EXPORT_SYMBOL(gasket_mapped_unforkable_page);
-# 2185 "./drivers/gasket/gasket_core.c"
+# 2161 "./drivers/gasket/gasket_core.c"
 static int gasket_get_hw_status(struct gasket_dev *gasket_dev)
 {
  int i;
@@ -2020,7 +2006,7 @@ static int gasket_get_hw_status(struct gasket_dev *gasket_dev)
 
  return GASKET_STATUS_ALIVE;
 }
-# 2235 "./drivers/gasket/gasket_core.c"
+# 2211 "./drivers/gasket/gasket_core.c"
 static long gasket_ioctl(struct file *filp, uint cmd, ulong arg)
 {
  struct gasket_filp_data *filp_data;
