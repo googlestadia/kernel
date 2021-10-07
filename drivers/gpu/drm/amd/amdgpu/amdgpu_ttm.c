@@ -1609,6 +1609,18 @@ static bool amdgpu_ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 }
 
 /**
+ * amdgpu_ttm_pfn_mapping_available -  Return whether the pfn mapping for io_mem
+ * is available.
+ */
+
+static bool amdgpu_ttm_pfn_mapping_available(struct ttm_buffer_object *bo)
+{
+  struct amdgpu_bo *abo = ttm_to_amdgpu_bo(bo);
+
+  return amdgpu_bo_storage_access_required(abo);
+}
+
+/**
  * amdgpu_ttm_access_memory - Read or Write memory that backs a buffer object.
  *
  * @bo:  The buffer object to read/write
@@ -1703,7 +1715,8 @@ static struct ttm_bo_driver amdgpu_bo_driver = {
 	.io_mem_free = &amdgpu_ttm_io_mem_free,
 	.io_mem_pfn = amdgpu_ttm_io_mem_pfn,
 	.access_memory = &amdgpu_ttm_access_memory,
-	.del_from_lru_notify = &amdgpu_vm_del_from_lru_notify
+	.del_from_lru_notify = &amdgpu_vm_del_from_lru_notify,
+        .io_mem_pfn_mapping_available = &amdgpu_ttm_pfn_mapping_available,
 };
 
 /*

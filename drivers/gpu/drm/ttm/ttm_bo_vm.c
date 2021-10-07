@@ -112,6 +112,16 @@ static unsigned long ttm_bo_io_mem_pfn(struct ttm_buffer_object *bo,
 		+ page_offset;
 }
 
+static bool ttm_bo_io_mem_pfn_mapping_available(struct ttm_buffer_object *bo)
+{
+  struct ttm_bo_device *bdev = bo->bdev;
+
+  if (bdev->driver->io_mem_pfn_mapping_available)
+    return bdev->driver->io_mem_pfn_mapping_available(bo);
+
+  return false;
+}
+
 /**
  * ttm_bo_vm_reserve - Reserve a buffer object in a retryable vm callback
  * @bo: The buffer object
@@ -204,6 +214,7 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 	struct page *page;
 	int err;
 	pgoff_t i;
+	u64 mixed_map_flags;
 	vm_fault_t ret = VM_FAULT_NOPAGE;
 #ifndef HAVE_VM_FAULT_ADDRESS_VMA
 	unsigned long address = (unsigned long)vmf->virtual_address;
@@ -290,6 +301,10 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 #endif
 	}
 
+	mixed_map_flags = PFN_DEV;
+	if (bo->ssg_can_map || ttm_bo_io_mem_pfn_mapping_available(bo))
+		mixed_map_flags |= PFN_MAP;
+
 	/*
 	 * Speculatively prefault a number of pages. Only error on
 	 * first page.
@@ -312,7 +327,7 @@ vm_fault_t ttm_bo_vm_fault_reserved(struct vm_fault *vmf,
 
 		if (vma->vm_flags & VM_MIXEDMAP)
 			ret = vmf_insert_mixed(&cvma, address,
-					__pfn_to_pfn_t(pfn, PFN_DEV | (bo->ssg_can_map ? PFN_MAP : 0)));
+					__pfn_to_pfn_t(pfn, mixed_map_flags));
 		else
 			ret = vmf_insert_pfn(&cvma, address, pfn);
 
@@ -512,6 +527,10 @@ static void ttm_bo_mmap_vma_setup(struct ttm_buffer_object *bo, struct vm_area_s
 	 */
 	vma->vm_flags |= VM_MIXEDMAP;
 	vma->vm_flags |= (bo->ssg_can_map ? 0 : VM_IO) | VM_DONTEXPAND | VM_DONTDUMP;
+
+        if (ttm_bo_io_mem_pfn_mapping_available(bo)) {
+          vma->vm_flags &= ~VM_IO;
+        }
 }
 
 int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,

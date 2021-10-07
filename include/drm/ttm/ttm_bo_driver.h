@@ -404,6 +404,14 @@ struct ttm_bo_driver {
 	 * adding fences that may force a delayed delete
 	 */
 	void (*release_notify)(struct ttm_buffer_object *bo);
+
+        /**
+         * Check whether the buffer has pfn mapping of pages available for
+         * io_mem.
+         *
+         * @bo: the buffer object for which pfn mapping needs to be checked.
+         */
+        bool (*io_mem_pfn_mapping_available)(struct ttm_buffer_object *ob);
 };
 
 /**

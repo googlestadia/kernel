@@ -231,6 +231,15 @@ static inline bool amdgpu_bo_explicit_sync(struct amdgpu_bo *bo)
 }
 
 /**
+ * amdgpu_bo_storage_access_required - return whether the bo will be accessed by
+ * storage.
+ */
+static inline bool amdgpu_bo_storage_access_required(struct amdgpu_bo *bo)
+{
+        return bo->flags & AMDGPU_GEM_CREATE_STORAGE_ACCESS_REQUIRED;
+}
+
+/**
  * amdgpu_bo_encrypted - test if the BO is encrypted
  * @bo: pointer to a buffer object
  *
