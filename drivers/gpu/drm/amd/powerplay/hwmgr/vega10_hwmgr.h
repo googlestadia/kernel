@@ -428,7 +428,8 @@ struct vega10_hwmgr {
 #define PPVEGA10_VEGA10UCLKCLKAVERAGEALPHA_DFLT      25 /* 10% * 255 = 25 */
 #define PPVEGA10_VEGA10GFXACTIVITYAVERAGEALPHA_DFLT  25 /* 10% * 255 = 25 */
 
-#define VEGA10_UMD_PSTATE_GFXCLK_LEVEL         0x3
+// Google: use 1269MHz as gfx profiling clock
+#define VEGA10_UMD_PSTATE_GFXCLK_LEVEL         0x5
 #define VEGA10_UMD_PSTATE_SOCCLK_LEVEL         0x3
 #define VEGA10_UMD_PSTATE_MCLK_LEVEL           0x2
 
