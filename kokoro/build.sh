@@ -364,7 +364,6 @@ function build() {
   finalize_config
   build_bzimage_and_headers
   build_modules
-  build_amdgpu_external_module
   build_perf
   build_kernel_rootfs
   build_initramfs
