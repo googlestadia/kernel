@@ -218,6 +218,8 @@ static int amdgpu_vram_mgr_init(struct ttm_mem_type_manager *man,
 	ret = device_create_file(adev->dev, &dev_attr_mem_info_vram_vendor);
 	if (ret) {
 		DRM_ERROR("Failed to create device file mem_info_vram_vendor\n");
+		return ret;
+	}
 	ret = device_create_file(adev->dev, &dev_attr_mem_info_num_bytes_moved);
 	if (ret) {
 		DRM_ERROR("Failed to create device file mem_info_num_bytes_moved\n");
