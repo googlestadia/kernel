@@ -32,7 +32,7 @@ readonly PEERMEM_SIZE_MB=192
 #   firmware support at least 8, and this helps reduce submission latency.
 # - no_evict allows user-mode to pin kernel buffer objects.
 modprobe amdgpu sched_jobs=1024 sched_hw_submission=8 no_evict=1 \
-  gttsize="${GTT_SIZE_MB}" peermem_size="${PEERMEM_SIZE_MB}"
+  gttsize="${GTT_SIZE_MB}" peermem_size="${PEERMEM_SIZE_MB}" virtual_display=all
 
 # Allow any user to write to `power_dpm_force_performance_level` so that
 # non-privileged processes (tools and amdvlk.so) can control the DPM enforcement
