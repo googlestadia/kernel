@@ -27,7 +27,7 @@ static ssize_t sysfs_store(
 static int valid_pcie_mrrs(int pcie_mrrs);
 
 
-static const struct gasket_sysfs_attribute argos_common_sysfs_attrs[] = {
+const struct gasket_sysfs_attribute argos_common_sysfs_attrs[] = {
  GASKET_SYSFS_RO(is_real_hardware, sysfs_show,
   ATTR_IS_REAL_HARDWARE),
  GASKET_SYSFS_RW(pcie_mrrs, sysfs_show, sysfs_store,

@@ -161,7 +161,7 @@ enum gasket_sysfs_attribute_type {
 };
 
 
-static const struct file_operations gasket_file_ops = {
+const struct file_operations gasket_file_ops = {
  .owner = THIS_MODULE,
  .llseek = no_llseek,
  .mmap = gasket_mmap,
@@ -883,7 +883,6 @@ fail:
   gasket_dev->bar_data[bar_num].length_bytes);
  return ret;
 }
-EXPORT_SYMBOL(gasket_map_pci_bar);
 
 
 
