@@ -92,6 +92,7 @@
 #include <linux/string_helpers.h>
 #include <linux/user_namespace.h>
 #include <linux/fs_struct.h>
+#include <linux/pid.h>
 
 #include <asm/processor.h>
 #include "internal.h"
@@ -155,8 +156,15 @@ static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 		task_tgid_nr_ns(rcu_dereference(p->real_parent), ns) : 0;
 
 	tracer = ptrace_parent(p);
-	if (tracer)
+	if (tracer) {
 		tpid = task_pid_nr_ns(tracer, ns);
+		if (tpid == 0) {
+			// Set the pid to a valid number, but not an actual valid pid
+			// so that anything checking if it is being traced will see
+			// that it is traced, even though it can't see the process.
+			tpid = pid_max;
+		}
+	}
 
 	tgid = task_tgid_nr_ns(p, ns);
 	ngid = task_numa_group_id(p);
