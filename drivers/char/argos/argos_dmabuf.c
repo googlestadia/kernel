@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_dmabuf.c"
 #include <linux/dma-buf.h>
@@ -22,15 +22,16 @@ static void argos_dma_buf_release(
  struct gasket_dma_buf_device_data *dbuf_device_data);
 
 struct dma_buf *argos_create_dma_buf(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct argos_direct_mapping_dma_buf_request *request)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  int ret;
  struct dma_buf *dbuf;
  struct argos_dma_buf_object *argos_dbuf;
-# 42 "./drivers/char/argos/argos_dmabuf.c"
+# 43 "./drivers/char/argos/argos_dmabuf.c"
  ret = argos_get_direct_mapping_mmap_offset(
-  device_data, &request->direct_mapping);
+  filp_data, &request->direct_mapping);
  if (ret) {
   gasket_log_error(device_data->gasket_dev,
    "failed to get mmap_offset for dma_buf backing storage: %d",
@@ -51,7 +52,7 @@ struct dma_buf *argos_create_dma_buf(
 
  INIT_LIST_HEAD(&argos_dbuf->list);
  argos_dbuf->request = *request;
- argos_dbuf->device_data = device_data;
+ argos_dbuf->filp_data = filp_data;
  argos_dbuf->dbuf_device_data.release_cb = argos_dma_buf_release;
 
  dbuf = gasket_create_mmap_dma_buf(device_data->gasket_dev,

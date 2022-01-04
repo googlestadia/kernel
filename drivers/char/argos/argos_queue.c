@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_queue.c"
 #include <linux/bitops.h>
@@ -102,9 +102,10 @@ int argos_lookup_queue_ctx(
 EXPORT_SYMBOL(argos_lookup_queue_ctx);
 
 int argos_allocate_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct argos_subcontainer_queue_ctx_config *config)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  struct queue_ctx *queue_ctx;
  int i, ctx_index, ret;
@@ -179,7 +180,7 @@ int argos_allocate_queue_ctx(
 
 
  ret = device_data->argos_cb->allocate_queue_ctx_cb(
-  device_data, queue_ctx, config);
+  filp_data, queue_ctx, config);
 
 exit:
 
@@ -222,9 +223,10 @@ int argos_deallocate_queue_ctx(
 EXPORT_SYMBOL(argos_deallocate_queue_ctx);
 
 int argos_enable_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  const char *name, struct argos_queue_ctx_config *config)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  int ret;
  struct queue_ctx *queue_ctx = NULL;
@@ -270,7 +272,7 @@ int argos_enable_queue_ctx(
 
 
  ret = device_data->argos_cb->enable_queue_ctx_cb(
-  device_data, queue_ctx);
+  filp_data, queue_ctx);
  if (ret) {
   gasket_log_error(gasket_dev,
    "Error enabling queue context %d: %d", queue_ctx->index,
@@ -291,7 +293,7 @@ out:
  return ret;
 }
 EXPORT_SYMBOL(argos_enable_queue_ctx);
-# 302 "./drivers/char/argos/argos_queue.c"
+# 304 "./drivers/char/argos/argos_queue.c"
 static void remove_all_mmaps(
  struct argos_common_device_data *device_data,
  int map_bar_index,
@@ -324,12 +326,13 @@ static void remove_all_mmaps(
    map_region->start,
    map_region->start + map_region->length_bytes);
 }
-# 347 "./drivers/char/argos/argos_queue.c"
+# 349 "./drivers/char/argos/argos_queue.c"
 static int remove_direct_mapping(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  struct direct_mapping *direct_mapping)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  int ret = 0;
  struct list_head *dbuf, *dbuf_next;
 
@@ -349,7 +352,7 @@ static int remove_direct_mapping(
 
  if (device_data->argos_cb->deallocate_direct_mapping_cb)
   ret = device_data->argos_cb->deallocate_direct_mapping_cb(
-   device_data, queue_ctx, direct_mapping);
+   filp_data, queue_ctx, direct_mapping);
  if (ret) {
   gasket_log_error(device_data->gasket_dev,
    "Error occurred in deallocating direct mapping for queue %d of BAR%d [%#llx, %#llx], prot=%d, rid_filter_window=%d",
@@ -368,9 +371,10 @@ static int remove_direct_mapping(
 }
 
 int argos_disable_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  int dm_ret = 0;
  int ret;
@@ -387,7 +391,7 @@ int argos_disable_queue_ctx(
      &queue_ctx->direct_mappings, list) {
 
   dm_ret |= remove_direct_mapping(
-   device_data, queue_ctx, direct_mapping);
+   filp_data, queue_ctx, direct_mapping);
   if (dm_ret)
    gasket_dev->status = GASKET_STATUS_DEAD;
  }
@@ -407,7 +411,7 @@ int argos_disable_queue_ctx(
  }
 
  ret = device_data->argos_cb->disable_queue_ctx_cb(
-  device_data, queue_ctx, &map_region);
+  filp_data, queue_ctx, &map_region);
  if (ret) {
 
 
@@ -436,9 +440,13 @@ int argos_disable_queue_ctx(
   mmap_read_unlock(current->mm);
  }
 
+
+
+
+
+ queue_ctx->owner = 0;
  if (queue_ctx->pg_tbl)
   gasket_page_table_unmap_all(queue_ctx->pg_tbl);
- queue_ctx->owner = 0;
 
  return ret;
 }
@@ -453,6 +461,9 @@ static void disable_owned_queues(
  struct argos_common_device_data *device_data,
  pid_t tgid)
 {
+ struct argos_filp_data fake_filp_data = {
+  .device_data = device_data,
+ };
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  int i;
  struct queue_ctx *queue_ctx;
@@ -472,7 +483,7 @@ static void disable_owned_queues(
   if (queue_ctx->owner == tgid) {
    gasket_log_debug(gasket_dev, "Disabling queue %d", i);
    argos_disable_queue_ctx(
-    device_data, queue_ctx);
+    &fake_filp_data, queue_ctx);
   }
   mutex_unlock(&queue_ctx->mutex);
 
@@ -542,6 +553,9 @@ EXPORT_SYMBOL(argos_cleanup_hash_entry);
 int argos_disable_and_deallocate_all_queues(
  struct argos_common_device_data *device_data)
 {
+ struct argos_filp_data fake_filp_data = {
+  .device_data = device_data,
+ };
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  struct queue_ctx *queue_ctx;
  int i, hash_idx, ret = 0;
@@ -567,7 +581,7 @@ int argos_disable_and_deallocate_all_queues(
   if (queue_ctx->allocated) {
    if (queue_ctx->owner != 0)
     ret |= argos_disable_queue_ctx(
-     device_data, queue_ctx);
+     &fake_filp_data, queue_ctx);
 
    ret |= argos_deallocate_queue_ctx(
     device_data, queue_ctx);
@@ -612,9 +626,6 @@ int argos_dram_request_evaluate_response(
   device_desc->kernel_queue_ddr_status_location(
    queue_ctx->index));
  status = kernel_queue_ddr_status_value(value);
- value = gasket_dev_read_64(gasket_dev, fw_bar,
-  device_desc->kernel_queue_ddr_status_location(
-   queue_ctx->index));
  alloced_chunks = kernel_queue_ddr_status_current_chunks(value);
 
  switch (status) {
@@ -664,22 +675,22 @@ int argos_dram_request_evaluate_response(
  }
 }
 EXPORT_SYMBOL(argos_dram_request_evaluate_response);
-# 695 "./drivers/char/argos/argos_queue.c"
+# 706 "./drivers/char/argos/argos_queue.c"
 static int disable_firmware_queue_context(
  struct argos_common_device_data *device_data, int queue_idx,
  ulong control_offset, ulong status_offset)
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  const struct argos_device_desc *device_desc = device_data->device_desc;
+ const int fw_bar = device_desc->firmware_register_bar;
  int ret;
 
 
 
  ret = argos_wait_for_expected_value(device_data,
-  device_desc->firmware_register_bar,
-  status_offset, QUEUE_CONTROL_DISABLE_TIMEOUT_SEC,
-  ARGOS_NAME_FIELD_DECODER_WRAPPER(queue_control_status_enable_pending),
-  0);
+  fw_bar, status_offset, QUEUE_CONTROL_DISABLE_TIMEOUT_SEC,
+  ARGOS_NAME_FIELD_DECODER_WRAPPER(
+   queue_control_status_enable_pending), 0, argos_read_32);
  if (ret == -ETIMEDOUT) {
   gasket_log_error(gasket_dev,
    "Queue %d did not finish enabling within timeout; status offset 0x%lx",
@@ -687,15 +698,12 @@ static int disable_firmware_queue_context(
   return -ETIMEDOUT;
  }
 
- gasket_dev_write_64(
-  gasket_dev, 0, device_desc->firmware_register_bar,
-  control_offset);
+ gasket_dev_write_32(gasket_dev, 0, fw_bar, control_offset);
 
  ret = argos_wait_for_expected_value(device_data,
-  device_desc->firmware_register_bar,
-  status_offset, QUEUE_CONTROL_DISABLE_TIMEOUT_SEC,
+  fw_bar, status_offset, QUEUE_CONTROL_DISABLE_TIMEOUT_SEC,
   ARGOS_NAME_FIELD_DECODER_WRAPPER(queue_control_status_enabled),
-  0);
+  0, argos_read_32);
  if (ret == -ETIMEDOUT) {
   gasket_log_error(gasket_dev,
    "Queue %d did not become disabled within timeout; status offset 0x%lx",
@@ -719,21 +727,22 @@ int argos_clear_firmware_queue_status(
 
  value = 0;
  set_interrupt_control_control_enabled(&value, 0);
- gasket_dev_write_64(gasket_dev, value, fw_bar,
+ gasket_dev_write_32(gasket_dev, value, fw_bar,
   device_desc->interrupt_control_control_location(queue_idx));
  value = 0;
  set_interrupt_control_status_hot(&value, 0);
- gasket_dev_write_64(gasket_dev, value, fw_bar,
+ gasket_dev_write_32(gasket_dev, value, fw_bar,
   device_desc->interrupt_control_status_location(queue_idx));
  return ret;
 }
 EXPORT_SYMBOL(argos_clear_firmware_queue_status);
 
 int argos_common_allocate_queue_ctx_callback(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  const struct argos_subcontainer_queue_ctx_config *config)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  const struct argos_device_desc *device_desc = device_data->device_desc;
  const int fw_bar = device_desc->firmware_register_bar;
@@ -751,15 +760,15 @@ int argos_common_allocate_queue_ctx_callback(
  }
 
 
- value = gasket_dev_read_64(gasket_dev, fw_bar, location);
+ value = gasket_dev_read_32(gasket_dev, fw_bar, location);
  set_kernel_queue_control_priority_value(&value, config->priority);
- gasket_dev_write_64(gasket_dev, value, fw_bar, location);
+ gasket_dev_write_32(gasket_dev, value, fw_bar, location);
 
 
  ret = argos_configure_queue_ctx_dram(
    device_data, queue_ctx,
    bitmap_ints, bitmap_num_ints);
-# 798 "./drivers/char/argos/argos_queue.c"
+# 807 "./drivers/char/argos/argos_queue.c"
  if (ret)
   return ret;
 
@@ -806,10 +815,17 @@ int argos_common_deallocate_queue_ctx_callback(
 EXPORT_SYMBOL(argos_common_deallocate_queue_ctx_callback);
 
 bool argos_should_map_queue(
- struct argos_common_device_data *device_data, int queue_idx)
+ struct argos_filp_data *filp_data, int queue_idx)
 {
  bool subcontainer_master = false;
- struct gasket_dev *gasket_dev = device_data->gasket_dev;
+ struct argos_common_device_data *device_data;
+ struct gasket_dev *gasket_dev;
+
+ if (!filp_data || !filp_data->device_data)
+  return false;
+
+ device_data = filp_data->device_data;
+ gasket_dev = device_data->gasket_dev;
 
  if (gasket_dev->parent && gasket_dev->ownership.owner == current->tgid)
   subcontainer_master = true;
@@ -852,7 +868,7 @@ static int lookup_queue_ctx_by_index(
 
  return 0;
 }
-# 900 "./drivers/char/argos/argos_queue.c"
+# 916 "./drivers/char/argos/argos_queue.c"
 static struct direct_mapping *find_direct_mapping_in_queue(
  const struct queue_ctx *queue_ctx,
  const struct argos_direct_mapping_request *request)
@@ -931,9 +947,10 @@ static int check_allocate_direct_mapping_request(
 }
 
 int argos_allocate_direct_mapping(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct argos_direct_mapping_request *request)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  int ret = 0;
  struct queue_ctx *queue_ctx;
  struct direct_mapping *direct_mapping;
@@ -996,7 +1013,7 @@ int argos_allocate_direct_mapping(
   (request->prot & PROT_WRITE ? VM_WRITE : 0);
 
  ret = device_data->argos_cb->allocate_direct_mapping_cb(
-  device_data, queue_ctx, direct_mapping);
+  filp_data, queue_ctx, direct_mapping);
  if (ret) {
   kfree(direct_mapping);
   goto exit;
@@ -1024,9 +1041,10 @@ exit:
 EXPORT_SYMBOL(argos_allocate_direct_mapping);
 
 int argos_deallocate_direct_mapping(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  const struct argos_direct_mapping_request *request)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  int ret = 0;
  struct queue_ctx *queue_ctx;
  struct direct_mapping *direct_mapping;
@@ -1066,7 +1084,7 @@ int argos_deallocate_direct_mapping(
   ret = -EINVAL;
   goto exit;
  }
- ret = remove_direct_mapping(device_data, queue_ctx, direct_mapping);
+ ret = remove_direct_mapping(filp_data, queue_ctx, direct_mapping);
 exit:
  if (current->mm)
   mmap_read_unlock(current->mm);
@@ -1077,10 +1095,11 @@ exit:
 EXPORT_SYMBOL(argos_deallocate_direct_mapping);
 
 int argos_get_direct_mappings_for_bar(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  int bar_index, int *num_mappings,
  struct gasket_mappable_region *mappable_regions)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  int ret = 0, i, output_index = 0;
  struct queue_ctx *queue_ctx;
  struct direct_mapping *direct_mapping;
@@ -1090,7 +1109,7 @@ int argos_get_direct_mappings_for_bar(
 
 
 #ifndef STADIA_KERNEL
-  if (!argos_should_map_queue(device_data, i))
+  if (!argos_should_map_queue(filp_data, i))
    continue;
 #endif
 
@@ -1142,9 +1161,10 @@ int argos_get_direct_mappings_for_bar(
 EXPORT_SYMBOL(argos_get_direct_mappings_for_bar);
 
 int argos_get_direct_mapping_mmap_offset(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct argos_direct_mapping_request *request)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  int ret;
  struct queue_ctx *queue_ctx;
  struct direct_mapping *direct_mapping;
@@ -1184,6 +1204,8 @@ EXPORT_SYMBOL(argos_get_direct_mapping_mmap_offset);
 
 int argos_add_dma_buf_to_direct_mapping(struct argos_dma_buf_object *argos_dbuf)
 {
+ struct argos_filp_data *filp_data = argos_dbuf->filp_data;
+ struct argos_common_device_data *device_data = filp_data->device_data;
  int ret;
  struct queue_ctx *queue_ctx;
  struct direct_mapping *direct_mapping;
@@ -1195,14 +1217,14 @@ int argos_add_dma_buf_to_direct_mapping(struct argos_dma_buf_object *argos_dbuf)
 
 
  ret = lookup_queue_ctx_by_index(
-  argos_dbuf->device_data, dm_request->queue_index, &queue_ctx);
+  device_data, dm_request->queue_index, &queue_ctx);
  if (ret)
   return ret;
 
  mutex_lock(&queue_ctx->mutex);
  mutex_lock(&queue_ctx->direct_mappings_mutex);
  if (queue_ctx->owner != current->tgid) {
-  gasket_log_error(argos_dbuf->device_data->gasket_dev,
+  gasket_log_error(device_data->gasket_dev,
    "Queue %d is not enabled and owned by the process",
    dm_request->queue_index);
   ret = -EINVAL;
@@ -1226,6 +1248,7 @@ EXPORT_SYMBOL(argos_add_dma_buf_to_direct_mapping);
 void argos_remove_dma_buf_from_direct_mapping(
  struct argos_dma_buf_object *argos_dbuf)
 {
+ struct argos_filp_data *filp_data = argos_dbuf->filp_data;
  struct queue_ctx *queue_ctx;
  struct direct_mapping *direct_mapping;
  struct argos_direct_mapping_request *dm_request;
@@ -1234,7 +1257,7 @@ void argos_remove_dma_buf_from_direct_mapping(
 
 
 
- if (lookup_queue_ctx_by_index(argos_dbuf->device_data,
+ if (lookup_queue_ctx_by_index(filp_data->device_data,
       dm_request->queue_index, &queue_ctx))
   return;
 
@@ -1245,7 +1268,7 @@ void argos_remove_dma_buf_from_direct_mapping(
   goto remove_dma_buf_exit;
 
  direct_mapping = find_direct_mapping_in_queue(queue_ctx, dm_request);
-# 1300 "./drivers/char/argos/argos_queue.c"
+# 1323 "./drivers/char/argos/argos_queue.c"
  if (!direct_mapping)
   goto remove_dma_buf_exit;
 
@@ -1257,14 +1280,15 @@ remove_dma_buf_exit:
 EXPORT_SYMBOL(argos_remove_dma_buf_from_direct_mapping);
 
 int argos_get_direct_mappable_regions(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  int bar_index, struct gasket_mappable_region **mappable_regions,
  int *num_mappable_regions)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  int ret;
 
  ret = argos_get_direct_mappings_for_bar(
-  device_data, bar_index, num_mappable_regions,
+  filp_data, bar_index, num_mappable_regions,
   NULL);
  if (ret || *num_mappable_regions == 0)
   return ret;
@@ -1281,7 +1305,7 @@ int argos_get_direct_mappable_regions(
  }
 
  ret = argos_get_direct_mappings_for_bar(
-  device_data, bar_index, num_mappable_regions,
+  filp_data, bar_index, num_mappable_regions,
   *mappable_regions);
  if (ret) {
   kfree(*mappable_regions);

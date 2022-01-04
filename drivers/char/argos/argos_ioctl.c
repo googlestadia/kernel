@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_ioctl.c"
 #include <linux/dma-buf.h>
@@ -32,7 +32,7 @@ static int argos_ioctl_check_is_master(struct gasket_dev *gasket_dev, ulong arg)
 }
 # 37 "./drivers/char/argos/argos_ioctl.c"
 static int argos_ioctl_allocate_queue_ctx(
- struct argos_common_device_data *device_data, ulong arg)
+ struct argos_filp_data *filp_data, ulong arg)
 {
  struct argos_subcontainer_queue_ctx_config subcontainer_alloc_cfg;
  struct argos_queue_ctx_config alloc_cfg;
@@ -50,12 +50,13 @@ static int argos_ioctl_allocate_queue_ctx(
  subcontainer_alloc_cfg.index = alloc_cfg.index;
 
  return argos_allocate_queue_ctx(
-  device_data, &subcontainer_alloc_cfg);
+  filp_data, &subcontainer_alloc_cfg);
 }
 # 66 "./drivers/char/argos/argos_ioctl.c"
 static int argos_ioctl_subcontainer_allocate_queue_ctx(
- struct argos_common_device_data *device_data, ulong arg)
+ struct argos_filp_data *filp_data, ulong arg)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  int i, ret, bitmap_ints;
  struct argos_subcontainer_queue_ctx_config alloc_cfg;
  __u8 *bitmap;
@@ -108,7 +109,7 @@ static int argos_ioctl_subcontainer_allocate_queue_ctx(
   }
 
  alloc_cfg.chunk_bitmap = bitmap;
- ret = argos_allocate_queue_ctx(device_data, &alloc_cfg);
+ ret = argos_allocate_queue_ctx(filp_data, &alloc_cfg);
 out:
  kfree(bitmap);
  return ret;
@@ -120,8 +121,9 @@ out:
 
 
 static int argos_ioctl_deallocate_queue_ctx(
- struct argos_common_device_data *device_data, ulong arg)
+ struct argos_filp_data *filp_data, ulong arg)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  char ctx_id[ARGOS_NAME_MAX_LENGTH];
  struct queue_ctx *queue_ctx = NULL;
@@ -154,7 +156,7 @@ static int argos_ioctl_deallocate_queue_ctx(
   gasket_log_debug(gasket_dev,
    "Disabling queue context %s (%i) during deallocation.",
    ctx_id, queue_ctx->index);
-  ret = argos_disable_queue_ctx(device_data, queue_ctx);
+  ret = argos_disable_queue_ctx(filp_data, queue_ctx);
  }
 
  ret |= argos_deallocate_queue_ctx(device_data, queue_ctx);
@@ -168,8 +170,9 @@ static int argos_ioctl_deallocate_queue_ctx(
 
 
 static int argos_ioctl_enable_queue_ctx(
- struct argos_common_device_data *device_data, ulong arg)
+ struct argos_filp_data *filp_data, ulong arg)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  int ret;
  struct argos_queue_ctx_config config;
@@ -186,7 +189,7 @@ static int argos_ioctl_enable_queue_ctx(
   return -EFAULT;
  }
 
- ret = argos_enable_queue_ctx(device_data, config.name, &config);
+ ret = argos_enable_queue_ctx(filp_data, config.name, &config);
  if (ret)
   return ret;
 
@@ -197,7 +200,7 @@ static int argos_ioctl_enable_queue_ctx(
    "Unable to copy data to user pointer.");
   if (!argos_lookup_queue_ctx(
     device_data, config.name, &queue_ctx))
-   argos_disable_queue_ctx(device_data, queue_ctx);
+   argos_disable_queue_ctx(filp_data, queue_ctx);
   return -EFAULT;
  }
 
@@ -210,8 +213,9 @@ static int argos_ioctl_enable_queue_ctx(
 
 
 static int argos_ioctl_disable_queue_ctx(
- struct argos_common_device_data *device_data, ulong arg)
+ struct argos_filp_data *filp_data, ulong arg)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  int ret = 0;
  pid_t queue_owner;
@@ -253,7 +257,7 @@ static int argos_ioctl_disable_queue_ctx(
  }
 
  queue_owner = queue_ctx->owner;
- ret = argos_disable_queue_ctx(device_data, queue_ctx);
+ ret = argos_disable_queue_ctx(filp_data, queue_ctx);
  mutex_unlock(&queue_ctx->mutex);
 
  gasket_log_debug(gasket_dev, "tgid: %d: queue %d disabled (was owned by %d)",
@@ -264,21 +268,21 @@ early_exit:
  mutex_unlock(&queue_ctx->mutex);
  return ret;
 }
-# 285 "./drivers/char/argos/argos_ioctl.c"
+# 289 "./drivers/char/argos/argos_ioctl.c"
 static int argos_ioctl_create_dma_buf(
- struct argos_common_device_data *device_data, ulong arg)
+ struct argos_filp_data *filp_data, ulong arg)
 {
  struct argos_direct_mapping_dma_buf_request request;
  struct dma_buf *dbuf;
  int ret;
 
  if (copy_from_user(&request, (void __user *)arg, sizeof(request))) {
-  gasket_log_error(device_data->gasket_dev,
+  gasket_log_error(filp_data->device_data->gasket_dev,
    "Unable to copy data from user pointer.");
   return -EFAULT;
  }
 
- dbuf = argos_create_dma_buf(device_data, &request);
+ dbuf = argos_create_dma_buf(filp_data, &request);
  if (IS_ERR(dbuf))
   return PTR_ERR(dbuf);
 
@@ -295,8 +299,9 @@ static int argos_ioctl_create_dma_buf(
 
 
 static int argos_ioctl_allocate_direct_mapping(
- struct argos_common_device_data *device_data, ulong arg)
+ struct argos_filp_data *filp_data, ulong arg)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct argos_direct_mapping_request request;
  int ret;
 
@@ -306,14 +311,14 @@ static int argos_ioctl_allocate_direct_mapping(
   return -EFAULT;
  }
 
- ret = argos_allocate_direct_mapping(device_data, &request);
+ ret = argos_allocate_direct_mapping(filp_data, &request);
  if (ret)
   return ret;
 
  if (copy_to_user((void __user *)arg, &request, sizeof(request))) {
   gasket_log_error(device_data->gasket_dev,
    "Unable to copy data to user pointer.");
-  argos_deallocate_direct_mapping(device_data, &request);
+  argos_deallocate_direct_mapping(filp_data, &request);
   return -EFAULT;
  }
 
@@ -326,23 +331,23 @@ static int argos_ioctl_allocate_direct_mapping(
 
 
 static int argos_ioctl_deallocate_direct_mapping(
- struct argos_common_device_data *device_data, ulong arg)
+ struct argos_filp_data *filp_data, ulong arg)
 {
  struct argos_direct_mapping_request request;
 
  if (copy_from_user(&request, (void __user *)arg, sizeof(request))) {
-  gasket_log_error(device_data->gasket_dev,
+  gasket_log_error(filp_data->device_data->gasket_dev,
    "Unable to copy data from user pointer.");
   return -EFAULT;
  }
 
- return argos_deallocate_direct_mapping(device_data, &request);
+ return argos_deallocate_direct_mapping(filp_data, &request);
 }
 
 int argos_queue_ioctl_dispatch(
- struct argos_common_device_data *device_data, uint cmd, ulong arg)
+ struct argos_filp_data *filp_data, uint cmd, ulong arg)
 {
- struct gasket_dev *gasket_dev = device_data->gasket_dev;
+ struct gasket_dev *gasket_dev = filp_data->device_data->gasket_dev;
 
  switch (cmd) {
  case ARGOS_IOCTL_PROCESS_IS_MASTER:
@@ -352,36 +357,36 @@ int argos_queue_ioctl_dispatch(
  case ARGOS_IOCTL_ALLOCATE_QUEUE_CTX:
   gasket_log_debug(gasket_dev,
      "Recvd ioctl ARGOS_IOCTL_ALLOCATE_QUEUE_CTX");
-  return argos_ioctl_allocate_queue_ctx(device_data, arg);
+  return argos_ioctl_allocate_queue_ctx(filp_data, arg);
  case ARGOS_IOCTL_DEALLOCATE_QUEUE_CTX:
   gasket_log_debug(gasket_dev,
      "Recvd ioctl ARGOS_IOCTL_DEALLOCATE_QUEUE_CTX");
-  return argos_ioctl_deallocate_queue_ctx(device_data, arg);
+  return argos_ioctl_deallocate_queue_ctx(filp_data, arg);
  case ARGOS_IOCTL_ENABLE_QUEUE_CTX:
   gasket_log_debug(gasket_dev,
      "Recvd ioctl ARGOS_IOCTL_ENABLE_QUEUE_CTX");
-  return argos_ioctl_enable_queue_ctx(device_data, arg);
+  return argos_ioctl_enable_queue_ctx(filp_data, arg);
  case ARGOS_IOCTL_DISABLE_QUEUE_CTX:
   gasket_log_debug(gasket_dev,
      "Recvd ioctl ARGOS_IOCTL_DISABLE_QUEUE_CTX");
-  return argos_ioctl_disable_queue_ctx(device_data, arg);
+  return argos_ioctl_disable_queue_ctx(filp_data, arg);
  case ARGOS_IOCTL_SUBCONTAINER_ALLOCATE_QUEUE_CTX:
   gasket_log_debug(gasket_dev,
      "Recvd ioctl ARGOS_IOCTL_SUBCONTAINER_ALLOCATE_QUEUE_CTX");
   return argos_ioctl_subcontainer_allocate_queue_ctx(
-    device_data, arg);
+    filp_data, arg);
  case ARGOS_IOCTL_ALLOCATE_DIRECT_MAPPING:
   gasket_log_debug(gasket_dev,
    "Recvd ioctl ARGOS_IOCTL_ALLOCATE_DIRECT_MAPPING");
-  return argos_ioctl_allocate_direct_mapping(device_data, arg);
+  return argos_ioctl_allocate_direct_mapping(filp_data, arg);
  case ARGOS_IOCTL_DEALLOCATE_DIRECT_MAPPING:
   gasket_log_debug(gasket_dev,
    "Recvd ioctl ARGOS_IOCTL_DEALLOCATE_DIRECT_MAPPING");
-  return argos_ioctl_deallocate_direct_mapping(device_data, arg);
+  return argos_ioctl_deallocate_direct_mapping(filp_data, arg);
  case ARGOS_IOCTL_CREATE_DIRECT_MAPPING_DMABUF:
   gasket_log_debug(gasket_dev,
    "Recvd ioctl ARGOS_IOCTL_CREATE_DIRECT_MAPPING_DMABUF");
-  return argos_ioctl_create_dma_buf(device_data, arg);
+  return argos_ioctl_create_dma_buf(filp_data, arg);
  default:
   return -EOPNOTSUPP;
  }
@@ -392,27 +397,29 @@ int argos_check_gasket_ioctl_permissions(struct file *filp, uint cmd)
 {
 
  struct argos_common_device_data *device_data;
- struct gasket_filp_data *filp_data =
-  (struct gasket_filp_data *)filp->private_data;
- struct gasket_dev *gasket_dev = filp_data->gasket_dev;
+ struct gasket_filp_data *gasket_filp_data = filp->private_data;
+ struct gasket_dev *gasket_dev = gasket_filp_data->gasket_dev;
+ struct argos_filp_data *filp_data = gasket_filp_data->driver_private;
  int is_master = argos_check_ownership(gasket_dev);
- struct queue_ctx *queue_ctxs;
 
- if (gasket_dev->cb_data == NULL) {
-  gasket_log_error(gasket_dev, "Callback data is NULL!");
+ if (!filp_data) {
+  gasket_log_warn(gasket_dev,
+   "driver_private data is NULL, cannot call ioctls");
+  return -EPERM;
+ }
+ if (!filp_data->device_data) {
+  gasket_log_error(gasket_dev, "Argos device_data is NULL!");
   return -EINVAL;
  }
- device_data = gasket_dev->cb_data;
+ device_data = filp_data->device_data;
 
 
  if (gasket_dev->parent)
   return argos_subcontainer_gasket_ioctl_has_permission(
-   device_data, cmd);
+   filp_data, cmd);
  else if (device_data->mode == ARGOS_MODE_OVERSEER)
   return argos_overseer_gasket_ioctl_has_permission(
-   device_data, cmd);
-
- queue_ctxs = device_data->queue_ctxs;
+   filp_data, cmd);
 
  switch (cmd) {
  case GASKET_IOCTL_RESET:
@@ -426,6 +433,8 @@ int argos_check_gasket_ioctl_permissions(struct file *filp, uint cmd)
  case GASKET_IOCTL_MAP_BUFFER:
  case GASKET_IOCTL_UNMAP_BUFFER:
   case GASKET_IOCTL_MAP_DMA_BUF:
+ case GASKET_IOCTL_REGISTER_INTERRUPT:
+ case GASKET_IOCTL_UNREGISTER_INTERRUPT:
 
 
 

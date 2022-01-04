@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
+# 1 "./drivers/accel/accel.c"
 # 10 "./drivers/accel/accel.c"
 #include <linux/accel.h>
 #include <linux/fs.h>
@@ -76,7 +77,7 @@ static void accel_dev_release(struct device *dev)
  accel_free_id(adev->id);
  adev->release(adev);
 }
-# 99 "./drivers/accel/accel.c"
+# 100 "./drivers/accel/accel.c"
 int accel_dev_init(struct accel_dev *adev,
      struct device *parent,
      void (*release)(struct accel_dev *))
@@ -107,7 +108,7 @@ int accel_dev_init(struct accel_dev *adev,
  return dev_set_name(&adev->dev, "accel%d", id);
 }
 EXPORT_SYMBOL(accel_dev_init);
-# 143 "./drivers/accel/accel.c"
+# 144 "./drivers/accel/accel.c"
 int accel_dev_register(struct accel_dev *adev)
 {
  int ret;
@@ -140,7 +141,7 @@ out_chrdev_unregister:
  return ret;
 }
 EXPORT_SYMBOL(accel_dev_register);
-# 188 "./drivers/accel/accel.c"
+# 189 "./drivers/accel/accel.c"
 void accel_dev_unregister(struct accel_dev *adev)
 {
  if (!adev)
@@ -161,7 +162,7 @@ static int accel_dev_match_devt(struct device *dev, const void *data)
 
  return dev->devt == *devt;
 }
-# 216 "./drivers/accel/accel.c"
+# 217 "./drivers/accel/accel.c"
 struct accel_dev *accel_dev_get_by_devt(dev_t devt)
 {
  struct device *dev;
@@ -181,7 +182,7 @@ static int accel_dev_match_parent(struct device *dev, const void *data)
 
  return dev->parent == parent;
 }
-# 243 "./drivers/accel/accel.c"
+# 244 "./drivers/accel/accel.c"
 struct accel_dev *accel_dev_get_by_parent(struct device *parent)
 {
  struct device *dev;
@@ -409,7 +410,7 @@ static struct class accel_class = {
  .dev_groups = accel_dev_groups,
  .dev_uevent = accel_dev_uevent,
 };
-# 478 "./drivers/accel/accel.c"
+# 479 "./drivers/accel/accel.c"
 int accel_add_physical_function(struct accel_dev *adev, struct device *dev)
 {
  if (WARN_ON(adev == NULL || dev == NULL))

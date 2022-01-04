@@ -1,7 +1,8 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
-# 2 "./drivers/char/argos/vargos_driver.c"
+# 1 "./drivers/char/argos/vargos_driver.c"
+
 #include <linux/google/argos.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
@@ -95,16 +96,13 @@
 #define VARGOS_PAGE_TABLE_BASE 0x00800000
 #define VARGOS_PAGE_TABLE_SIZE 0x1000
 
-#define VARGOS_CHIP_GLOBAL_START 0x02000000
-#define VARGOS_CHIP_GLOBAL_SIZE 0x20
-
-#define VARGOS_SNAPDUMP_REGISTER_BASE 0x10000
-#define VARGOS_SNAPDUMP_REGISTER_SIZE 0x8
-
 
 #define VARGOS_FAKE_STICKY_START 0x02106000
 #define VARGOS_FAKE_STICKY_SIZE PAGE_SIZE
-# 112 "./drivers/char/argos/vargos_driver.c"
+
+#define VARGOS_SNAPDUMP_REGISTER_BASE 0x10000
+#define VARGOS_SNAPDUMP_REGISTER_SIZE 0x8
+# 109 "./drivers/char/argos/vargos_driver.c"
 #define VARGOS_MAILBOX_TIMEOUT (msecs_to_jiffies(500))
 
 
@@ -152,6 +150,18 @@ struct vargos_chip_family_data {
 
 
  int dram_chunk_count;
+
+
+
+
+
+ int (*get_bar_region_count)(int bar);
+
+
+
+
+
+ const struct gasket_mappable_region *(*get_bar_regions)(int bar);
 };
 
 static struct vargos_mailbox *get_mailbox(
@@ -178,7 +188,7 @@ static int vargos_enable_dev(struct gasket_dev *gasket_dev);
 static int vargos_disable_dev(struct gasket_dev *gasket_dev);
 
 static int vargos_get_mappable_regions_cb(
- struct gasket_dev *gasket_dev, int bar_index,
+ struct gasket_filp_data *gasket_filp_data, int bar_index,
  struct gasket_mappable_region **mappable_regions,
  int *num_mappable_regions);
 static enum gasket_status vargos_status(struct gasket_dev *gasket_dev);
@@ -194,25 +204,25 @@ static bool vargos_is_queue_ctx_failed(
  struct argos_common_device_data *device_data,
  struct queue_ctx *queue_ctx);
 static int vargos_allocate_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  const struct argos_subcontainer_queue_ctx_config *config);
 static int vargos_enable_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx);
 static int vargos_disable_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  struct gasket_mappable_region *mappable_region);
 static int vargos_deallocate_queue_ctx(
  struct argos_common_device_data *device_data,
  struct queue_ctx *queue_ctx);
 static int vargos_allocate_direct_mapping(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  struct direct_mapping *direct_mapping);
 static int vargos_deallocate_direct_mapping(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  struct direct_mapping *direct_mapping);
 
@@ -235,6 +245,12 @@ static int mailbox_submit_and_wait_one(
  const struct vargos_mailbox_command *command);
 
 
+static int vargos_v1_get_bar_region_count(int bar);
+static const struct gasket_mappable_region *vargos_v1_get_bar_regions(int bar);
+static int vargos_v2_get_bar_region_count(int bar);
+static const struct gasket_mappable_region *vargos_v2_get_bar_regions(int bar);
+
+
 static const struct gasket_sysfs_attribute vargos_sysfs_attrs[] = {
  GASKET_SYSFS_RW(mailbox, sysfs_show, sysfs_store, ATTR_MAILBOX),
  GASKET_SYSFS_RW(timeout_scaling, sysfs_show, sysfs_store,
@@ -253,6 +269,8 @@ static const struct vargos_chip_family_data vargos_v1_chip_family_data = {
  .page_table_max_entries = VARGOS_V1_PAGE_TABLE_MAX_ENTRIES,
  .dram_chunk_count =
   (VARGOS_V1_DRAM_BYTES / ARGOS_DRAM_CHUNK_BYTES),
+ .get_bar_region_count = vargos_v1_get_bar_region_count,
+ .get_bar_regions = vargos_v1_get_bar_regions,
 };
 
 static const struct vargos_chip_family_data vargos_v2_chip_family_data = {
@@ -260,6 +278,8 @@ static const struct vargos_chip_family_data vargos_v2_chip_family_data = {
  .page_table_max_entries = VARGOS_V2_PAGE_TABLE_MAX_ENTRIES,
  .dram_chunk_count =
   (VARGOS_V2_DRAM_BYTES / ARGOS_DRAM_CHUNK_BYTES),
+ .get_bar_region_count = vargos_v2_get_bar_region_count,
+ .get_bar_regions = vargos_v2_get_bar_regions,
 };
 
 
@@ -271,6 +291,24 @@ static const struct gasket_mappable_region fw_bar_regions[] = {
 
 static const struct gasket_mappable_region dram_bar_regions[] = {
  { 0x0, VARGOS_DRAM_BAR_SIZE, VM_READ | VM_WRITE }
+};
+
+
+
+
+static const struct gasket_mappable_region vargos_v1_firmware_bar_ranges[] = {
+
+ {0x02000000, 0x70, VM_READ | VM_WRITE},
+                               {0x20c0000, 0x10, VM_READ | VM_WRITE },
+};
+
+
+
+
+static const struct gasket_mappable_region vargos_v2_firmware_bar_ranges[] = {
+
+ {0x02000000, 0x60, VM_READ | VM_WRITE},
+                               {0x02040000, 0x10, VM_READ | VM_WRITE },
 };
 
 static struct gasket_page_table_config
@@ -374,7 +412,7 @@ static int __init vargos_init(void)
  int i;
  int ret;
 
- gasket_nodev_info("Loading VArgos driver: a1b124635dd9.");
+ gasket_nodev_info("Loading VArgos driver: 4af768204226.");
 
  ret = vargos_wormhole_setup();
  if (ret)
@@ -402,10 +440,13 @@ static int __init vargos_init(void)
  }
 
  driver_desc.chip_model = chip_family_data->name;
+ vargos_device_desc.get_bar_region_count =
+  chip_family_data->get_bar_region_count,
+ vargos_device_desc.get_bar_regions = chip_family_data->get_bar_regions;
 
  return gasket_register_device(&device_desc);
 }
-# 421 "./drivers/char/argos/vargos_driver.c"
+# 461 "./drivers/char/argos/vargos_driver.c"
 static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 {
  const int reg = PCI_BASE_ADDRESS_0 + 4 * bar;
@@ -437,7 +478,7 @@ static int hacky_pci_update_resource(struct pci_dev *pdev, int bar)
 
  return ret;
 }
-# 465 "./drivers/char/argos/vargos_driver.c"
+# 505 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_move_bar(
  struct pci_dev *pdev, int bar, struct resource *wormhole_res,
  u64 wormhole_bar_base)
@@ -448,7 +489,7 @@ int vargos_wormhole_move_bar(
 
  if (!wormhole_bar_base)
   return 0;
-# 483 "./drivers/char/argos/vargos_driver.c"
+# 523 "./drivers/char/argos/vargos_driver.c"
  ret = -EINVAL;
  pci_bus_for_each_resource(pdev->bus, r, i) {
   if (!r || !resource_contains(r, bar_res))
@@ -520,7 +561,7 @@ int vargos_wormhole_move_bar(
 
  return 0;
 }
-# 562 "./drivers/char/argos/vargos_driver.c"
+# 602 "./drivers/char/argos/vargos_driver.c"
 int vargos_wormhole_setup(void)
 {
  struct pci_dev *pdev = NULL;
@@ -606,7 +647,7 @@ release_device:
 
  return 0;
 }
-# 657 "./drivers/char/argos/vargos_driver.c"
+# 697 "./drivers/char/argos/vargos_driver.c"
 static int vargos_initialize_chip_family(void)
 {
  const struct pci_device_id *id = NULL;
@@ -974,23 +1015,35 @@ static unsigned long get_page_table_entry_offset(
  return VARGOS_PAGE_TABLE_BASE + reg_index * VARGOS_PAGE_TABLE_SIZE +
   entry_index * sizeof(u64);
 }
-# 1032 "./drivers/char/argos/vargos_driver.c"
+# 1075 "./drivers/char/argos/vargos_driver.c"
 static int vargos_get_mappable_regions_cb(
- struct gasket_dev *gasket_dev, int bar_index,
+ struct gasket_filp_data *gasket_filp_data, int bar_index,
  struct gasket_mappable_region **mappable_regions,
  int *num_mappable_regions)
 {
+ struct gasket_dev *gasket_dev = gasket_filp_data->gasket_dev;
+ struct argos_filp_data *filp_data = gasket_filp_data->driver_private;
  struct argos_common_device_data *device_data;
+ const struct argos_device_desc *device_desc;
+ const struct gasket_mappable_region *mappable_bar_region;
  struct queue_ctx *queue_ctxs;
  bool return_all = false;
  int i, output_index = 0;
  bool non_subcontainer_master = false;
+ int num_mappable_bar_regions;
+ struct argos_filp_data *tmp_filp_data;
+ int ret;
+
+
+
+
 
  if (gasket_dev->cb_data == NULL) {
   gasket_log_error(gasket_dev, "Callback data is NULL!");
   return -EINVAL;
  }
  device_data = gasket_dev->cb_data;
+ device_desc = device_data->device_desc;
 
  *mappable_regions = NULL;
  *num_mappable_regions = 0;
@@ -1004,7 +1057,17 @@ static int vargos_get_mappable_regions_cb(
 
  if (bar_index == VARGOS_FIRMWARE_BAR) {
 
-  *num_mappable_regions = 1;
+  num_mappable_bar_regions = device_desc->get_bar_region_count(
+   VARGOS_FIRMWARE_BAR);
+  mappable_bar_region = device_desc->get_bar_regions(
+   VARGOS_FIRMWARE_BAR);
+  if (mappable_bar_region == NULL) {
+   gasket_log_error(gasket_dev,
+    "Could not determine common mappable regions for firmware bar!");
+   *num_mappable_regions = 0;
+   return -EINVAL;
+  }
+  *num_mappable_regions = num_mappable_bar_regions;
 
 
   non_subcontainer_master =
@@ -1020,7 +1083,7 @@ static int vargos_get_mappable_regions_cb(
   }
 
   for (i = 0; i < VARGOS_QUEUE_CTX_COUNT; i++)
-   if (argos_should_map_queue(device_data, i) ||
+   if (argos_should_map_queue(filp_data, i) ||
        return_all)
     (*num_mappable_regions)++;
 
@@ -1043,7 +1106,7 @@ static int vargos_get_mappable_regions_cb(
 
 
 
-   if (argos_should_map_queue(device_data, i) ||
+   if (argos_should_map_queue(filp_data, i) ||
        return_all) {
     populate_queue_mappable_region(
      i, &(*mappable_regions)[output_index]);
@@ -1064,14 +1127,9 @@ static int vargos_get_mappable_regions_cb(
 
 
 
-
-
-  (*mappable_regions)[output_index].start =
-   VARGOS_CHIP_GLOBAL_START;
-  (*mappable_regions)[output_index].length_bytes =
-   VARGOS_CHIP_GLOBAL_SIZE;
-  (*mappable_regions)[output_index].flags = VM_READ | VM_WRITE;
-  output_index++;
+  for (i = 0; i < num_mappable_bar_regions; i++)
+   (*mappable_regions)[output_index++] =
+    mappable_bar_region[i];
 
 
   (*mappable_regions)[output_index].start =
@@ -1080,15 +1138,34 @@ static int vargos_get_mappable_regions_cb(
    VARGOS_FAKE_STICKY_SIZE;
   (*mappable_regions)[output_index].flags = VM_READ | VM_WRITE;
   output_index++;
-
-
-
-
-
  } else if (bar_index == VARGOS_DRAM_BAR) {
-  return argos_get_direct_mappable_regions(
-   device_data, bar_index, mappable_regions,
-   num_mappable_regions);
+  if (filp_data) {
+
+
+
+
+
+
+   return argos_get_direct_mappable_regions(
+    filp_data, bar_index, mappable_regions,
+    num_mappable_regions);
+  } else {
+# 1217 "./drivers/char/argos/vargos_driver.c"
+   tmp_filp_data =
+    kzalloc(sizeof(*tmp_filp_data), GFP_KERNEL);
+   if (!tmp_filp_data) {
+    gasket_log_error(gasket_dev,
+     "Failed to allocate argos_filp_data!");
+    return -ENOMEM;
+   }
+
+   tmp_filp_data->device_data = device_data;
+   ret = argos_get_direct_mappable_regions(
+    tmp_filp_data, bar_index, mappable_regions,
+    num_mappable_regions);
+   kfree(tmp_filp_data);
+   return ret;
+  }
  } else {
   gasket_log_error(
    gasket_dev, "Invalid BAR specified: %d", bar_index);
@@ -1105,10 +1182,11 @@ static enum gasket_status vargos_status(struct gasket_dev *gasket_dev)
 }
 
 static int vargos_allocate_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  const struct argos_subcontainer_queue_ctx_config *config)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  struct vargos_mailbox *mailbox = get_mailbox(device_data);
  struct vargos_mailbox_command command;
@@ -1154,9 +1232,10 @@ static bool vargos_is_queue_ctx_failed(
 }
 
 static int vargos_enable_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct vargos_mailbox *mailbox = get_mailbox(device_data);
  struct vargos_mailbox_command command;
 
@@ -1167,10 +1246,11 @@ static int vargos_enable_queue_ctx(
 }
 
 static int vargos_disable_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  struct gasket_mappable_region *mappable_region)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  struct vargos_mailbox *mailbox = get_mailbox(device_data);
  struct vargos_mailbox_command command;
@@ -1178,7 +1258,7 @@ static int vargos_disable_queue_ctx(
 
  command.type = VARGOS_MAILBOX_COMMAND_DISABLE;
  command.virtual_queue_index = queue_ctx->index;
-# 1244 "./drivers/char/argos/vargos_driver.c"
+# 1333 "./drivers/char/argos/vargos_driver.c"
  ret = mailbox_submit_and_wait_one(mailbox, &command);
  if (ret)
   gasket_log_warn(gasket_dev,
@@ -1187,7 +1267,7 @@ static int vargos_disable_queue_ctx(
 
  return 0;
 }
-# 1268 "./drivers/char/argos/vargos_driver.c"
+# 1357 "./drivers/char/argos/vargos_driver.c"
 static int vargos_map_buffer(
  struct gasket_dev *gasket_dev, int queue_idx, ulong dma_addr,
  ulong dev_addr, uint num_pages)
@@ -1219,12 +1299,13 @@ static int vargos_map_buffer(
 
  return ret;
 }
-# 1314 "./drivers/char/argos/vargos_driver.c"
+# 1403 "./drivers/char/argos/vargos_driver.c"
 static int vargos_unmap_buffer(
  struct gasket_dev *gasket_dev, int queue_idx, ulong dev_addr,
  uint num_pages)
 {
  struct argos_common_device_data *device_data;
+ struct queue_ctx *queue_ctx;
  struct vargos_mailbox *mailbox;
  struct vargos_mailbox_command command;
  int ret;
@@ -1235,6 +1316,21 @@ static int vargos_unmap_buffer(
   return -EINVAL;
  }
  device_data = gasket_dev->cb_data;
+
+
+
+
+
+ if (queue_idx < 0 ||
+     queue_idx >= device_data->device_desc->queue_ctx_count) {
+  gasket_log_error(gasket_dev, "Invalid queue index %d!",
+   queue_idx);
+  return -EINVAL;
+ }
+ queue_ctx = &device_data->queue_ctxs[queue_idx];
+ if (queue_ctx->owner == 0)
+  return 0;
+
  mailbox = get_mailbox(device_data);
 
  command.type = VARGOS_MAILBOX_COMMAND_UNMAP_BUFFER;
@@ -1252,10 +1348,11 @@ static int vargos_unmap_buffer(
 }
 
 int vargos_allocate_direct_mapping(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  struct direct_mapping *direct_mapping)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct vargos_mailbox *mailbox = get_mailbox(device_data);
  struct vargos_mailbox_command command;
  struct vargos_mailbox_response response;
@@ -1330,10 +1427,11 @@ int vargos_allocate_direct_mapping(
 }
 
 int vargos_deallocate_direct_mapping(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx,
  struct direct_mapping *direct_mapping)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct vargos_mailbox *mailbox = get_mailbox(device_data);
  struct vargos_mailbox_command command;
  int ret;
@@ -1634,4 +1732,64 @@ static int mailbox_submit_and_wait_one(
  mutex_unlock(&mailbox->mutex);
 
  return ret;
+}
+
+
+
+
+
+static int vargos_v1_get_bar_region_count(int bar)
+{
+ switch (bar) {
+ case VARGOS_FIRMWARE_BAR:
+  return ARRAY_SIZE(vargos_v1_firmware_bar_ranges);
+ case VARGOS_DRAM_BAR:
+  return ARRAY_SIZE(dram_bar_regions);
+ }
+ return 0;
+}
+
+
+
+
+
+static const struct gasket_mappable_region *vargos_v1_get_bar_regions(int bar)
+{
+ switch (bar) {
+ case VARGOS_FIRMWARE_BAR:
+  return vargos_v1_firmware_bar_ranges;
+ case VARGOS_DRAM_BAR:
+  return dram_bar_regions;
+ }
+ return NULL;
+}
+
+
+
+
+
+static int vargos_v2_get_bar_region_count(int bar)
+{
+ switch (bar) {
+ case VARGOS_FIRMWARE_BAR:
+  return ARRAY_SIZE(vargos_v1_firmware_bar_ranges);
+ case VARGOS_DRAM_BAR:
+  return ARRAY_SIZE(dram_bar_regions);
+ }
+ return 0;
+}
+
+
+
+
+
+static const struct gasket_mappable_region *vargos_v2_get_bar_regions(int bar)
+{
+ switch (bar) {
+ case VARGOS_FIRMWARE_BAR:
+  return vargos_v2_firmware_bar_ranges;
+ case VARGOS_DRAM_BAR:
+  return dram_bar_regions;
+ }
+ return NULL;
 }

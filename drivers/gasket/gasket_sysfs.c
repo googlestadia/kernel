@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
 # 1 "./drivers/gasket/gasket_sysfs.c"
 #include "gasket_sysfs.h"
@@ -117,7 +117,6 @@ int gasket_sysfs_create_mapping(
  if (map_idx == GASKET_SYSFS_NUM_MAPPINGS) {
   gasket_log_error(
    gasket_dev, "All mappings have been exhausted!");
-  mutex_unlock(&function_mutex);
   ret = -ENOMEM;
   goto unlock_function;
  }
@@ -257,7 +256,7 @@ void gasket_sysfs_remove_mapping(struct device *device)
   return;
 
  mutex_lock(&mapping->mutex);
-# 274 "./drivers/gasket/gasket_sysfs.c"
+# 273 "./drivers/gasket/gasket_sysfs.c"
  mutex_unlock(&mapping->mutex);
 
  gasket_log_info(mapping->gasket_dev,
@@ -305,7 +304,7 @@ struct gasket_sysfs_attribute *gasket_sysfs_get_attr(
 
  if (mapping == NULL)
   return NULL;
-# 330 "./drivers/gasket/gasket_sysfs.c"
+# 329 "./drivers/gasket/gasket_sysfs.c"
  attrs = mapping->attributes;
  num_attrs = mapping->attribute_count;
  for (i = 0; i < num_attrs; ++i) {

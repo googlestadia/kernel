@@ -1,7 +1,11 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
-# 5 "./drivers/char/argos/vargos_mailbox_types.h"
+# 1 "./drivers/char/argos/vargos_mailbox_types.h"
+
+
+
+
 #ifndef __VARGOS_MAILBOX_H__
 #define __VARGOS_MAILBOX_H__ 
 

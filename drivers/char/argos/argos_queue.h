@@ -1,7 +1,8 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
-# 2 "./drivers/char/argos/argos_queue.h"
+# 1 "./drivers/char/argos/argos_queue.h"
+
 #ifndef __ARGOS_COMMON_H__
 #define __ARGOS_COMMON_H__ 
 
@@ -16,7 +17,7 @@ int argos_lookup_queue_ctx(struct argos_common_device_data *device_data,
  const char *ctx_id, struct queue_ctx **queue_ctx_ptr);
 # 40 "./drivers/char/argos/argos_queue.h"
 int argos_allocate_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct argos_subcontainer_queue_ctx_config *config);
 # 53 "./drivers/char/argos/argos_queue.h"
 int argos_deallocate_queue_ctx(
@@ -24,11 +25,11 @@ int argos_deallocate_queue_ctx(
  struct queue_ctx *queue_ctx);
 # 66 "./drivers/char/argos/argos_queue.h"
 int argos_enable_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  const char *name, struct argos_queue_ctx_config *config);
 # 80 "./drivers/char/argos/argos_queue.h"
 int argos_disable_queue_ctx(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct queue_ctx *queue_ctx);
 # 91 "./drivers/char/argos/argos_queue.h"
 void argos_cleanup_hash_entry(struct kref *ref);
@@ -40,45 +41,43 @@ int argos_clear_firmware_queue_status(
  struct argos_common_device_data *device_data, int queue_idx);
 # 124 "./drivers/char/argos/argos_queue.h"
 int argos_common_allocate_queue_ctx_callback(
- struct argos_common_device_data *device_data,
- struct queue_ctx *queue_ctx,
+ struct argos_filp_data *filp_data, struct queue_ctx *queue_ctx,
  const struct argos_subcontainer_queue_ctx_config *config);
-# 139 "./drivers/char/argos/argos_queue.h"
+# 138 "./drivers/char/argos/argos_queue.h"
 int argos_allocate_direct_mapping(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct argos_direct_mapping_request *request);
-# 153 "./drivers/char/argos/argos_queue.h"
+# 152 "./drivers/char/argos/argos_queue.h"
 int argos_deallocate_direct_mapping(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  const struct argos_direct_mapping_request *request);
-# 171 "./drivers/char/argos/argos_queue.h"
+# 170 "./drivers/char/argos/argos_queue.h"
 int argos_get_direct_mapping_mmap_offset(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct argos_direct_mapping_request *request);
-# 184 "./drivers/char/argos/argos_queue.h"
+# 183 "./drivers/char/argos/argos_queue.h"
 int argos_add_dma_buf_to_direct_mapping(
  struct argos_dma_buf_object *argos_dbuf);
-# 194 "./drivers/char/argos/argos_queue.h"
+# 193 "./drivers/char/argos/argos_queue.h"
 void argos_remove_dma_buf_from_direct_mapping(
  struct argos_dma_buf_object *argos_dbuf);
-# 215 "./drivers/char/argos/argos_queue.h"
+# 214 "./drivers/char/argos/argos_queue.h"
 int argos_get_direct_mappings_for_bar(
- struct argos_common_device_data *device_data,
- int bar_index, int *num_mappings,
+ struct argos_filp_data *filp_data, int bar_index, int *num_mappings,
  struct gasket_mappable_region *mappable_regions);
-# 235 "./drivers/char/argos/argos_queue.h"
+# 233 "./drivers/char/argos/argos_queue.h"
 int argos_get_direct_mappable_regions(
- struct argos_common_device_data *device_data,
- int bar_index, struct gasket_mappable_region **mappable_regions,
+ struct argos_filp_data *filp_data, int bar_index,
+ struct gasket_mappable_region **mappable_regions,
  int *num_mappable_regions);
-# 248 "./drivers/char/argos/argos_queue.h"
+# 246 "./drivers/char/argos/argos_queue.h"
 int argos_common_deallocate_queue_ctx_callback(
  struct argos_common_device_data *device_data,
  struct queue_ctx *queue_ctx);
-# 260 "./drivers/char/argos/argos_queue.h"
+# 259 "./drivers/char/argos/argos_queue.h"
 bool argos_should_map_queue(
- struct argos_common_device_data *device_data, int queue_idx);
-# 270 "./drivers/char/argos/argos_queue.h"
+ struct argos_filp_data *filp_data, int queue_idx);
+# 269 "./drivers/char/argos/argos_queue.h"
 int argos_disable_and_deallocate_all_queues(
  struct argos_common_device_data *device_data);
 

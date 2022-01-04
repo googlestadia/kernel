@@ -1,7 +1,8 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
-# 2 "./drivers/char/argos/argos_common.h"
+# 1 "./drivers/char/argos/argos_common.h"
+
 #ifndef __ASIC_COMMON_H__
 #define __ASIC_COMMON_H__ 
 

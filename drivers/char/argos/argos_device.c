@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_device.c"
 #include <linux/fs.h>
@@ -45,7 +45,8 @@ ARGOS_FIELD_DECODER_WRAPPER(kernel_chip_global_chip_reset_value)
 int argos_wait_for_expected_value(
  struct argos_common_device_data *device_data, int bar,
  ulong offset, ulong timeout, ulong (*get_decoded_value)(uint64),
- ulong expected_value)
+ ulong expected_value,
+ u64 (*read_device_register)(struct gasket_dev *, int, ulong))
 {
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  u64 value;
@@ -53,14 +54,14 @@ int argos_wait_for_expected_value(
 
  deadline = jiffies + timeout * device_data->timeout_scaling * HZ;
  do {
-  value = gasket_dev_read_64(gasket_dev, bar, offset);
+  value = read_device_register(gasket_dev, bar, offset);
   if (get_decoded_value(value) == expected_value)
    return 0;
   schedule_timeout_interruptible(msecs_to_jiffies(1));
  } while (time_before(jiffies, deadline));
 
 
- value = gasket_dev_read_64(gasket_dev, bar, offset);
+ value = read_device_register(gasket_dev, bar, offset);
  if (get_decoded_value(value) == expected_value)
   return 0;
 
@@ -102,7 +103,6 @@ int argos_device_enable_dev(struct gasket_dev *gasket_dev)
  const struct argos_device_desc *device_desc;
  struct queue_ctx *queue_ctxs;
  int i;
- ulong fw_api_version;
  int ret, fw_bar;
  u64 value;
 
@@ -113,17 +113,6 @@ int argos_device_enable_dev(struct gasket_dev *gasket_dev)
  device_data = gasket_dev->cb_data;
  device_desc = device_data->device_desc;
  fw_bar = device_desc->firmware_register_bar;
-
- value = gasket_dev_read_64(gasket_dev, fw_bar,
-  device_desc->firmware_api_version_location);
- fw_api_version = chip_global_api_version_version(value);
- if (fw_api_version != ARGOS_DEVICE_DRIVER_FIRMWARE_API_VERSION) {
-  gasket_log_error(gasket_dev,
-   "Firmware API version mismatch! Driver: %lu, firmware: %lu",
-   ARGOS_DEVICE_DRIVER_FIRMWARE_API_VERSION,
-   fw_api_version);
-  return -EINVAL;
- }
 
  value = gasket_dev_read_64(gasket_dev, fw_bar,
   device_desc->max_ddr_chunks_per_ctx_location);
@@ -180,16 +169,36 @@ int argos_device_disable_dev(struct gasket_dev *gasket_dev)
 }
 EXPORT_SYMBOL(argos_device_disable_dev);
 
-int argos_device_open(struct gasket_dev *gasket_dev, struct file *filp)
+int argos_device_open(
+ struct gasket_filp_data *gasket_filp_data, struct file *filp)
 {
+ struct gasket_dev *gasket_dev = gasket_filp_data->gasket_dev;
  struct argos_common_device_data *device_data;
+ struct argos_filp_data *filp_data;
+ const struct gasket_driver_desc *driver_desc = gasket_dev->driver_desc;
  int ret = 0;
+ int i;
 
  if (gasket_dev->cb_data == NULL) {
   gasket_log_error(gasket_dev, "Callback data is NULL!");
   return -EINVAL;
  }
  device_data = gasket_dev->cb_data;
+
+ if (gasket_filp_data->driver_private) {
+  gasket_log_error(gasket_dev,
+   "Unknown filp_data already attached!");
+  return -EINVAL;
+ }
+
+ gasket_filp_data->driver_private = filp_data =
+  kzalloc(sizeof(*filp_data), GFP_KERNEL);
+ if (!filp_data) {
+  gasket_log_error(gasket_dev,
+   "Failed to allocate argos_filp_data!");
+  return -ENOMEM;
+ }
+ filp_data->device_data = device_data;
 
  mutex_lock(&device_data->mutex);
  if (tgid_hash_get_or_create(device_data, current->tgid) == NULL) {
@@ -201,8 +210,18 @@ int argos_device_open(struct gasket_dev *gasket_dev, struct file *filp)
 
 
 
- if (gasket_dev->ownership.write_open_count == 0)
-  legacy_gasket_interrupt_setup(gasket_dev);
+ if (gasket_dev->ownership.write_open_count == 0) {
+  if (driver_desc->legacy_interrupts != NULL) {
+   legacy_gasket_interrupt_setup(gasket_dev);
+  } else {
+   for (i = 0; i < driver_desc->num_msix_interrupts; i++) {
+    gasket_dev_write_32(gasket_dev, i,
+     driver_desc->interrupts[i].bar_index,
+     driver_desc->interrupts[i].reg);
+   }
+   gasket_interrupt_reinit(gasket_dev);
+  }
+ }
 
 exit:
  mutex_unlock(&device_data->mutex);
@@ -210,34 +229,44 @@ exit:
 }
 EXPORT_SYMBOL(argos_device_open);
 
-int argos_device_release(struct gasket_dev *gasket_dev, struct file *filp)
+int argos_device_release(
+ struct gasket_filp_data *gasket_filp_data, struct file *filp)
 {
+ struct gasket_dev *gasket_dev = gasket_filp_data->gasket_dev;
  struct argos_common_device_data *device_data;
+ struct argos_filp_data *filp_data;
  int ret;
 
- if (gasket_dev->cb_data == NULL) {
+ if (!gasket_dev->cb_data) {
   gasket_log_error(gasket_dev, "Callback data is NULL!");
   return -EINVAL;
  }
  device_data = gasket_dev->cb_data;
 
+ if (!gasket_filp_data->driver_private) {
+  gasket_log_error(gasket_dev, "Argos driver_private is NULL!");
+  return -EINVAL;
+ }
+ filp_data = gasket_filp_data->driver_private;
+
  mutex_lock(&device_data->mutex);
  ret = tgid_hash_put(device_data, current->tgid);
  mutex_unlock(&device_data->mutex);
+
+ kfree(filp_data);
+ gasket_filp_data->driver_private = NULL;
 
  return ret;
 }
 EXPORT_SYMBOL(argos_device_release);
 
-
-
-
-
-int argos_device_close(struct gasket_dev *gasket_dev)
+int argos_device_close(
+ struct gasket_filp_data *gasket_filp_data, struct file *filp)
 {
+ struct gasket_dev *gasket_dev = gasket_filp_data->gasket_dev;
  struct argos_common_device_data *device_data;
 
- if (gasket_dev->cb_data == NULL) {
+ if (!gasket_dev->cb_data) {
   gasket_log_error(gasket_dev, "Callback data is NULL!");
   return -EINVAL;
  }
@@ -250,8 +279,10 @@ int argos_device_close(struct gasket_dev *gasket_dev)
 }
 EXPORT_SYMBOL(argos_device_close);
 
-int argos_interrupt_permissions(struct gasket_dev *gasket_dev, int interrupt)
+int argos_interrupt_permissions(
+ struct gasket_filp_data *gasket_filp_data, int interrupt)
 {
+ struct gasket_dev *gasket_dev = gasket_filp_data->gasket_dev;
  struct argos_common_device_data *device_data;
  struct queue_ctx *queue_ctx;
  int is_master = argos_check_ownership(gasket_dev);
@@ -282,13 +313,14 @@ int argos_interrupt_permissions(struct gasket_dev *gasket_dev, int interrupt)
 }
 EXPORT_SYMBOL(argos_interrupt_permissions);
 
-int argos_page_table_permissions(struct gasket_dev *gasket_dev, int page_table)
+int argos_page_table_permissions(
+ struct gasket_filp_data *gasket_filp_data, int page_table)
 {
 
 
 
 
- return argos_interrupt_permissions(gasket_dev, page_table);
+ return argos_interrupt_permissions(gasket_filp_data, page_table);
 }
 EXPORT_SYMBOL(argos_page_table_permissions);
 
@@ -354,45 +386,38 @@ static int ioctl_set_priority_algorithm(
 
 long argos_device_ioctl(struct file *filp, uint cmd, ulong arg)
 {
- struct gasket_filp_data *filp_data =
-  (struct gasket_filp_data *)filp->private_data;
- struct gasket_dev *gasket_dev = filp_data->gasket_dev;
+
+ struct gasket_filp_data *gasket_filp_data = filp->private_data;
+ struct gasket_dev *gasket_dev = gasket_filp_data->gasket_dev;
+ struct argos_filp_data *filp_data = gasket_filp_data->driver_private;
  struct argos_common_device_data *device_data;
  int ret;
 
- if (filp->f_inode == NULL)
-  return -EFAULT;
-
- if (gasket_dev == NULL) {
-  gasket_nodev_error("Gasket dev is NULL!");
+ if (!filp_data || !filp_data->device_data) {
+  gasket_log_error(gasket_dev,
+   "Argos filp_data (%p) or its device_data is NULL!",
+   filp_data);
   return -EINVAL;
  }
-
- if (gasket_dev->cb_data == NULL) {
-  gasket_log_error(gasket_dev,
-   "device descriptor is missing queue context pointer!");
-  return -EFAULT;
- }
- device_data = gasket_dev->cb_data;
+ device_data = filp_data->device_data;
 
  if (gasket_dev->parent) {
   ret = argos_subcontainer_argos_ioctl_has_permission(
-   device_data, cmd);
+   filp_data, cmd);
   if (ret)
    return ret;
  } else if (device_data->mode == ARGOS_MODE_OVERSEER) {
-  ret = argos_overseer_argos_ioctl_has_permission(
-   device_data, cmd);
+  ret = argos_overseer_argos_ioctl_has_permission(filp_data, cmd);
   if (ret)
    return ret;
  }
 
- ret = argos_queue_ioctl_dispatch(device_data, cmd, arg);
+ ret = argos_queue_ioctl_dispatch(filp_data, cmd, arg);
  if (ret != -EOPNOTSUPP)
   return ret;
 
  if (device_data->device_desc->overseer_supported) {
-  ret = argos_overseer_ioctl_dispatch(device_data, cmd, arg);
+  ret = argos_overseer_ioctl_dispatch(filp_data, cmd, arg);
   if (ret != -EOPNOTSUPP)
    return ret;
  }
@@ -453,7 +478,8 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
    RESET_TIMEOUT_SEC,
    ARGOS_NAME_FIELD_DECODER_WRAPPER(
     kernel_chip_global_chip_reset_value),
-   kKernelChipGlobalChipResetValueValueResetAccepted))
+   kKernelChipGlobalChipResetValueValueResetAccepted,
+   gasket_dev_read_64))
   return -ETIMEDOUT;
 
 
@@ -462,7 +488,8 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
    RESET_TIMEOUT_SEC,
    ARGOS_NAME_FIELD_DECODER_WRAPPER(
     chip_global_state_value),
-   kChipGlobalStateValueValueInitialized))
+   kChipGlobalStateValueValueInitialized,
+   gasket_dev_read_64))
   return -ETIMEDOUT;
 
 
@@ -491,7 +518,7 @@ int argos_device_reset(struct gasket_dev *gasket_dev, uint reset_type)
  return 0;
 }
 EXPORT_SYMBOL(argos_device_reset);
-# 500 "./drivers/char/argos/argos_device.c"
+# 527 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_count_based(
   struct argos_common_device_data *device_data,
   const struct queue_ctx *queue_ctx,
@@ -502,12 +529,12 @@ static int argos_dram_request_send_count_based(
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  const struct argos_device_desc *device_desc = device_data->device_desc;
  const int fw_bar = device_desc->firmware_register_bar;
- const int ddr_control_location =
+ const uint64 ddr_control_location =
   device_desc->kernel_queue_ddr_control_location(
    queue_ctx->index);
 
 
- value = gasket_dev_read_64(gasket_dev, fw_bar,
+ value = gasket_dev_read_32(gasket_dev, fw_bar,
   device_desc->global_chip_ddr_state_location);
  available_chunks = chip_global_ddr_state_available_chunks(value);
  *chunk_delta = queue_ctx->dram_chunks - original_chunks;
@@ -518,17 +545,17 @@ static int argos_dram_request_send_count_based(
  }
 
 
- value = gasket_dev_read_64(gasket_dev, fw_bar, ddr_control_location);
+ value = gasket_dev_read_32(gasket_dev, fw_bar, ddr_control_location);
  set_kernel_queue_ddr_control_change_requested(
   &value,
   kKernelQueueDdrControlChangeRequestedValueCountBasedRequest);
  set_kernel_queue_ddr_control_requested_chunks(
   &value, queue_ctx->dram_chunks);
- gasket_dev_write_64(gasket_dev, value, fw_bar, ddr_control_location);
+ gasket_dev_write_32(gasket_dev, value, fw_bar, ddr_control_location);
 
  return 0;
 }
-# 546 "./drivers/char/argos/argos_device.c"
+# 573 "./drivers/char/argos/argos_device.c"
 static int argos_dram_request_send_bitmap_based(
   struct argos_common_device_data *device_data,
   struct queue_ctx *queue_ctx, int original_chunks,
@@ -570,15 +597,15 @@ static int argos_dram_request_send_bitmap_based(
 
 
 
- value = gasket_dev_read_64(gasket_dev, fw_bar, ddr_control_location);
+ value = gasket_dev_read_32(gasket_dev, fw_bar, ddr_control_location);
  set_kernel_queue_ddr_control_change_requested(
   &value,
   kKernelQueueDdrControlChangeRequestedValueBitmapBasedRequest);
- gasket_dev_write_64(gasket_dev, value, fw_bar, ddr_control_location);
+ gasket_dev_write_32(gasket_dev, value, fw_bar, ddr_control_location);
 
  return 0;
 }
-# 603 "./drivers/char/argos/argos_device.c"
+# 630 "./drivers/char/argos/argos_device.c"
 static int get_dram_configuration_response(
  struct argos_common_device_data *device_data,
  int queue_index)
@@ -593,7 +620,8 @@ static int get_dram_configuration_response(
     queue_index),
    DDR_CHUNK_ACK_TIMEOUT_SEC,
    ARGOS_NAME_FIELD_DECODER_WRAPPER(
-    kernel_queue_ddr_control_change_requested), 0);
+    kernel_queue_ddr_control_change_requested), 0,
+   argos_read_32);
  if (ret == -ETIMEDOUT) {
   gasket_log_error(gasket_dev,
    "HW/FW error: DDR config request not acked! Marking device unhealthy.");
@@ -608,7 +636,8 @@ static int get_dram_configuration_response(
    device_data->max_chunks_per_queue_ctx *
    DDR_CHUNK_ACK_TIMEOUT_SEC,
    ARGOS_NAME_FIELD_DECODER_WRAPPER(
-    kernel_queue_ddr_status_pending_config), 0);
+    kernel_queue_ddr_status_pending_config), 0,
+   gasket_dev_read_64);
  if (ret == -ETIMEDOUT) {
   gasket_log_error(
    gasket_dev,
@@ -650,9 +679,6 @@ int argos_configure_queue_ctx_dram(
   device_desc->kernel_queue_ddr_status_location(
    queue_ctx->index));
  pending_config = kernel_queue_ddr_status_pending_config(value);
- value = gasket_dev_read_64(gasket_dev, fw_bar,
-  device_desc->kernel_queue_ddr_status_location(
-   queue_ctx->index));
  status = kernel_queue_ddr_status_value(value);
  if (pending_config || status ==
   kKernelQueueDdrStatusValueValuePendingConfigInProgress) {
@@ -667,9 +693,6 @@ int argos_configure_queue_ctx_dram(
   goto out;
  }
 
- value = gasket_dev_read_64(gasket_dev, fw_bar,
-  device_desc->kernel_queue_ddr_status_location(
-   queue_ctx->index));
  original_chunks = kernel_queue_ddr_status_current_chunks(value);
 
  if (bitmap == NULL) {
@@ -718,12 +741,14 @@ void argos_populate_queue_mappable_region(
  mappable_region->flags = VM_READ | VM_WRITE;
 }
 EXPORT_SYMBOL(argos_populate_queue_mappable_region);
-# 750 "./drivers/char/argos/argos_device.c"
+
 int argos_get_mappable_regions_cb(
- struct gasket_dev *gasket_dev, int bar_index,
+ struct gasket_filp_data *gasket_filp_data, int bar_index,
  struct gasket_mappable_region **mappable_regions,
  int *num_mappable_regions)
 {
+ struct gasket_dev *gasket_dev = gasket_filp_data->gasket_dev;
+ struct argos_filp_data *filp_data = gasket_filp_data->driver_private;
  struct argos_common_device_data *device_data;
  const struct argos_device_desc *device_desc;
  const struct gasket_driver_desc *driver_desc;
@@ -735,6 +760,10 @@ int argos_get_mappable_regions_cb(
  int i, output_index = 0;
  int ret;
         int num_mappable_bar_regions;
+
+
+
+
 
  if (gasket_dev->cb_data == NULL) {
   gasket_log_error(gasket_dev, "Callback data is NULL!");
@@ -775,7 +804,7 @@ int argos_get_mappable_regions_cb(
    return_all = true;
 
   for (i = 0; i < device_desc->queue_ctx_count; i++)
-   if (argos_should_map_queue(device_data, i) ||
+   if (argos_should_map_queue(filp_data, i) ||
        return_all)
     (*num_mappable_regions)++;
 
@@ -795,7 +824,7 @@ int argos_get_mappable_regions_cb(
 
 
 
-   if (argos_should_map_queue(device_data, i) ||
+   if (argos_should_map_queue(filp_data, i) ||
        return_all) {
     argos_populate_queue_mappable_region(
      device_data,
@@ -810,13 +839,15 @@ int argos_get_mappable_regions_cb(
 
   for (i = 0; i < num_mappable_bar_regions; i++)
    (*mappable_regions)[output_index++] =
-                            mappable_bar_region[i];
+    mappable_bar_region[i];
  } else if (bar_index == device_desc->dram_bar) {
-  ret = argos_get_direct_mappable_regions(
-   device_data, bar_index, mappable_regions,
-   num_mappable_regions);
-  if (ret || *num_mappable_regions > 0)
-   return ret;
+  if (filp_data) {
+   ret = argos_get_direct_mappable_regions(
+    filp_data, bar_index, mappable_regions,
+    num_mappable_regions);
+   if (ret || *num_mappable_regions > 0)
+    return ret;
+  }
 
 
 
@@ -835,7 +866,7 @@ int argos_get_mappable_regions_cb(
     *num_mappable_regions);
 
  } else if (bar_index == device_desc->debug_bar) {
-# 879 "./drivers/char/argos/argos_device.c"
+# 903 "./drivers/char/argos/argos_device.c"
   if (gasket_dev->ownership.owner != current->tgid)
    return 0;
 

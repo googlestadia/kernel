@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
 # 1 "./drivers/gasket/gasket_ioctl.c"
 #include "gasket_ioctl.h"
@@ -17,20 +17,21 @@
 
 static uint gasket_ioctl_check_permissions(
  struct gasket_dev *gasket_dev, struct file *filp, uint cmd);
-static int gasket_set_event_fd(struct gasket_dev *dev, ulong arg);
+static int gasket_set_event_fd(struct gasket_filp_data *filp_data, ulong arg);
 static int gasket_read_page_table_size(
  struct gasket_dev *gasket_dev, ulong arg);
 static int gasket_read_simple_page_table_size(
  struct gasket_dev *gasket_dev, ulong arg);
 static int gasket_partition_page_table(
  struct gasket_dev *gasket_dev, ulong arg);
-static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg);
-static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg);
-static int gasket_map_dma_buf(struct gasket_dev *gasket_dev, ulong arg);
-static int gasket_register_interrupt(struct gasket_dev *gasket_dev, ulong arg);
-static int gasket_unregister_interrupt(struct gasket_dev *gasket_dev,
- int interrupt);
-# 38 "./drivers/gasket/gasket_ioctl.c"
+static int gasket_map_buffers(struct gasket_filp_data *filp_data, ulong arg);
+static int gasket_unmap_buffers(struct gasket_filp_data *filp_data, ulong arg);
+static int gasket_map_dma_buf(struct gasket_filp_data *filp_data, ulong arg);
+static int gasket_register_interrupt(
+ struct gasket_filp_data *filp_data, ulong arg);
+static int gasket_unregister_interrupt(
+ struct gasket_filp_data *filp_data, int interrupt);
+# 39 "./drivers/gasket/gasket_ioctl.c"
 long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
 {
  struct gasket_filp_data *filp_data =
@@ -63,12 +64,12 @@ long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
   retval = gasket_reset(gasket_dev, arg);
   break;
  case GASKET_IOCTL_SET_EVENTFD:
-  retval = gasket_set_event_fd(gasket_dev, arg);
+  retval = gasket_set_event_fd(filp_data, arg);
   break;
  case GASKET_IOCTL_CLEAR_EVENTFD:
   trace_gasket_ioctl_integer_data(arg);
   retval = legacy_gasket_interrupt_clear_eventfd(
-   gasket_dev, (int)arg);
+   filp_data, (int)arg);
   break;
  case GASKET_IOCTL_PARTITION_PAGE_TABLE:
   trace_gasket_ioctl_integer_data(arg);
@@ -89,13 +90,13 @@ long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
   retval = gasket_read_simple_page_table_size(gasket_dev, arg);
   break;
  case GASKET_IOCTL_MAP_BUFFER:
-  retval = gasket_map_buffers(gasket_dev, arg);
+  retval = gasket_map_buffers(filp_data, arg);
   break;
  case GASKET_IOCTL_UNMAP_BUFFER:
-  retval = gasket_unmap_buffers(gasket_dev, arg);
+  retval = gasket_unmap_buffers(filp_data, arg);
   break;
  case GASKET_IOCTL_MAP_DMA_BUF:
-  retval = gasket_map_dma_buf(gasket_dev, arg);
+  retval = gasket_map_dma_buf(filp_data, arg);
   break;
  case GASKET_IOCTL_CLEAR_INTERRUPT_COUNTS:
 
@@ -103,10 +104,10 @@ long gasket_handle_ioctl(struct file *filp, uint cmd, ulong arg)
   retval = gasket_interrupt_reset_counts(gasket_dev);
   break;
  case GASKET_IOCTL_REGISTER_INTERRUPT:
-  retval = gasket_register_interrupt(gasket_dev, arg);
+  retval = gasket_register_interrupt(filp_data, arg);
   break;
  case GASKET_IOCTL_UNREGISTER_INTERRUPT:
-  retval = gasket_unregister_interrupt(gasket_dev, (int)arg);
+  retval = gasket_unregister_interrupt(filp_data, (int)arg);
   break;
  default:
 
@@ -145,7 +146,7 @@ long gasket_is_supported_ioctl(uint cmd)
   return 0;
  }
 }
-# 160 "./drivers/gasket/gasket_ioctl.c"
+# 161 "./drivers/gasket/gasket_ioctl.c"
 static uint gasket_ioctl_check_permissions(
  struct gasket_dev *gasket_dev, struct file *filp, uint cmd)
 {
@@ -193,8 +194,10 @@ static uint gasket_ioctl_check_permissions(
 
 
 
-static int gasket_register_interrupt(struct gasket_dev *gasket_dev, ulong arg)
+static int gasket_register_interrupt(
+ struct gasket_filp_data *filp_data, ulong arg)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct gasket_interrupt_mapping mapping;
  int ret;
 
@@ -208,7 +211,7 @@ static int gasket_register_interrupt(struct gasket_dev *gasket_dev, ulong arg)
 
  mutex_lock(&gasket_dev->mutex);
  ret = gasket_interrupt_register_mapping(
-  gasket_dev, mapping.interrupt, mapping.event_fd,
+  filp_data, mapping.interrupt, mapping.event_fd,
   mapping.bar_index, mapping.reg_offset);
  mutex_unlock(&gasket_dev->mutex);
 
@@ -220,15 +223,16 @@ static int gasket_register_interrupt(struct gasket_dev *gasket_dev, ulong arg)
 
 
 
-static int gasket_unregister_interrupt(struct gasket_dev *gasket_dev,
-     int interrupt)
+static int gasket_unregister_interrupt(
+ struct gasket_filp_data *filp_data, int interrupt)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  int ret;
 
  trace_gasket_ioctl_integer_data(interrupt);
 
  mutex_lock(&gasket_dev->mutex);
- ret = gasket_interrupt_unregister_mapping(gasket_dev, interrupt);
+ ret = gasket_interrupt_unregister_mapping(filp_data, interrupt);
  mutex_unlock(&gasket_dev->mutex);
  return ret;
 }
@@ -238,7 +242,8 @@ static int gasket_unregister_interrupt(struct gasket_dev *gasket_dev,
 
 
 
-static int gasket_set_event_fd(struct gasket_dev *gasket_dev, ulong arg)
+static int gasket_set_event_fd(
+ struct gasket_filp_data *filp_data, ulong arg)
 {
  struct gasket_interrupt_eventfd die;
 
@@ -250,7 +255,7 @@ static int gasket_set_event_fd(struct gasket_dev *gasket_dev, ulong arg)
  trace_gasket_ioctl_eventfd_data(die.interrupt, die.event_fd);
 
  return legacy_gasket_interrupt_set_eventfd(
-  gasket_dev, die.interrupt, die.event_fd);
+  filp_data, die.interrupt, die.event_fd);
 }
 
 
@@ -356,8 +361,9 @@ static int gasket_partition_page_table(struct gasket_dev *gasket_dev, ulong arg)
 
 
 
-static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg)
+static int gasket_map_buffers(struct gasket_filp_data *filp_data, ulong arg)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct gasket_page_table_ioctl ibuf;
 
  if (copy_from_user(&ibuf, (void __user *)arg,
@@ -372,7 +378,7 @@ static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg)
 
  if (gasket_dev->driver_desc->page_table_permissions_cb) {
   int retval = gasket_dev->driver_desc->page_table_permissions_cb(
-   gasket_dev, ibuf.page_table_index);
+   filp_data, ibuf.page_table_index);
   if (retval < 0)
    return retval;
  }
@@ -387,8 +393,9 @@ static int gasket_map_buffers(struct gasket_dev *gasket_dev, ulong arg)
 
 
 
-static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg)
+static int gasket_unmap_buffers(struct gasket_filp_data *filp_data, ulong arg)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct gasket_page_table_ioctl ibuf;
 
  if (copy_from_user(&ibuf, (void __user *)arg,
@@ -403,7 +410,7 @@ static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg)
 
  if (gasket_dev->driver_desc->page_table_permissions_cb) {
   int retval = gasket_dev->driver_desc->page_table_permissions_cb(
-   gasket_dev, ibuf.page_table_index);
+   filp_data, ibuf.page_table_index);
   if (retval < 0)
    return retval;
  }
@@ -412,9 +419,10 @@ static int gasket_unmap_buffers(struct gasket_dev *gasket_dev, ulong arg)
   gasket_dev->page_table[ibuf.page_table_index],
   ibuf.device_address, ibuf.size);
 }
-# 434 "./drivers/gasket/gasket_ioctl.c"
-static int gasket_map_dma_buf(struct gasket_dev *gasket_dev, ulong arg)
+# 441 "./drivers/gasket/gasket_ioctl.c"
+static int gasket_map_dma_buf(struct gasket_filp_data *filp_data, ulong arg)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct gasket_page_table_dmabuf_ioctl ibuf;
 
  if (copy_from_user(&ibuf, (void __user *)arg,
@@ -426,7 +434,7 @@ static int gasket_map_dma_buf(struct gasket_dev *gasket_dev, ulong arg)
 
  if (gasket_dev->driver_desc->page_table_permissions_cb) {
   int retval = gasket_dev->driver_desc->page_table_permissions_cb(
-   gasket_dev, ibuf.page_table_index);
+   filp_data, ibuf.page_table_index);
   if (retval < 0)
    return retval;
  }
