@@ -1,7 +1,13 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
-# 7 "./drivers/gasket/gasket_core.h"
+# 1 "./drivers/gasket/gasket_core.h"
+
+
+
+
+
+
 #ifndef __GASKET_CORE_H__
 #define __GASKET_CORE_H__ 
 
@@ -21,12 +27,13 @@
 #include "gasket_constants.h"
 
 struct gasket_dev;
-# 35 "./drivers/gasket/gasket_core.h"
+struct gasket_filp_data;
+# 36 "./drivers/gasket/gasket_core.h"
 struct gasket_num_name {
  uint snn_num;
  const char *snn_name;
 };
-# 50 "./drivers/gasket/gasket_core.h"
+# 51 "./drivers/gasket/gasket_core.h"
 enum legacy_gasket_interrupt_packing {
  PACK_0 = 0,
  PACK_1 = 1,
@@ -111,28 +118,28 @@ struct gasket_page_table_config {
  int bar_index;
 
 
- int base_reg;
+ u64 base_reg;
 
 
 
 
 
 
- int extended_reg;
+ u64 extended_reg;
 
 
  int extended_bit;
-# 161 "./drivers/gasket/gasket_core.h"
+# 162 "./drivers/gasket/gasket_core.h"
  int (*map_buffer_cb)(struct gasket_dev *dev, int page_table_id,
   ulong dma_addr, ulong dev_addr, uint num_pages);
-# 178 "./drivers/gasket/gasket_core.h"
+# 179 "./drivers/gasket/gasket_core.h"
  int (*unmap_buffer_cb)(struct gasket_dev *dev, int page_table_id,
   ulong dev_addr, uint num_pages);
-# 189 "./drivers/gasket/gasket_core.h"
+# 190 "./drivers/gasket/gasket_core.h"
  bool (*owns_page_table_cb)(
   struct gasket_dev *gasket_dev, int page_table_id);
 };
-# 200 "./drivers/gasket/gasket_core.h"
+# 201 "./drivers/gasket/gasket_core.h"
 struct gasket_mappable_region {
  u64 start;
  u64 length_bytes;
@@ -141,7 +148,7 @@ struct gasket_mappable_region {
 
 
 struct gasket_bar_desc {
-# 217 "./drivers/gasket/gasket_core.h"
+# 218 "./drivers/gasket/gasket_core.h"
  u64 size;
 
 
@@ -164,7 +171,7 @@ enum gasket_mapping_options { GASKET_NOMAP = 0 };
  { \
   0, GASKET_NOMAP, 0, 0, NULL \
  }
-# 251 "./drivers/gasket/gasket_core.h"
+# 252 "./drivers/gasket/gasket_core.h"
 enum gasket_iommu_mappings {
 
  GASKET_IOMMU_ANY = 0,
@@ -315,7 +322,7 @@ struct gasket_driver_desc {
 
 
  const struct legacy_gasket_interrupt_desc *legacy_interrupts;
-# 411 "./drivers/gasket/gasket_core.h"
+# 412 "./drivers/gasket/gasket_core.h"
  int legacy_interrupt_pack_width;
 
 
@@ -324,51 +331,54 @@ struct gasket_driver_desc {
 
 
  enum gasket_iommu_mappings iommu_mappings;
-# 431 "./drivers/gasket/gasket_core.h"
+# 432 "./drivers/gasket/gasket_core.h"
  int (*add_dev_cb)(struct gasket_dev *dev);
-# 442 "./drivers/gasket/gasket_core.h"
+# 443 "./drivers/gasket/gasket_core.h"
  int (*remove_dev_cb)(struct gasket_dev *dev);
-# 452 "./drivers/gasket/gasket_core.h"
- int (*device_open_cb)(struct gasket_dev *dev, struct file *file);
-# 463 "./drivers/gasket/gasket_core.h"
+# 454 "./drivers/gasket/gasket_core.h"
+ int (*device_open_cb)(
+  struct gasket_filp_data *filp_data, struct file *file);
+# 467 "./drivers/gasket/gasket_core.h"
  int (*device_release_cb)(
-  struct gasket_dev *gasket_dev, struct file *file);
-# 477 "./drivers/gasket/gasket_core.h"
- int (*device_close_cb)(struct gasket_dev *dev);
-# 491 "./drivers/gasket/gasket_core.h"
+  struct gasket_filp_data *filp_data, struct file *file);
+# 482 "./drivers/gasket/gasket_core.h"
+ int (*device_close_cb)(
+  struct gasket_filp_data *filp_data, struct file *file);
+# 497 "./drivers/gasket/gasket_core.h"
  int (*enable_dev_cb)(struct gasket_dev *dev);
-# 500 "./drivers/gasket/gasket_core.h"
+# 506 "./drivers/gasket/gasket_core.h"
  int (*disable_dev_cb)(struct gasket_dev *dev);
-# 509 "./drivers/gasket/gasket_core.h"
+# 515 "./drivers/gasket/gasket_core.h"
  int (*sysfs_setup_cb)(struct gasket_dev *dev);
-# 518 "./drivers/gasket/gasket_core.h"
+# 524 "./drivers/gasket/gasket_core.h"
  int (*sysfs_cleanup_cb)(struct gasket_dev *dev);
-# 533 "./drivers/gasket/gasket_core.h"
+# 539 "./drivers/gasket/gasket_core.h"
  int (*get_mappable_regions_cb)(
-  struct gasket_dev *gasket_dev, int bar_index,
+  struct gasket_filp_data *filp_data, int bar_index,
   struct gasket_mappable_region **mappable_regions,
   int *num_mappable_regions);
-# 552 "./drivers/gasket/gasket_core.h"
+# 558 "./drivers/gasket/gasket_core.h"
  int (*ioctl_permissions_cb)(struct file *filp, uint cmd);
-# 564 "./drivers/gasket/gasket_core.h"
- int (*interrupt_permissions_cb)(struct gasket_dev *dev, int interrupt);
-# 576 "./drivers/gasket/gasket_core.h"
+# 570 "./drivers/gasket/gasket_core.h"
+ int (*interrupt_permissions_cb)(
+  struct gasket_filp_data *filp_data, int interrupt);
+# 583 "./drivers/gasket/gasket_core.h"
  int (*page_table_permissions_cb)(
-  struct gasket_dev *dev, int page_table);
-# 590 "./drivers/gasket/gasket_core.h"
+  struct gasket_filp_data *filp_data, int page_table);
+# 597 "./drivers/gasket/gasket_core.h"
  long (*ioctl_handler_cb)(struct file *filp, uint cmd, ulong arg);
-# 600 "./drivers/gasket/gasket_core.h"
+# 607 "./drivers/gasket/gasket_core.h"
  enum gasket_status (*device_status_cb)(struct gasket_dev *dev);
-# 609 "./drivers/gasket/gasket_core.h"
+# 616 "./drivers/gasket/gasket_core.h"
  int (*hardware_revision_cb)(struct gasket_dev *dev);
-# 622 "./drivers/gasket/gasket_core.h"
+# 629 "./drivers/gasket/gasket_core.h"
  int (*firmware_version_cb)(struct gasket_dev *dev,
        unsigned int *major, unsigned int *minor,
        unsigned int *point, unsigned int *subpoint);
-# 639 "./drivers/gasket/gasket_core.h"
+# 646 "./drivers/gasket/gasket_core.h"
  int (*device_reset_cb)(struct gasket_dev *dev, uint reset_type);
 };
-# 651 "./drivers/gasket/gasket_core.h"
+# 658 "./drivers/gasket/gasket_core.h"
 struct gasket_device_desc {
 
  const char *name;
@@ -409,7 +419,7 @@ struct gasket_filp_data {
 
  void *driver_private;
 };
-# 703 "./drivers/gasket/gasket_core.h"
+# 710 "./drivers/gasket/gasket_core.h"
 int __gasket_register_device(const struct gasket_device_desc *device_desc,
         const char *device_name);
 
@@ -421,9 +431,9 @@ int __gasket_register_device(const struct gasket_device_desc *device_desc,
 
 #define gasket_register_device(device_desc) \
  __gasket_register_device(device_desc, KBUILD_MODNAME)
-# 722 "./drivers/gasket/gasket_core.h"
+# 729 "./drivers/gasket/gasket_core.h"
 void gasket_unregister_device(const struct gasket_device_desc *device_desc);
-# 742 "./drivers/gasket/gasket_core.h"
+# 749 "./drivers/gasket/gasket_core.h"
 int gasket_clone_create(struct gasket_dev *parent, struct gasket_dev *clone);
 
 
@@ -431,7 +441,7 @@ int gasket_clone_create(struct gasket_dev *parent, struct gasket_dev *clone);
 
 
 int gasket_clone_cleanup(struct gasket_dev *clone);
-# 760 "./drivers/gasket/gasket_core.h"
+# 767 "./drivers/gasket/gasket_core.h"
 int gasket_reset(struct gasket_dev *gasket_dev, uint reset_type);
 int gasket_reset_nolock(struct gasket_dev *gasket_dev, uint reset_type);
 

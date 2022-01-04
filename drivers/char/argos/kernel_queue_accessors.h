@@ -1,7 +1,9 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
-# 3 "./drivers/char/argos/kernel_queue_accessors.h"
+# 1 "./drivers/char/argos/kernel_queue_accessors.h"
+
+
 #ifndef _DRIVERS_CHAR_ARGOS_KERNEL_QUEUE_ACCESSORS_H_
 #define _DRIVERS_CHAR_ARGOS_KERNEL_QUEUE_ACCESSORS_H_ 
 

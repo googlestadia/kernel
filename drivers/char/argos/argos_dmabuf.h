@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
 # 1 "./drivers/char/argos/argos_dmabuf.h"
 #ifndef __ARGOS_DMABUF_H__
@@ -11,7 +11,7 @@
 struct argos_dma_buf_object;
 # 17 "./drivers/char/argos/argos_dmabuf.h"
 struct dma_buf *argos_create_dma_buf(
- struct argos_common_device_data *device_data,
+ struct argos_filp_data *filp_data,
  struct argos_direct_mapping_dma_buf_request *request);
 
 

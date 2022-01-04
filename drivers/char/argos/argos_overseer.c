@@ -1,7 +1,8 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
-# 2 "./drivers/char/argos/argos_overseer.c"
+# 1 "./drivers/char/argos/argos_overseer.c"
+
 #include <linux/accel.h>
 #include <linux/fs.h>
 #include <linux/google/argos.h>
@@ -364,8 +365,9 @@ exit:
 }
 
 int argos_overseer_gasket_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd)
+ struct argos_filp_data *filp_data, uint cmd)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
 
  switch (cmd) {
@@ -392,8 +394,9 @@ int argos_overseer_gasket_ioctl_has_permission(
 EXPORT_SYMBOL(argos_overseer_gasket_ioctl_has_permission);
 
 int argos_subcontainer_gasket_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd)
+ struct argos_filp_data *filp_data, uint cmd)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
  struct argos_common_device_data *parent_device_data;
  bool owns_all;
@@ -451,8 +454,9 @@ int argos_subcontainer_gasket_ioctl_has_permission(
 EXPORT_SYMBOL(argos_subcontainer_gasket_ioctl_has_permission);
 
 int argos_overseer_argos_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd)
+ struct argos_filp_data *filp_data, uint cmd)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
 
  switch (cmd) {
@@ -480,8 +484,9 @@ int argos_overseer_argos_ioctl_has_permission(
 EXPORT_SYMBOL(argos_overseer_argos_ioctl_has_permission);
 
 int argos_subcontainer_argos_ioctl_has_permission(
- struct argos_common_device_data *device_data, uint cmd)
+ struct argos_filp_data *filp_data, uint cmd)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
 
  switch (cmd) {
@@ -537,7 +542,7 @@ bool argos_overseer_subcontainer_owns_all_parent_resources(
  return true;
 }
 EXPORT_SYMBOL(argos_overseer_subcontainer_owns_all_parent_resources);
-# 585 "./drivers/char/argos/argos_overseer.c"
+# 589 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_subcontainers(
  struct argos_common_device_data *device_data, char *buf)
 {
@@ -599,7 +604,7 @@ static ssize_t sysfs_show_subcontainers(
 
  return bytes_written;
 }
-# 656 "./drivers/char/argos/argos_overseer.c"
+# 660 "./drivers/char/argos/argos_overseer.c"
 static ssize_t sysfs_show_mem_alloc(
   struct argos_common_device_data *device_data, int mem_alloc,
   char *buf)
@@ -663,8 +668,9 @@ static ssize_t sysfs_show(struct device *device, struct device_attribute *attr,
 }
 
 int argos_overseer_ioctl_dispatch(
- struct argos_common_device_data *device_data, uint cmd, ulong arg)
+ struct argos_filp_data *filp_data, uint cmd, ulong arg)
 {
+ struct argos_common_device_data *device_data = filp_data->device_data;
  struct gasket_dev *gasket_dev = device_data->gasket_dev;
 
  switch (cmd) {

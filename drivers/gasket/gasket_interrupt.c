@@ -1,7 +1,8 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
-# 2 "./drivers/gasket/gasket_interrupt.c"
+# 1 "./drivers/gasket/gasket_interrupt.c"
+
 #include "gasket_interrupt.h"
 
 #include <linux/interrupt.h>
@@ -383,17 +384,18 @@ fail_configure:
  gasket_interrupt_msix_teardown(gasket_dev->interrupt_data);
  return ret;
 }
-# 391 "./drivers/gasket/gasket_interrupt.c"
+# 395 "./drivers/gasket/gasket_interrupt.c"
 static int gasket_interrupt_clear_eventfd(
- struct gasket_dev *gasket_dev, int interrupt)
+ struct gasket_dev *gasket_dev, struct gasket_filp_data *filp_data,
+ int interrupt)
 {
  struct gasket_interrupt_data *interrupt_data =
   gasket_dev->interrupt_data;
  ulong flags;
 
- if (gasket_dev->driver_desc->interrupt_permissions_cb) {
+ if (filp_data && gasket_dev->driver_desc->interrupt_permissions_cb) {
   int retval = gasket_dev->driver_desc->interrupt_permissions_cb(
-   gasket_dev, interrupt);
+   filp_data, interrupt);
   if (retval < 0)
    return retval;
  }
@@ -439,7 +441,7 @@ static void gasket_interrupt_clear_all_eventfds(struct gasket_dev *gasket_dev)
  int i;
 
  for (i = 0; i < interrupt_data->num_msix_interrupts; i++)
-  gasket_interrupt_clear_eventfd(gasket_dev, i);
+  gasket_interrupt_clear_eventfd(gasket_dev, NULL, i);
 }
 
 
@@ -495,6 +497,7 @@ int gasket_interrupt_reinit(struct gasket_dev *gasket_dev)
 
  return ret;
 }
+EXPORT_SYMBOL(gasket_interrupt_reinit);
 
 
 int gasket_interrupt_reset_counts(struct gasket_dev *gasket_dev)
@@ -705,10 +708,11 @@ int gasket_interrupt_system_status(struct gasket_dev *gasket_dev)
 
  return GASKET_STATUS_ALIVE;
 }
-
+# 727 "./drivers/gasket/gasket_interrupt.c"
 static int gasket_interrupt_set_eventfd(
- struct gasket_dev *gasket_dev, int interrupt, int event_fd)
+ struct gasket_filp_data *filp_data, int interrupt, int event_fd)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct gasket_interrupt_data *interrupt_data =
   gasket_dev->interrupt_data;
  struct eventfd_ctx *ctx;
@@ -716,7 +720,7 @@ static int gasket_interrupt_set_eventfd(
 
  if (gasket_dev->driver_desc->interrupt_permissions_cb) {
   int retval = gasket_dev->driver_desc->interrupt_permissions_cb(
-   gasket_dev, interrupt);
+   filp_data, interrupt);
   if (retval < 0)
    return retval;
  }
@@ -736,8 +740,9 @@ static int gasket_interrupt_set_eventfd(
 }
 
 int legacy_gasket_interrupt_set_eventfd(
- struct gasket_dev *gasket_dev, int interrupt, int event_fd)
+ struct gasket_filp_data *filp_data, int interrupt, int event_fd)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct gasket_interrupt_data *interrupt_data =
   gasket_dev->interrupt_data;
 
@@ -753,12 +758,13 @@ int legacy_gasket_interrupt_set_eventfd(
   return -EINVAL;
  }
 
- return gasket_interrupt_set_eventfd(gasket_dev, interrupt, event_fd);
+ return gasket_interrupt_set_eventfd(filp_data, interrupt, event_fd);
 }
 
 int legacy_gasket_interrupt_clear_eventfd(
- struct gasket_dev *gasket_dev, int interrupt)
+ struct gasket_filp_data *filp_data, int interrupt)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct gasket_interrupt_data *interrupt_data =
   gasket_dev->interrupt_data;
 
@@ -774,7 +780,7 @@ int legacy_gasket_interrupt_clear_eventfd(
   return -EINVAL;
  }
 
- return gasket_interrupt_clear_eventfd(gasket_dev, interrupt);
+ return gasket_interrupt_clear_eventfd(gasket_dev, filp_data, interrupt);
 }
 
 struct eventfd_ctx **gasket_interrupt_get_eventfd_ctxs(
@@ -873,9 +879,11 @@ static irqreturn_t gasket_interrupt_handler(int irq, void *dev_id)
  return IRQ_HANDLED;
 }
 
-int gasket_interrupt_register_mapping(struct gasket_dev *gasket_dev,
+int gasket_interrupt_register_mapping(
+ struct gasket_filp_data *filp_data,
  int interrupt, int event_fd, int bar_index, u64 reg)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct gasket_interrupt_data *interrupt_data =
   gasket_dev->interrupt_data;
  const struct gasket_interrupt_desc *interrupt_desc;
@@ -930,7 +938,7 @@ int gasket_interrupt_register_mapping(struct gasket_dev *gasket_dev,
   return -EINVAL;
  }
 
- ret = gasket_interrupt_set_eventfd(gasket_dev, interrupt, event_fd);
+ ret = gasket_interrupt_set_eventfd(filp_data, interrupt, event_fd);
  if (ret) {
   gasket_log_error(gasket_dev,
    "Error when setting eventfd %d for interrupt %d: %d",
@@ -946,7 +954,7 @@ int gasket_interrupt_register_mapping(struct gasket_dev *gasket_dev,
   goto fail_interrupt_configure;
  }
 
- gasket_dev_write_64(gasket_dev, interrupt, bar_index, reg);
+ gasket_dev_write_32(gasket_dev, interrupt, bar_index, reg);
 
  interrupt_data->mapped_registers[interrupt] = register_index;
  interrupt_data->configured_registers[register_index] = true;
@@ -954,13 +962,14 @@ int gasket_interrupt_register_mapping(struct gasket_dev *gasket_dev,
  return 0;
 
 fail_interrupt_configure:
- gasket_interrupt_clear_eventfd(gasket_dev, interrupt);
+ gasket_interrupt_clear_eventfd(gasket_dev, filp_data, interrupt);
  return ret;
 }
 
-int gasket_interrupt_unregister_mapping(struct gasket_dev *gasket_dev,
- int interrupt)
+int gasket_interrupt_unregister_mapping(
+ struct gasket_filp_data *filp_data, int interrupt)
 {
+ struct gasket_dev *gasket_dev = filp_data->gasket_dev;
  struct gasket_interrupt_data *interrupt_data;
  int register_index;
 
@@ -984,5 +993,5 @@ int gasket_interrupt_unregister_mapping(struct gasket_dev *gasket_dev,
 
  gasket_interrupt_free_irq(interrupt_data, interrupt);
 
- return gasket_interrupt_clear_eventfd(gasket_dev, interrupt);
+ return gasket_interrupt_clear_eventfd(gasket_dev, filp_data, interrupt);
 }

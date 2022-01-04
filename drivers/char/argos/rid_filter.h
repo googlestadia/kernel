@@ -1,7 +1,8 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
-# 2 "./drivers/char/argos/rid_filter.h"
+# 1 "./drivers/char/argos/rid_filter.h"
+
 #ifndef __RID_FILTER_H__
 #define __RID_FILTER_H__ 
 

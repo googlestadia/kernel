@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2021 Google LLC.
+ * Copyright (C) 2022 Google LLC.
  */
+# 1 "./include/trace/events/vargos_driver.h"
 # 9 "./include/trace/events/vargos_driver.h"
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM vargos_driver
