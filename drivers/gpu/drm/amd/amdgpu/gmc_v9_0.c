@@ -21,7 +21,6 @@
  *
  */
 
-#include "linux/pci-p2pdma.h"
 #include <linux/firmware.h>
 #include <linux/pci.h>
 
@@ -1035,7 +1034,6 @@ static int gmc_v9_0_mc_init(struct amdgpu_device *adev)
 	}
 
 	gmc_v9_0_vram_gtt_location(adev, &adev->gmc);
-        pci_p2pdma_add_resource(adev->pdev, 0, adev->gmc.visible_vram_size, 0);
 
 	return 0;
 }
