@@ -352,7 +352,7 @@ void *memremap_pages(struct dev_pagemap *pgmap, int nid)
 	case MEMORY_DEVICE_GENERIC:
 		break;
 	case MEMORY_DEVICE_PCI_P2PDMA:
-		params.pgprot = pgprot_noncached(params.pgprot);
+		params.pgprot = pgprot_writecombine(params.pgprot);
 		break;
 	default:
 		WARN(1, "Invalid pgmap type %d\n", pgmap->type);
