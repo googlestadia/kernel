@@ -203,6 +203,37 @@ function build_amdgpu_external_module() {
   popd
 }
 
+function build_nvidia_external_module() {
+  readonly NVIDIA_DRIVER_DIR="${KBUILD_OUTPUT}/nvidia-drivers"
+  rm -rf "${NVIDIA_DRIVER_DIR}"
+  mkdir -p "${NVIDIA_DRIVER_DIR}"
+
+  tar -xf "${DOCKER_GFILE_DIR}/nvidia-drivers.tar.gz" \
+    -C "${NVIDIA_DRIVER_DIR}"/
+
+  local -r ext_kbuild="${KBUILD_OUTPUT}"/nvidia-kernel
+  rm -rf "${ext_kbuild}"
+  mkdir -p "${ext_kbuild}"
+
+  # Copy kernel module source files.
+  rsync -a ${NVIDIA_DRIVER_DIR}/kernel/ ${ext_kbuild}
+
+  pushd "${SRC_DIR}"
+  make -j "$(nproc)" \
+    NV_KERNEL_SOURCES="${SRC_DIR}" \
+    NV_KERNEL_OUTPUT="${KBUILD_OUTPUT}" \
+    NV_KERNEL_MODULES="nvidia nvidia-uvm nvidia-modeset nvidia-drm" \
+    M="${ext_kbuild}" "${MAKE_ARGS[@]}"
+  local -r mod_install_usr_dir="${MOD_INSTALL_DIR}/usr"
+  ls "${mod_install_usr_dir}/lib/modules/${KERNELRELEASE}"
+  make -j "$(nproc)" \
+    M="${ext_kbuild}" \
+    modules_install "${MAKE_ARGS[@]}" \
+    INSTALL_MOD_PATH="${mod_install_usr_dir}" \
+    INSTALL_MOD_STRIP=1
+  popd
+}
+
 function build_kernel_rootfs() {
   # LINT.IfChange
   readonly KROOTFS="${INITRAMFS_INSTALL_DIR}/krootfs.squashfs"
@@ -297,6 +328,69 @@ pkgdef mpm = {
 EOL
 }
 
+function build_nvidia_modules_disk() {
+  readonly NVIDIA_DISK_NAME="nvidia-disk-${NVIDIA_DRIVER_VERSION}-${KERNELRELEASE}-${ARCH}.squashfs"
+  readonly NVIDIA_DISK="${KBUILD_OUTPUT}/${NVIDIA_DISK_NAME}"
+
+  local -r nvidiafs_assets="${SRC_DIR}/stadia/nvrootfs"
+  local -r nvidiafs_install_dir="${KBUILD_OUTPUT}/nvidiafs-install"
+  local -r nvidiafs_lib_dir="${nvidiafs_install_dir}/usr/lib/x86_64-linux-gnu"
+  rm -rf "${NVIDIA_DISK}" "${nvidiafs_install_dir}"
+  mkdir "${nvidiafs_install_dir}"
+  mkdir "${nvidiafs_install_dir}/etc"
+  mkdir -p "${nvidiafs_install_dir}/usr/lib/modules/${KERNELRELEASE}/extra/nvidia"
+  mkdir -p "${nvidiafs_lib_dir}"
+
+  # Copy manifest to /etc
+  install -D -m "u=rw,go=r,a-s" "${NVIDIA_DRIVER_DIR}/nvidia_icd.json" \
+  "${nvidiafs_install_dir}/etc/vulkan/icd.d/nvidia_icd.json"
+
+  # Copy libraries to /usr/lib/x86_64-linux-gnu
+  install -D "${NVIDIA_DRIVER_DIR}/lib"* "${nvidiafs_lib_dir}"
+
+  # Create symlinks for all the libraries
+  # - Always create a <name>.so link for each library
+  # - For libraries that contain the NVIDIA_DRIVER_VERSION number
+  # create a symlink that ends in <name>.so.1
+  # - For the rest of the libraries with the pattern .so.<major>.<minor>.<patch>
+  # create a symlink <name>.so.<major> if the `major` > 0.
+  pushd ${nvidiafs_lib_dir}
+    for lib in $(ls lib*); do
+      local name=$(basename -- ${lib})
+      local basename=${name%%.*}
+
+      ln -s ${lib} ${basename}.so
+
+      if [[ "$name" =~ .*${NVIDIA_DRIVER_VERSION}.* ]]; then
+        ln -s ${lib} ${basename}.so.1
+      else
+        local version=$(echo ${name} | cut -d "." -f 3)
+        if [[ version -gt 0 ]]; then
+          ln -s ${lib} ${basename}.so.${version}
+        fi
+      fi
+    done
+  popd
+
+  rsync -a \
+    "${nvidiafs_assets}"/ \
+    "${nvidiafs_install_dir}"/
+
+  rsync -a \
+    "${MOD_INSTALL_DIR}/usr/lib/modules/${KERNELRELEASE}/extra"/ \
+    "${nvidiafs_install_dir}/usr/lib/modules/${KERNELRELEASE}/extra/nvidia"/
+
+  # chown everything under the install dir to root:root, then refine as needed.
+  # Do not follow symlinks (-h).
+  chown -hR 0:0 "${nvidiafs_install_dir}"
+
+  chmod 00755 "${nvidiafs_install_dir}"
+
+  find "${nvidiafs_install_dir}" -type d -exec chmod 00755 {} \;
+  mksquashfs "${nvidiafs_install_dir}" "${NVIDIA_DISK}" \
+    -comp xz -no-exports -no-progress -no-recovery -Xbcj x86
+}
+
 function build_perf() {
   pushd "${SRC_DIR}"/tools/perf
   local -r perf_objs="${KBUILD_OUTPUT}"/tools/perf
@@ -334,7 +428,7 @@ function build_perf_tar_xz() {
     "$(dirname "${PERF_TAR_XZ}")/perf-latest.tar.xz"
 }
 
-function stage_artifacts() {
+function stage_kernel_artifacts() {
   readonly artifacts_dir="${DOCKER_ARTIFACTS_DIR}"
   readonly mpm_dir="${artifacts_dir}/mpm"
 
@@ -354,7 +448,16 @@ function stage_artifacts() {
   cp -a "${BOOT_DISK}" "${kernel_disk_mpm_dir}/disk.raw"
 }
 
-function build() {
+function stage_nvidia_artifacts() {
+    # See https://g3doc.corp.google.com/cloud/network/edge/g3doc/vm_disk.md#creating-an-mpm-disk-package
+  readonly artifacts_dir="${DOCKER_ARTIFACTS_DIR}"
+  readonly nvidia_disk_dir="${artifacts_dir}/disk"
+  mkdir -p "${nvidia_disk_dir}"
+  cp -a "${NVIDIA_DISK}" "${artifacts_dir}/"
+  cp -a "${NVIDIA_DISK}" "${nvidia_disk_dir}/disk.raw"
+}
+
+function build_kernel_disk() {
   check_env
   set_LOCALVERSION_from_buildstamp
   download_initramfs_artifacts
@@ -371,7 +474,29 @@ function build() {
   build_linux_tar_xz
   build_perf_tar_xz
   build_boot_disk
-  stage_artifacts
+  stage_kernel_artifacts
+}
+
+function build_nvidia_disk() {
+  check_env
+  set_LOCALVERSION_from_buildstamp
+  create_kbuild_output
+  finalize_config
+  build_bzimage_and_headers
+  build_modules
+  build_nvidia_external_module
+  build_nvidia_modules_disk
+  stage_nvidia_artifacts
+}
+
+function build() {
+  if [[ ! -z ${NVIDIA_DRIVER_VERSION} ]]; then
+    echo "Building NVIDIA userspace modules and kernel modules disk"
+    build_nvidia_disk
+  else
+    echo "Building kernel disk with amdgpu modules"
+    build_kernel_disk
+  fi
 }
 
 build

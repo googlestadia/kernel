@@ -45,16 +45,24 @@ else
   exit 1
 fi
 
-# Download the amdgpu firmware. Set "AMDGPU_FIRMWARE_URL" in the environment to
-# override the default package.
-readonly DEFAULT_AMDGPU_FIRMWARE_URL="https://storage.googleapis.com/stadia_kernel_public/amdgpu-firmware/amdgpu-firmware-19.50.tar.gz"
-readonly DEFAULT_AMDGPU_FIRMWARE_SHA256="89785ad581781bbdb98902ab82bce95bf12a861b81b84731020d7ba63a1a1533"
-if [[ -z "${AMDGPU_FIRMWARE_URL}" ]]; then
-  AMDGPU_FIRMWARE_URL="${DEFAULT_AMDGPU_FIRMWARE_URL}"
-  AMDGPU_FIRMWARE_SHA256="${DEFAULT_AMDGPU_FIRMWARE_SHA256}"
+if [[ ! -z "${NVIDIA_DRIVER_PATH}" ]]; then
+  echo "Copying NVIDIA driver package from ${NVIDIA_DRIVER_PATH}."
+  cp "${NVIDIA_DRIVER_PATH}" "${BUILD_DIR}/gfile/nvidia-drivers.tar.gz"
+
+  readonly nvidia_filename=$(basename -- ${NVIDIA_DRIVER_PATH})
+  readonly NVIDIA_DRIVER_VERSION=$(echo "$nvidia_filename" | grep -Eo '[0-9]+[.]+[0-9]+')
+else
+  # Download the amdgpu firmware. Set "AMDGPU_FIRMWARE_URL" in the environment to
+  # override the default package.
+  readonly DEFAULT_AMDGPU_FIRMWARE_URL="https://storage.googleapis.com/stadia_kernel_public/amdgpu-firmware/amdgpu-firmware-19.50.tar.gz"
+  readonly DEFAULT_AMDGPU_FIRMWARE_SHA256="89785ad581781bbdb98902ab82bce95bf12a861b81b84731020d7ba63a1a1533"
+  if [[ -z "${AMDGPU_FIRMWARE_URL}" ]]; then
+    AMDGPU_FIRMWARE_URL="${DEFAULT_AMDGPU_FIRMWARE_URL}"
+    AMDGPU_FIRMWARE_SHA256="${DEFAULT_AMDGPU_FIRMWARE_SHA256}"
+  fi
+  download_wget "${AMDGPU_FIRMWARE_URL}" \
+    "${BUILD_DIR}/gfile/amdgpu-firmware.tar.gz" "${AMDGPU_FIRMWARE_SHA256}"
 fi
-download_wget "${AMDGPU_FIRMWARE_URL}" \
-  "${BUILD_DIR}/gfile/amdgpu-firmware.tar.gz" "${AMDGPU_FIRMWARE_SHA256}"
 
 ${ENGINE_BIN} pull gcr.io/stadia-open-source/kernel/debian9:latest
 ${ENGINE_BIN} run \
@@ -70,6 +78,7 @@ ${ENGINE_BIN} run \
   --env "DOCKER_GFILE_DIR=/workspace/gfile" \
   --env "DOCKER_TMP_DIR=/workspace/tmp" \
   --env "DOCKER_SRC_DIR=/workspace/src/kernel" \
+  --env "NVIDIA_DRIVER_VERSION=${NVIDIA_DRIVER_VERSION}" \
   --net=host \
   --privileged=true \
   --tty \
