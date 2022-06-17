@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +18,9 @@ set -ex
 readonly SCRIPT_DIR=$(dirname "$(readlink -f "${0}")")
 readonly PRESUBMIT_ARTIFACTS="${KOKORO_ROOT}/presubmit"
 mkdir ${PRESUBMIT_ARTIFACTS}
+
+source ${SCRIPT_DIR}/check_commit_tags.sh "${KOKORO_ARTIFACTS_DIR}/git/gamelet_kernel/.git"
+#source ${SCRIPT_DIR}/check_commit_tags.sh ".git"
 
 # move mpm to presubmit artifacts
 mv "${KOKORO_ARTIFACTS_DIR}/mpm" "${PRESUBMIT_ARTIFACTS}/"
