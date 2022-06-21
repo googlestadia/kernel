@@ -55,7 +55,18 @@ label="presubmit_${KOKORO_GERRIT_REVISION}"
   --label="${label}" \
   --service_key="${PRESUBMIT_ARTIFACTS}/71274_kokoro_service_key_json"
 
-${PRESUBMIT_ARTIFACTS}/mpm/tools/guitar_presubmit \
-  --service_key="${PRESUBMIT_ARTIFACTS}/71274_kokoro_service_key_json" \
-  --env_params=version_kernel="${label}" \
-  --test_type=LIBDRM --wait
+RUN_FULL_FOUND=$(check_tag "Run_Full_Presubmit")
+
+if [ -z "${RUN_FULL_FOUND}" ]; then
+  echo "Running libdrm presubmit"
+  ${PRESUBMIT_ARTIFACTS}/mpm/tools/guitar_presubmit \
+    --service_key="${PRESUBMIT_ARTIFACTS}/71274_kokoro_service_key_json" \
+    --env_params=version_kernel="${label}" \
+    --test_type=LIBDRM --wait
+else
+  echo "Running full presubmit tests workflow"
+  ${PRESUBMIT_ARTIFACTS}/mpm/tools/guitar_presubmit \
+    --service_key="${PRESUBMIT_ARTIFACTS}/71274_kokoro_service_key_json" \
+    --env_params=version_kernel="${label}" \
+    --test_type=GUEST_KERNEL_LARGE --wait
+fi
