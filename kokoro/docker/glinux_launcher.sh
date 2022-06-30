@@ -81,7 +81,7 @@ ${ENGINE_BIN} run \
   --env "NVIDIA_DRIVER_VERSION=${NVIDIA_DRIVER_VERSION}" \
   --net=host \
   --privileged=true \
-  --tty \
+  --tty -i \
   gcr.io/stadia-open-source/kernel/debian9:latest \
   /container_tools/fix_permissions.sh --user "$(id -u):$(id -g)" \
   -- \

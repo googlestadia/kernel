@@ -19,7 +19,7 @@ readonly SCRIPT_DIR=$(dirname "$(readlink -f "${0}")")
 readonly PRESUBMIT_ARTIFACTS="${KOKORO_ROOT}/presubmit"
 mkdir ${PRESUBMIT_ARTIFACTS}
 
-source ${SCRIPT_DIR}/check_commit_tags.sh "${KOKORO_ARTIFACTS_DIR}/git/gamelet_kernel/.git"
+source ${SCRIPT_DIR}/check_commit_tags.sh "${KOKORO_ARTIFACTS_DIR}"
 #source ${SCRIPT_DIR}/check_commit_tags.sh ".git"
 
 # move mpm to presubmit artifacts
