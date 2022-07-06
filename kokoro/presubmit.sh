@@ -70,3 +70,9 @@ else
     --env_params=version_kernel="${label}" \
     --test_type=GUEST_KERNEL_LARGE --wait
 fi
+
+${PRESUBMIT_ARTIFACTS}/mpm/tools/guitar_presubmit \
+  --service_key="${PRESUBMIT_ARTIFACTS}/71274_kokoro_service_key_json" \
+  --env_params=version_kernel="${label}" \
+  --test_type=GUEST_KERNEL_VIDEO --wait
+
