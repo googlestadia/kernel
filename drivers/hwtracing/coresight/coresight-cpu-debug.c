@@ -379,9 +379,10 @@ static int debug_notifier_call(struct notifier_block *self,
 	int cpu;
 	struct debug_drvdata *drvdata;
 
-	mutex_lock(&debug_lock);
+	/* Bail out if we can't acquire the mutex or the functionality is off */
+	if (!mutex_trylock(&debug_lock))
+		return NOTIFY_DONE;
 
-	/* Bail out if the functionality is disabled */
 	if (!debug_enable)
 		goto skip_dump;
 
@@ -400,7 +401,7 @@ static int debug_notifier_call(struct notifier_block *self,
 
 skip_dump:
 	mutex_unlock(&debug_lock);
-	return 0;
+	return NOTIFY_DONE;
 }
 
 static struct notifier_block debug_notifier = {
@@ -627,7 +628,7 @@ err:
 	return ret;
 }
 
-static int debug_remove(struct amba_device *adev)
+static void debug_remove(struct amba_device *adev)
 {
 	struct device *dev = &adev->dev;
 	struct debug_drvdata *drvdata = amba_get_drvdata(adev);
@@ -642,8 +643,6 @@ static int debug_remove(struct amba_device *adev)
 
 	if (!--debug_count)
 		debug_func_exit();
-
-	return 0;
 }
 
 static const struct amba_cs_uci_id uci_id_debug[] = {

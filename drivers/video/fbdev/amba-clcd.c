@@ -771,12 +771,15 @@ static int clcdfb_of_vram_setup(struct clcd_fb *fb)
 		return -ENODEV;
 
 	fb->fb.screen_base = of_iomap(memory, 0);
-	if (!fb->fb.screen_base)
+	if (!fb->fb.screen_base) {
+		of_node_put(memory);
 		return -ENOMEM;
+	}
 
 	fb->fb.fix.smem_start = of_translate_address(memory,
 			of_get_address(memory, 0, &size, NULL));
 	fb->fb.fix.smem_len = size;
+	of_node_put(memory);
 
 	return 0;
 }
@@ -925,7 +928,7 @@ static int clcdfb_probe(struct amba_device *dev, const struct amba_id *id)
 	return ret;
 }
 
-static int clcdfb_remove(struct amba_device *dev)
+static void clcdfb_remove(struct amba_device *dev)
 {
 	struct clcd_fb *fb = amba_get_drvdata(dev);
 
@@ -942,8 +945,6 @@ static int clcdfb_remove(struct amba_device *dev)
 	kfree(fb);
 
 	amba_release_regions(dev);
-
-	return 0;
 }
 
 static const struct amba_id clcdfb_id_table[] = {

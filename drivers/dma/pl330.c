@@ -2591,7 +2591,7 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
 
 	/* If the DMAC pool is empty, alloc new */
 	if (!desc) {
-		DEFINE_SPINLOCK(lock);
+		static DEFINE_SPINLOCK(lock);
 		LIST_HEAD(pool);
 
 		if (!add_desc(&pool, &lock, GFP_ATOMIC, 1))
@@ -3199,7 +3199,7 @@ probe_err2:
 	return ret;
 }
 
-static int pl330_remove(struct amba_device *adev)
+static void pl330_remove(struct amba_device *adev)
 {
 	struct pl330_dmac *pl330 = amba_get_drvdata(adev);
 	struct dma_pl330_chan *pch, *_p;
@@ -3239,7 +3239,6 @@ static int pl330_remove(struct amba_device *adev)
 
 	if (pl330->rstc)
 		reset_control_assert(pl330->rstc);
-	return 0;
 }
 
 static const struct amba_id pl330_ids[] = {
