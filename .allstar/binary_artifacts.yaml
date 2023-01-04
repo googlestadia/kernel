@@ -1,0 +1,4 @@
+# Ignore reason: Upstream binary test files
+ignorePaths:
+- tools/perf/tests/pe-file.exe
+- tools/perf/tests/pe-file.exe.debug
